@@ -1,9 +1,8 @@
-import XCTest
+import Testing
 @testable import OpenClawLinuxFixture
 
-final class OpenClawLinuxFixtureTests: XCTestCase {
-    func testMarkerIsStable() {
-        let fixture = OpenClawLinuxFixture()
-        XCTAssertEqual(fixture.toolchainMarker(), "linux-fixture-ready")
-    }
+@Test
+func markerIsStable() {
+    let fixture = OpenClawLinuxFixture()
+    #expect(fixture.toolchainMarker() == "linux-fixture-ready")
 }

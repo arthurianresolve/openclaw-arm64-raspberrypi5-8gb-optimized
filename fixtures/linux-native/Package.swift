@@ -1,6 +1,8 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
+// Keep this fixture aligned with Swift 6.0-compatible dependencies.
+// On Linux Swift 6.0.3, explicitly depending on swift-testing remains the most reliable path.
 let package = Package(
     name: "OpenClawLinuxFixture",
     products: [
@@ -10,6 +12,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
         .package(url: "https://github.com/apple/swift-system.git", from: "1.2.0"),
+        .package(url: "https://github.com/swiftlang/swift-testing", from: "0.99.0"),
     ],
     targets: [
         .target(
@@ -25,7 +28,10 @@ let package = Package(
         ),
         .testTarget(
             name: "OpenClawLinuxFixtureTests",
-            dependencies: ["OpenClawLinuxFixture"]
+            dependencies: [
+                "OpenClawLinuxFixture",
+                .product(name: "Testing", package: "swift-testing"),
+            ]
         ),
     ]
 )

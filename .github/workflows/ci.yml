@@ -2122,6 +2122,23 @@ jobs:
           toolchain_key="$(printf '%s\n' "$swift_version" | sha256sum | awk '{print $1}')"
           echo "key=$toolchain_key" >> "$GITHUB_OUTPUT"
 
+      - name: Validate Swift toolchain floor
+        run: |
+          set -euo pipefail
+          swift_version="$(swift --version | head -n 1)"
+          swift_semver="$(printf '%s\n' "$swift_version" | sed -nE 's/^Swift version ([0-9]+)\.([0-9]+).*/\1.\2/p')"
+          if [ -z "$swift_semver" ]; then
+            echo "Unable to parse Swift version from: $swift_version" >&2
+            exit 1
+          fi
+          swift_major="${swift_semver%%.*}"
+          swift_minor="${swift_semver#*.}"
+          if [ "$swift_major" -lt 6 ]; then
+            echo "Swift $swift_semver is unsupported for linux-native fixture (require >= 6.0)." >&2
+            exit 1
+          fi
+          echo "Linux fixture Swift toolchain: $swift_version"
+
       - name: Cache SwiftPM
         uses: actions/cache@v5
         with:

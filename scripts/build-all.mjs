@@ -14,6 +14,7 @@ export const BUILD_ALL_STEPS = [
   { label: "canvas:a2ui:bundle", kind: "pnpm", pnpmArgs: ["canvas:a2ui:bundle"] },
   { label: "tsdown", kind: "node", args: ["scripts/tsdown-build.mjs"] },
   { label: "runtime-postbuild", kind: "node", args: ["scripts/runtime-postbuild.mjs"] },
+  { label: "ui:build", kind: "pnpm", pnpmArgs: ["ui:build"] },
   { label: "build-stamp", kind: "node", args: ["scripts/build-stamp.mjs"] },
   {
     label: "build:plugin-sdk:dts",
@@ -92,6 +93,7 @@ export const BUILD_ALL_PROFILES = {
     "canvas:a2ui:bundle",
     "tsdown",
     "runtime-postbuild",
+    "ui:build",
     "build-stamp",
     "build:plugin-sdk:dts",
     "write-plugin-sdk-entry-dts",

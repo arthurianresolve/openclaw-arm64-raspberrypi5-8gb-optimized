@@ -2114,6 +2114,11 @@ jobs:
           persist-credentials: false
           submodules: false
 
+      - name: Setup Swift 6.2
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.2"
+
       - name: Detect Swift toolchain cache key
         id: swift-toolchain
         run: |
@@ -2133,8 +2138,8 @@ jobs:
           fi
           swift_major="${swift_semver%%.*}"
           swift_minor="${swift_semver#*.}"
-          if [ "$swift_major" -lt 6 ]; then
-            echo "Swift $swift_semver is unsupported for linux-native fixture (require >= 6.0)." >&2
+          if [ "$swift_major" -lt 6 ] || { [ "$swift_major" -eq 6 ] && [ "$swift_minor" -lt 2 ]; }; then
+            echo "Swift $swift_semver is unsupported for linux-native fixture (require >= 6.2)." >&2
             exit 1
           fi
           echo "Linux fixture Swift toolchain: $swift_version"

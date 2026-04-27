@@ -122,7 +122,8 @@ The CI concurrency key is versioned (`CI-v7-*`) so a GitHub-side zombie in an ol
 pnpm changed:lanes   # inspect the local changed-lane classifier for origin/main...HEAD
 pnpm check:changed   # smart local gate: changed typecheck/lint/tests by boundary lane
 pnpm check          # fast local gate: production tsgo + sharded lint + parallel fast guards
-pnpm check:test-types
+pnpm check:types:required
+pnpm check:types:extended  # broader TS gate: tooling + root tests + QA Convex + src/ui/package test shards
 pnpm check:timed    # same gate with per-stage timings
 pnpm build:strict-smoke
 pnpm check:architecture

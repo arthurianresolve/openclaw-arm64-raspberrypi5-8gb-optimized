@@ -6,7 +6,7 @@
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { showPagedSelectList } from "./ui/paged-select";
+import { showPagedSelectList } from "./ui/paged-select.js";
 
 interface FileInfo {
   status: string;
@@ -100,8 +100,9 @@ export default function (pi: ExtensionAPI) {
         }
       };
 
+      const fileByPath = new Map(files.map((file) => [file.file, file] as const));
       const items = files.map((file) => ({
-        value: file,
+        value: file.file,
         label: `${file.status} ${file.file}`,
       }));
       await showPagedSelectList({
@@ -109,7 +110,10 @@ export default function (pi: ExtensionAPI) {
         title: " Select file to diff",
         items,
         onSelect: (item) => {
-          void openSelected(item.value as FileInfo);
+          const selected = fileByPath.get(item.value);
+          if (selected) {
+            void openSelected(selected);
+          }
         },
       });
     },

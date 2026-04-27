@@ -137,10 +137,6 @@ export default function promptUrlWidgetExtension(pi: ExtensionAPI) {
     renderPromptMatch(ctx, match);
   });
 
-  pi.on("session_switch", async (_event, ctx) => {
-    rebuildFromSession(ctx);
-  });
-
   const getUserText = (content: string | { type: string; text?: string }[] | undefined): string => {
     if (!content) {
       return "";

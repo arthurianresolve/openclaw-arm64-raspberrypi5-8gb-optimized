@@ -13,7 +13,11 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { resolveOpenClawAgentDir } from "../src/agents/agent-paths.js";
-import { ensureAuthProfileStore, type AuthProfileCredential } from "../src/agents/auth-profiles.js";
+import {
+  ensureAuthProfileStore,
+  type AuthProfileCredential,
+  type TokenCredential,
+} from "../src/agents/auth-profiles.js";
 import { normalizeProviderId } from "../src/agents/model-selection.js";
 import { validateAnthropicSetupToken } from "../src/commands/auth-token.js";
 import { callGateway } from "../src/gateway/call.js";
@@ -137,20 +141,19 @@ function isSetupToken(value: string): boolean {
   return value.startsWith("sk-ant-oat01-");
 }
 
+function isAnthropicTokenCredential(cred: AuthProfileCredential): cred is TokenCredential {
+  return cred.type === "token" && normalizeProviderId(cred.provider) === "anthropic";
+}
+
 function listSetupTokenProfiles(store: {
   profiles: Record<string, AuthProfileCredential>;
 }): Array<{ id: string; token: string }> {
-  return Object.entries(store.profiles)
-    .filter(([, cred]) => {
-      if (cred.type !== "token") {
-        return false;
-      }
-      if (normalizeProviderId(cred.provider) !== "anthropic") {
-        return false;
-      }
-      return isSetupToken(cred.token ?? "");
-    })
-    .map(([id, cred]) => ({ id, token: cred.token ?? "" }));
+  return Object.entries(store.profiles).flatMap(([id, cred]) => {
+    if (!isAnthropicTokenCredential(cred) || !isSetupToken(cred.token ?? "")) {
+      return [];
+    }
+    return [{ id, token: cred.token ?? "" }];
+  });
 }
 
 function pickSetupTokenProfile(candidates: Array<{ id: string; token: string }>): {
@@ -227,14 +230,16 @@ async function readRequestBody(req: http.IncomingMessage): Promise<Buffer> {
 }
 
 function extractProxyCapture(rawBody: string, req: http.IncomingMessage): ProxyCapture {
-  let parsed: {
+  type ParsedProxyBody = {
     system?: Array<{ text?: string }>;
     messages?: Array<{ role?: string; content?: unknown }>;
-  } | null = null;
+  };
+
+  let parsed: ParsedProxyBody | undefined;
   try {
-    parsed = JSON.parse(rawBody) as typeof parsed;
+    parsed = JSON.parse(rawBody) as ParsedProxyBody;
   } catch {
-    parsed = null;
+    parsed = undefined;
   }
   const systemTexts = Array.isArray(parsed?.system)
     ? parsed.system
@@ -301,9 +306,9 @@ async function startAnthropicProxy(params: { port: number; upstreamBaseUrl: stri
         body:
           method === "GET" || method === "HEAD" || requestBody.byteLength === 0
             ? undefined
-            : requestBody,
+            : new Uint8Array(requestBody),
         duplex: "half",
-      });
+      } as RequestInit & { duplex: "half" });
       const responseHeaders: Record<string, string> = {};
       for (const [key, value] of upstreamRes.headers.entries()) {
         const lower = key.toLowerCase();
@@ -618,15 +623,17 @@ async function runGatewayPrompt(prompt: string): Promise<PromptResult> {
     });
     const text = extractPayloadText(waitRes);
     const logTail = await readLogTail(logPath);
-    const matched400 = matchesExtraUsage400(waitRes.error, logTail, JSON.stringify(waitRes));
+    const waitError = typeof waitRes.error === "string" ? waitRes.error : undefined;
+    const waitStatus = typeof waitRes.status === "string" ? waitRes.status : undefined;
+    const matched400 = matchesExtraUsage400(waitError, logTail, JSON.stringify(waitRes));
     return {
       prompt,
-      ok: waitRes.status === "ok" && !matched400,
+      ok: waitStatus === "ok" && !matched400,
       transport: "gateway",
       promptMode: GATEWAY_PROMPT_MODE,
-      status: waitRes.status,
+      status: waitStatus,
       text: text || undefined,
-      error: waitRes.status === "ok" ? undefined : waitRes.error || logTail || "agent.wait failed",
+      error: waitStatus === "ok" ? undefined : waitError || logTail || "agent.wait failed",
       matchedExtraUsage400: matched400,
       capture: summarizeCapture(proxy?.getLastCapture(), prompt),
       tmpDir,

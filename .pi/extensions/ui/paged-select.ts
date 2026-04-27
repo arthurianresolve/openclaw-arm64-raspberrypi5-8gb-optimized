@@ -1,4 +1,4 @@
-import { DynamicBorder } from "@mariozechner/pi-coding-agent";
+import { DynamicBorder, type ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
 import {
   Container,
   Key,
@@ -8,28 +8,8 @@ import {
   Text,
 } from "@mariozechner/pi-tui";
 
-type CustomUiContext = {
-  ui: {
-    custom: <T>(
-      render: (
-        tui: { requestRender: () => void },
-        theme: {
-          fg: (tone: string, text: string) => string;
-          bold: (text: string) => string;
-        },
-        kb: unknown,
-        done: () => void,
-      ) => {
-        render: (width: number) => string;
-        invalidate: () => void;
-        handleInput: (data: string) => void;
-      },
-    ) => Promise<T>;
-  };
-};
-
 export async function showPagedSelectList(params: {
-  ctx: CustomUiContext;
+  ctx: Pick<ExtensionCommandContext, "ui">;
   title: string;
   items: SelectItem[];
   onSelect: (item: SelectItem) => void;

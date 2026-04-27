@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { runTelegramQaLive } from "../../extensions/qa-lab/src/live-transports/telegram/telegram-live.runtime.ts";
+import type { QaProviderModeInput } from "../../extensions/qa-lab/src/run-config.js";
 import { formatErrorMessage } from "../../src/infra/errors.ts";
 
 function parseBoolean(value: string | undefined) {
@@ -66,7 +67,9 @@ async function main() {
     outputDir,
     sutOpenClawCommand,
     preflightInstalledOnboarding: true,
-    providerMode: process.env.OPENCLAW_NPM_TELEGRAM_PROVIDER_MODE,
+    providerMode: process.env.OPENCLAW_NPM_TELEGRAM_PROVIDER_MODE as
+      | QaProviderModeInput
+      | undefined,
     primaryModel: process.env.OPENCLAW_NPM_TELEGRAM_MODEL,
     alternateModel: process.env.OPENCLAW_NPM_TELEGRAM_ALT_MODEL,
     fastMode: parseBoolean(process.env.OPENCLAW_NPM_TELEGRAM_FAST),

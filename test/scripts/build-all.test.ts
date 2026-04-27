@@ -124,11 +124,17 @@ describe("resolveBuildAllStep", () => {
 describe("resolveBuildAllSteps", () => {
   it("keeps the full profile aligned with the declared steps", () => {
     expect(resolveBuildAllSteps("full")).toEqual(BUILD_ALL_STEPS);
-    expect(BUILD_ALL_PROFILES.full).toEqual(BUILD_ALL_STEPS.map((step) => step.label));
+    expect(BUILD_ALL_PROFILES.full).toEqual(
+      BUILD_ALL_STEPS.map((step: (typeof BUILD_ALL_STEPS)[number]) => step.label),
+    );
   });
 
   it("uses a runtime artifact plus plugin SDK export profile for ci artifacts", () => {
-    expect(resolveBuildAllSteps("ciArtifacts").map((step) => step.label)).toEqual([
+    expect(
+      resolveBuildAllSteps("ciArtifacts").map(
+        (step: (typeof BUILD_ALL_STEPS)[number]) => step.label,
+      ),
+    ).toEqual([
       "canvas:a2ui:bundle",
       "tsdown",
       "runtime-postbuild",
@@ -146,21 +152,25 @@ describe("resolveBuildAllSteps", () => {
   });
 
   it("uses a minimal built runtime profile for gateway watch regression", () => {
-    expect(resolveBuildAllSteps("gatewayWatch").map((step) => step.label)).toEqual([
-      "tsdown",
-      "runtime-postbuild",
-      "build-stamp",
-    ]);
+    expect(
+      resolveBuildAllSteps("gatewayWatch").map(
+        (step: (typeof BUILD_ALL_STEPS)[number]) => step.label,
+      ),
+    ).toEqual(["tsdown", "runtime-postbuild", "build-stamp"]);
   });
 
   it("does not cache plugin-sdk entry shims over compiled JS", () => {
-    const step = BUILD_ALL_STEPS.find((entry) => entry.label === "write-plugin-sdk-entry-dts");
+    const step = BUILD_ALL_STEPS.find(
+      (entry: (typeof BUILD_ALL_STEPS)[number]) => entry.label === "write-plugin-sdk-entry-dts",
+    );
     expect(step).toBeTruthy();
     expect(step?.cache).toBeUndefined();
   });
 
   it("does not cache hook metadata over compiled hook handlers", () => {
-    const step = BUILD_ALL_STEPS.find((entry) => entry.label === "copy-hook-metadata");
+    const step = BUILD_ALL_STEPS.find(
+      (entry: (typeof BUILD_ALL_STEPS)[number]) => entry.label === "copy-hook-metadata",
+    );
     expect(step).toBeTruthy();
     expect(step?.cache).toBeUndefined();
   });

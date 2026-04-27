@@ -1,9 +1,20 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
+    "allowJs": true,
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["**/*.ts"],
+  "include": [
+    "**/*.ts",
+    "**/*.mjs",
+    "../knip.config.ts",
+    "../tsdown.config.ts",
+    "../vitest.config.ts",
+    "../apps/android/scripts/**/*.ts",
+    "../.pi/extensions/**/*.ts",
+    "../src/types/**/*.d.ts",
+    "../ui/src/ui/data/**/*.ts"
+  ],
   "exclude": ["pre-commit/**"]
 }

@@ -1,9 +1,10 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
+    "allowJs": true,
     "noEmit": true,
     "types": ["node", "vitest"]
   },
-  "include": ["**/*.ts"],
+  "include": ["**/*.ts", "**/*.mjs", "../scripts/**/*.mjs", "../src/types/**/*.d.ts"],
   "exclude": ["fixtures/**"]
 }

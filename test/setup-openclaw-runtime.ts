@@ -166,7 +166,7 @@ function createTestRegistryForSetup(
     commands: [],
     conversationBindingResolvedHandlers: [],
     diagnostics: [],
-  };
+  } as unknown as PluginRegistry;
 }
 
 function resolveSlackStubReplyToMode(params: {
@@ -239,11 +239,7 @@ const createStubPlugin = (params: {
   aliases?: string[];
   deliveryMode?: ChannelOutboundAdapter["deliveryMode"];
   preferSessionLookupForAnnounceTarget?: boolean;
-  resolveReplyToMode?: (params: {
-    cfg: OpenClawConfig;
-    accountId?: string | null;
-    chatType?: string | null;
-  }) => "off" | "first" | "all";
+  resolveReplyToMode?: ReplyToModeResolver;
 }): ChannelPlugin => ({
   id: params.id,
   meta: {
@@ -297,7 +293,9 @@ const createDefaultRegistry = () =>
       plugin: createStubPlugin({
         id: "discord",
         label: "Discord",
-        resolveReplyToMode: createTopLevelChannelReplyToModeResolverForTest("discord"),
+        resolveReplyToMode: createTopLevelChannelReplyToModeResolverForTest(
+          "discord",
+        ) as ReplyToModeResolver,
       }),
       source: "test",
     },
@@ -306,7 +304,8 @@ const createDefaultRegistry = () =>
       plugin: createStubPlugin({
         id: "slack",
         label: "Slack",
-        resolveReplyToMode: ({ cfg, chatType }) => resolveSlackStubReplyToMode({ cfg, chatType }),
+        resolveReplyToMode: (({ cfg, chatType }) =>
+          resolveSlackStubReplyToMode({ cfg, chatType })) as ReplyToModeResolver,
       }),
       source: "test",
     },
@@ -316,7 +315,9 @@ const createDefaultRegistry = () =>
         ...createStubPlugin({
           id: "telegram",
           label: "Telegram",
-          resolveReplyToMode: createTopLevelChannelReplyToModeResolverForTest("telegram"),
+          resolveReplyToMode: createTopLevelChannelReplyToModeResolverForTest(
+            "telegram",
+          ) as ReplyToModeResolver,
         }),
         status: {
           buildChannelSummary: async () => ({

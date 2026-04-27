@@ -19,12 +19,22 @@ describe("mockNodeBuiltinModule", () => {
     const homedir = () => "/tmp/home";
 
     const mocked = await mockNodeBuiltinModule(
-      async () => ({ tmpdir: () => "/tmp" }),
-      { homedir },
+      async () =>
+        ({
+          tmpdir: () => "/tmp",
+        }) as {
+          tmpdir: () => string;
+          homedir?: () => string;
+          default?: {
+            tmpdir: () => string;
+            homedir?: () => string;
+          };
+        },
+      { homedir } as { homedir: () => string },
       { mirrorToDefault: true },
     );
 
-    expect(mocked.default).toMatchObject({
+    expect((mocked as { default: object }).default).toMatchObject({
       homedir,
       tmpdir: expect.any(Function),
     });

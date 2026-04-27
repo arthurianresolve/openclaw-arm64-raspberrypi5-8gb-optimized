@@ -155,6 +155,32 @@ systemctl --user status openclaw-gateway.service
 journalctl --user -u openclaw-gateway.service -f
 ```
 
+## 8.5) Install the optimized QMD wrapper (recommended for memory search)
+
+If you plan to use the QMD memory backend on a Pi 5, install the repo-managed
+wrapper and MCP service after upstream QMD:
+
+```bash
+npm install -g @tobilu/qmd
+cd /data/openclaw
+./scripts/setup-qmd-system.sh --enable-service --enable-linger
+```
+
+Why this wrapper exists:
+
+- Keeps QMD state under a writable XDG home instead of fragile default paths
+- Forces CPU mode with `QMD_LLAMA_GPU=none`
+- Defaults `qmd query` to `--no-rerank`, which is much more practical on a
+  4-core ARM CPU
+- Installs an optional `qmd-mcp.service` user unit on port `8181`
+
+Verify:
+
+```bash
+qmd status
+systemctl --user status qmd-mcp.service
+```
+
 ## 9) Access the OpenClaw Dashboard
 
 Replace `user@gateway-host` with your Pi username and hostname or IP address.

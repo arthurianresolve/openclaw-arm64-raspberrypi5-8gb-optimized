@@ -29,6 +29,17 @@ binary, and can index content beyond your workspace memory files.
 - QMD must be on the gateway's `PATH`.
 - macOS and Linux work out of the box. Windows is best supported via WSL2.
 
+On Raspberry Pi or other CPU-only ARM64 hosts, install the repo's wrapper after
+installing upstream QMD:
+
+```bash
+./scripts/setup-qmd-system.sh --enable-service --enable-linger
+```
+
+That wrapper keeps QMD on a writable XDG home, forces CPU mode with
+`QMD_LLAMA_GPU=none`, and defaults `qmd query` to `--no-rerank` so first-party
+OpenClaw deployments do not stall on slow reranking.
+
 ### Enable
 
 ```json5
@@ -157,12 +168,15 @@ with no extra dependencies.
 
 ## Troubleshooting
 
-**QMD not found?** Ensure the binary is on the gateway's `PATH`. If OpenClaw
-runs as a service, create a symlink:
-`sudo ln -s ~/.bun/bin/qmd /usr/local/bin/qmd`.
+**QMD not found?** Ensure the binary is on the gateway's `PATH`. On ARM64
+service hosts, prefer the checked-in wrapper:
+`./scripts/setup-qmd-system.sh`.
 
 **First search very slow?** QMD downloads GGUF models on first use. Pre-warm
-with `qmd query "test"` using the same XDG dirs OpenClaw uses.
+with `qmd query "test"` using the same XDG dirs OpenClaw uses. The
+OpenClaw wrapper also defaults `qmd query` to `--no-rerank` on CPU-only
+installs; set `QMD_DEFAULT_QUERY_MODE=full` or pass `--no-rerank` /
+`--candidate-limit` explicitly if you want different behavior.
 
 **Search times out?** Increase `memory.qmd.limits.timeoutMs` (default: 4000ms).
 Set to `120000` for slower hardware.

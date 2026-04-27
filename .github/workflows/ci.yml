@@ -1511,7 +1511,7 @@ jobs:
               pnpm check:import-cycles
               ;;
             test-types)
-              pnpm check:test-types
+              pnpm check:types:extended
               ;;
             strict-smoke)
               # build-artifacts already runs the tsdown/runtime build for the same Node-relevant changes.

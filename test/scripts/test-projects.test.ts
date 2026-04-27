@@ -1000,7 +1000,7 @@ describe("scripts/test-projects parallel cache paths", () => {
       { cwd: "/repo", env: { OPENCLAW_VITEST_FS_MODULE_CACHE_PATH: "/tmp/cache" } },
     );
 
-    expect(spec?.env.OPENCLAW_VITEST_FS_MODULE_CACHE_PATH).toBeUndefined();
+    expect(spec?.env?.OPENCLAW_VITEST_FS_MODULE_CACHE_PATH).toBeUndefined();
   });
 });
 
@@ -1020,7 +1020,7 @@ describe("scripts/test-projects Vitest stall watchdog", () => {
       { env: { PATH: "/usr/bin" } },
     );
 
-    expect(spec?.env.OPENCLAW_VITEST_NO_OUTPUT_TIMEOUT_MS).toBe(
+    expect(spec?.env?.OPENCLAW_VITEST_NO_OUTPUT_TIMEOUT_MS).toBe(
       DEFAULT_TEST_PROJECTS_VITEST_NO_OUTPUT_TIMEOUT_MS,
     );
   });
@@ -1048,8 +1048,8 @@ describe("scripts/test-projects Vitest stall watchdog", () => {
       { env: { PATH: "/usr/bin" } },
     );
 
-    expect(specs[0]?.env.OPENCLAW_VITEST_NO_OUTPUT_TIMEOUT_MS).toBeUndefined();
-    expect(specs[1]?.env.OPENCLAW_VITEST_NO_OUTPUT_TIMEOUT_MS).toBe("0");
+    expect(specs[0]?.env?.OPENCLAW_VITEST_NO_OUTPUT_TIMEOUT_MS).toBeUndefined();
+    expect(specs[1]?.env?.OPENCLAW_VITEST_NO_OUTPUT_TIMEOUT_MS).toBe("0");
   });
 
   it("allows changed checks to disable automatic silent-run retries", () => {
@@ -1086,7 +1086,7 @@ describe("scripts/test-projects Vitest cache isolation", () => {
       { cwd: "/repo", env: {} },
     );
 
-    expect(specs.map((spec) => spec.env.OPENCLAW_VITEST_FS_MODULE_CACHE_PATH)).toEqual([
+    expect(specs.map((spec) => spec.env?.OPENCLAW_VITEST_FS_MODULE_CACHE_PATH)).toEqual([
       path.join(
         "/repo",
         "node_modules",

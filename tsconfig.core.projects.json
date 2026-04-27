@@ -1,4 +1,6 @@
 {
+  "extends": "./tsconfig.json",
   "files": [],
+  "include": [],
   "references": [{ "path": "./tsconfig.core.json" }, { "path": "./tsconfig.core.test.json" }]
 }

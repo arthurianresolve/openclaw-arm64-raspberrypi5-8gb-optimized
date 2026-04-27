@@ -27,4 +27,12 @@ declare module "web-push" {
     payload?: string | Buffer | null,
     options?: Record<string, unknown>,
   ): Promise<SendResult>;
+
+  const webPush: {
+    generateVAPIDKeys: typeof generateVAPIDKeys;
+    setVapidDetails: typeof setVapidDetails;
+    sendNotification: typeof sendNotification;
+  };
+
+  export default webPush;
 }

@@ -6,12 +6,8 @@ export function createAutoReplyReplyVitestConfig(env?: Record<string, string | u
     dir: "src/auto-reply",
     env,
     fileParallelism: false,
-    maxWorkers: 1,
     name: "auto-reply-reply",
-    sequence: {
-      groupOrder: 1,
-    },
-  });
+  } as Parameters<typeof createScopedVitestConfig>[1]);
 }
 
 export default createAutoReplyReplyVitestConfig();

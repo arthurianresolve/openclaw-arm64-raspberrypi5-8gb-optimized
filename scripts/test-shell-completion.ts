@@ -26,7 +26,7 @@
 import os from "node:os";
 import path from "node:path";
 import { confirm, isCancel } from "@clack/prompts";
-import { installCompletion } from "../src/cli/completion-cli.js";
+import { installCompletion } from "../src/cli/completion-runtime.js";
 import {
   checkShellCompletionStatus,
   ensureCompletionCacheExists,

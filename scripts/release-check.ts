@@ -489,6 +489,8 @@ function runPackedCliSmoke(params: {
           env,
           shell: false,
           windowsVerbatimArguments: true,
+        } as import("node:child_process").ExecFileSyncOptions & {
+          windowsVerbatimArguments: boolean;
         },
       );
       continue;

@@ -178,7 +178,9 @@ function createIsolatedRootHelpRenderContext(
       },
     },
     plugins: {
-      loadPaths: [],
+      load: {
+        paths: [],
+      },
     },
   };
   return { config, env };

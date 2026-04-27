@@ -272,7 +272,7 @@ async function connectGatewayOnce(params: {
   });
 
   return {
-    request(method, requestParams) {
+    request<T>(method: string, requestParams?: unknown) {
       const id = randomUUID();
       ws.send(
         JSON.stringify({
@@ -282,7 +282,7 @@ async function connectGatewayOnce(params: {
           params: requestParams ?? {},
         }),
       );
-      return new Promise((resolve, reject) => {
+      return new Promise<T>((resolve, reject) => {
         const timeout = setTimeout(() => {
           pending.delete(id);
           reject(new Error(`gateway request timeout: ${method}`));

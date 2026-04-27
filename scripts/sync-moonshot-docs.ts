@@ -1,16 +1,20 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  MOONSHOT_KIMI_K2_CONTEXT_WINDOW,
-  MOONSHOT_KIMI_K2_COST,
-  MOONSHOT_KIMI_K2_INPUT,
-  MOONSHOT_KIMI_K2_MAX_TOKENS,
-  MOONSHOT_KIMI_K2_MODELS,
-} from "../ui/src/ui/data/moonshot-kimi-k2";
+import { buildMoonshotProvider } from "../extensions/moonshot/provider-catalog.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..");
+const moonshotProvider = buildMoonshotProvider();
+const MOONSHOT_KIMI_K2_MODELS = moonshotProvider.models;
+const primaryMoonshotModel = MOONSHOT_KIMI_K2_MODELS[0];
+if (!primaryMoonshotModel) {
+  throw new Error("Moonshot provider catalog is empty.");
+}
+const MOONSHOT_KIMI_K2_INPUT = primaryMoonshotModel.input;
+const MOONSHOT_KIMI_K2_COST = primaryMoonshotModel.cost;
+const MOONSHOT_KIMI_K2_CONTEXT_WINDOW = primaryMoonshotModel.contextWindow;
+const MOONSHOT_KIMI_K2_MAX_TOKENS = primaryMoonshotModel.maxTokens;
 
 function replaceBlockLines(
   text: string,
@@ -51,36 +55,45 @@ function replaceBlockLines(
 }
 
 function renderKimiK2Ids(prefix: string) {
-  return [...MOONSHOT_KIMI_K2_MODELS.map((model) => `- \`${prefix}${model.id}\``), ""];
+  return [
+    ...MOONSHOT_KIMI_K2_MODELS.map(
+      (model: (typeof MOONSHOT_KIMI_K2_MODELS)[number]) => `- \`${prefix}${model.id}\``,
+    ),
+    "",
+  ];
 }
 
 function renderMoonshotAliases() {
-  return MOONSHOT_KIMI_K2_MODELS.map((model, index) => {
-    const isLast = index === MOONSHOT_KIMI_K2_MODELS.length - 1;
-    const suffix = isLast ? "" : ",";
-    return `"moonshot/${model.id}": { alias: "${model.alias}" }${suffix}`;
-  });
+  return MOONSHOT_KIMI_K2_MODELS.map(
+    (model: (typeof MOONSHOT_KIMI_K2_MODELS)[number], index: number) => {
+      const isLast = index === MOONSHOT_KIMI_K2_MODELS.length - 1;
+      const suffix = isLast ? "" : ",";
+      return `"moonshot/${model.id}": { alias: "${model.name}" }${suffix}`;
+    },
+  );
 }
 
 function renderMoonshotModels() {
   const input = JSON.stringify([...MOONSHOT_KIMI_K2_INPUT]);
   const cost = `input: ${MOONSHOT_KIMI_K2_COST.input}, output: ${MOONSHOT_KIMI_K2_COST.output}, cacheRead: ${MOONSHOT_KIMI_K2_COST.cacheRead}, cacheWrite: ${MOONSHOT_KIMI_K2_COST.cacheWrite}`;
 
-  return MOONSHOT_KIMI_K2_MODELS.flatMap((model, index) => {
-    const isLast = index === MOONSHOT_KIMI_K2_MODELS.length - 1;
-    const closing = isLast ? "}" : "},";
-    return [
-      "{",
-      `  id: "${model.id}",`,
-      `  name: "${model.name}",`,
-      `  reasoning: ${model.reasoning},`,
-      `  input: ${input},`,
-      `  cost: { ${cost} },`,
-      `  contextWindow: ${MOONSHOT_KIMI_K2_CONTEXT_WINDOW},`,
-      `  maxTokens: ${MOONSHOT_KIMI_K2_MAX_TOKENS}`,
-      closing,
-    ];
-  });
+  return MOONSHOT_KIMI_K2_MODELS.flatMap(
+    (model: (typeof MOONSHOT_KIMI_K2_MODELS)[number], index: number) => {
+      const isLast = index === MOONSHOT_KIMI_K2_MODELS.length - 1;
+      const closing = isLast ? "}" : "},";
+      return [
+        "{",
+        `  id: "${model.id}",`,
+        `  name: "${model.name}",`,
+        `  reasoning: ${model.reasoning},`,
+        `  input: ${input},`,
+        `  cost: { ${cost} },`,
+        `  contextWindow: ${MOONSHOT_KIMI_K2_CONTEXT_WINDOW},`,
+        `  maxTokens: ${MOONSHOT_KIMI_K2_MAX_TOKENS}`,
+        closing,
+      ];
+    },
+  );
 }
 
 async function syncMoonshotDocs() {

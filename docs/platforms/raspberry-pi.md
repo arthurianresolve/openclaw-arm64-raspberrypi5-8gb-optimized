@@ -159,7 +159,7 @@ If you plan to use the QMD memory backend on a Pi 5, install the repo-managed
 wrapper and MCP service after upstream QMD:
 
 ```bash
-npm install -g @tobilu/qmd
+npm install -g @tobilu/qmd@2.1.0
 cd /data/openclaw
 ./scripts/setup-qmd-system.sh --enable-service --enable-linger
 ```

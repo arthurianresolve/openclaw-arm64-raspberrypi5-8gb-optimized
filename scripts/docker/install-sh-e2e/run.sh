@@ -12,6 +12,7 @@ source "$VERIFY_HELPER_PATH"
 INSTALL_URL="${OPENCLAW_INSTALL_URL:-https://openclaw.bot/install.sh}"
 MODELS_MODE="${OPENCLAW_E2E_MODELS:-both}" # both|openai|anthropic
 INSTALL_TAG="${OPENCLAW_INSTALL_TAG:-latest}"
+INSTALL_PACKAGE_TGZ="${OPENCLAW_INSTALL_PACKAGE_TGZ:-}"
 E2E_PREVIOUS_VERSION="${OPENCLAW_INSTALL_E2E_PREVIOUS:-}"
 SKIP_PREVIOUS="${OPENCLAW_INSTALL_E2E_SKIP_PREVIOUS:-0}"
 OPENAI_API_KEY="${OPENAI_API_KEY:-}"
@@ -48,9 +49,24 @@ elif [[ "$MODELS_MODE" == "anthropic" && -z "$ANTHROPIC_API_TOKEN" && -z "$ANTHR
 fi
 
 echo "==> Resolve npm versions"
-EXPECTED_VERSION="$(quiet_npm view "openclaw@${INSTALL_TAG}" version)"
+if [[ -n "$INSTALL_PACKAGE_TGZ" ]]; then
+  if [[ ! -f "$INSTALL_PACKAGE_TGZ" ]]; then
+    echo "ERROR: OPENCLAW_INSTALL_PACKAGE_TGZ does not exist: $INSTALL_PACKAGE_TGZ" >&2
+    exit 2
+  fi
+  EXPECTED_VERSION="$(
+    tar -xOf "$INSTALL_PACKAGE_TGZ" package/package.json | node -e '
+const fs = require("node:fs");
+const pkg = JSON.parse(fs.readFileSync(0, "utf8"));
+if (typeof pkg.version !== "string" || pkg.version.length === 0) process.exit(1);
+process.stdout.write(pkg.version);
+'
+  )"
+else
+  EXPECTED_VERSION="$(quiet_npm view "openclaw@${INSTALL_TAG}" version)"
+fi
 if [[ -z "$EXPECTED_VERSION" || "$EXPECTED_VERSION" == "undefined" || "$EXPECTED_VERSION" == "null" ]]; then
-  echo "ERROR: unable to resolve openclaw@${INSTALL_TAG} version" >&2
+  echo "ERROR: unable to resolve candidate OpenClaw version" >&2
   exit 2
 fi
 if [[ -n "$E2E_PREVIOUS_VERSION" ]]; then
@@ -73,10 +89,13 @@ else
 fi
 
 echo "==> Run official installer one-liner"
-if [[ "$INSTALL_TAG" == "beta" ]]; then
-  OPENCLAW_BETA=1 curl -fsSL "$INSTALL_URL" | bash
+if [[ -n "$INSTALL_PACKAGE_TGZ" ]]; then
+  echo "==> Install candidate tarball"
+  quiet_npm install -g "$INSTALL_PACKAGE_TGZ"
+elif [[ "$INSTALL_TAG" == "beta" ]]; then
+  curl -fsSL "$INSTALL_URL" | OPENCLAW_BETA=1 bash
 elif [[ "$INSTALL_TAG" != "latest" ]]; then
-  OPENCLAW_VERSION="$INSTALL_TAG" curl -fsSL "$INSTALL_URL" | bash
+  curl -fsSL "$INSTALL_URL" | OPENCLAW_VERSION="$INSTALL_TAG" bash
 else
   curl -fsSL "$INSTALL_URL" | bash
 fi
@@ -501,7 +520,7 @@ run_profile() {
   local image_model
   if [[ "$agent_model_provider" == "openai" ]]; then
     agent_model="$(set_agent_model "$profile" \
-      "openai/gpt-5.4" \
+      "openai/gpt-5.5" \
       "openai/gpt-4o-mini" \
       "openai/gpt-4o")"
     image_model="$(set_image_model "$profile" \
@@ -544,6 +563,14 @@ run_profile() {
   }
   trap cleanup_profile EXIT
 
+  TURN1_JSON="/tmp/agent-${profile}-1.json"
+  TURN2_JSON="/tmp/agent-${profile}-2.json"
+  TURN2B_JSON="/tmp/agent-${profile}-2b.json"
+  TURN3_JSON="/tmp/agent-${profile}-3.json"
+  TURN3B_JSON="/tmp/agent-${profile}-3b.json"
+  TURN4_JSON="/tmp/agent-${profile}-4.json"
+  HEALTH_JSON="/tmp/health-${profile}.json"
+
   echo "==> Wait for health ($profile)"
   for _ in $(seq 1 240); do
     if openclaw --profile "$profile" health --timeout 5000 --json >/dev/null 2>&1; then
@@ -551,15 +578,13 @@ run_profile() {
     fi
     sleep 0.25
   done
-  openclaw --profile "$profile" health --timeout 60000 --json >/dev/null
+  if ! openclaw --profile "$profile" health --timeout 60000 --json >"$HEALTH_JSON" 2>&1; then
+    echo "ERROR: gateway health failed ($profile, output=$HEALTH_JSON)" >&2
+    dump_profile_debug "$profile" "$HEALTH_JSON" >&2 || true
+    return 1
+  fi
 
   echo "==> Agent turns ($profile)"
-  TURN1_JSON="/tmp/agent-${profile}-1.json"
-  TURN2_JSON="/tmp/agent-${profile}-2.json"
-  TURN2B_JSON="/tmp/agent-${profile}-2b.json"
-  TURN3_JSON="/tmp/agent-${profile}-3.json"
-  TURN3B_JSON="/tmp/agent-${profile}-3b.json"
-  TURN4_JSON="/tmp/agent-${profile}-4.json"
 
   run_agent_turn "$profile" "$SESSION_ID" \
     "Use the read tool (not exec) to read ${PROOF_TXT}. Reply with the exact contents only (no extra whitespace)." \

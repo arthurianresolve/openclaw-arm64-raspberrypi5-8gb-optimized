@@ -96,7 +96,6 @@ function createPrompter(params: {
   configure?: boolean;
   showBrewInstall?: boolean;
   multiselect?: string[];
-  recreate?: boolean;
 }): { prompter: WizardPrompter; notes: Array<{ title?: string; message: string }> } {
   const notes: Array<{ title?: string; message: string }> = [];
 
@@ -118,9 +117,6 @@ function createPrompter(params: {
       if (message === "Show Homebrew install command?") {
         return params.showBrewInstall ?? false;
       }
-      if (message.includes("Recreate ")) {
-        return params.recreate ?? false;
-      }
       return confirmAnswers.shift() ?? false;
     }),
     progress: vi.fn(() => ({ update: vi.fn(), stop: vi.fn() })),
@@ -138,6 +134,38 @@ const runtime: RuntimeEnv = {
 };
 
 describe("setupSkills", () => {
+  it("does not recommend Homebrew when user skips installing brew-backed deps", async () => {
+    if (process.platform === "win32") {
+      return;
+    }
+
+    mockMissingBrewStatus([
+      createBundledSkill({
+        name: "apple-reminders",
+        description: "macOS-only",
+        bins: ["remindctl"],
+        os: ["darwin"],
+        installLabel: "Install remindctl (brew)",
+      }),
+      createBundledSkill({
+        name: "video-frames",
+        description: "ffmpeg",
+        bins: ["ffmpeg"],
+        installLabel: "Install ffmpeg (brew)",
+      }),
+    ]);
+
+    const { prompter, notes } = createPrompter({ multiselect: ["__skip__"] });
+    await setupSkills({} as OpenClawConfig, "/tmp/ws", runtime, prompter);
+
+    // OS-mismatched skill should be counted as unsupported, not installable/missing.
+    const status = notes.find((n) => n.title === "Skills status")?.message ?? "";
+    expect(status).toContain("Unsupported on this OS: 1");
+
+    const brewNote = notes.find((n) => n.title === "Homebrew recommended");
+    expect(brewNote).toBeUndefined();
+  });
+
   it("recommends Homebrew when user selects a brew-backed install and brew is missing", async () => {
     if (process.platform === "win32") {
       return;
@@ -157,56 +185,5 @@ describe("setupSkills", () => {
 
     const brewNote = notes.find((n) => n.title === "Homebrew recommended");
     expect(brewNote).toBeDefined();
-  });
-
-  it("offers to recreate unsupported skills for the local Linux environment", async () => {
-    mockMissingBrewStatus([
-      createBundledSkill({
-        name: "ios-only",
-        description: "iOS-only skill",
-        bins: ["example"],
-        os: ["darwin"],
-        installLabel: "Install example",
-      }),
-    ]);
-
-    const { prompter, notes } = createPrompter({ recreate: true });
-    await setupSkills({} as OpenClawConfig, "/tmp/ws", runtime, prompter);
-
-    expect(prompter.confirm).toHaveBeenCalledWith({
-      message:
-        "Some skills are incompatible with this Linux host. Recreate their functionality for the local environment instead?",
-      initialValue: false,
-    });
-    expect(notes.find((n) => n.title === "Recreate locally")).toBeDefined();
-  });
-
-  it("offers to recreate local functionality when a selected install is incompatible", async () => {
-    mockMissingBrewStatus([
-      createBundledSkill({
-        name: "video-frames",
-        description: "ffmpeg",
-        bins: ["ffmpeg"],
-        installLabel: "Install ffmpeg (brew)",
-      }),
-    ]);
-    mocks.installSkill.mockResolvedValue({
-      ok: false,
-      message: "Skill not installed due to incompatibility with Linux.",
-      stdout: "",
-      stderr: "",
-      code: null,
-      incompatible: true,
-      recreateSuggested: true,
-    });
-
-    const { prompter, notes } = createPrompter({ multiselect: ["video-frames"], recreate: true });
-    await setupSkills({} as OpenClawConfig, "/tmp/ws", runtime, prompter);
-
-    expect(prompter.confirm).toHaveBeenCalledWith({
-      message: "Recreate video-frames functionality for this local Linux environment instead?",
-      initialValue: false,
-    });
-    expect(notes.find((n) => n.title === "Recreate locally")).toBeDefined();
   });
 });

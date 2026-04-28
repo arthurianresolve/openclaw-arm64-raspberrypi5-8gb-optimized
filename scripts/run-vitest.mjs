@@ -1,7 +1,6 @@
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import path from "node:path";
-import { fullSuiteVitestShards } from "../test/vitest/vitest.test-shards.mjs";
 import { resolveLocalVitestEnv } from "./lib/vitest-local-scheduling.mjs";
 import { spawnPnpmRunner } from "./pnpm-runner.mjs";
 import {
@@ -21,47 +20,6 @@ function isTruthyEnvValue(value) {
 function parsePositiveInt(value) {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
-function hasExplicitConfigLoader(argv) {
-  return argv.some((arg) => arg === "--configLoader" || arg.startsWith("--configLoader="));
-}
-
-function isTargetFileArg(value) {
-  if (!value || value.startsWith("-")) {
-    return false;
-  }
-  return value.startsWith("src/");
-}
-
-function resolveShardConfigForTargets(argv) {
-  const targets = argv.filter(isTargetFileArg).map((target) => target.replaceAll("\\", "/"));
-  if (targets.length === 0) {
-    return null;
-  }
-
-  const allAgents = targets.every((target) => target.startsWith("src/agents/"));
-  if (allAgents) {
-    return "test/vitest/vitest.agents.config.ts";
-  }
-
-  const allCommands = targets.every((target) => target.startsWith("src/commands/"));
-  if (allCommands) {
-    return "test/vitest/vitest.commands.config.ts";
-  }
-
-  const agenticTargets = targets.every(
-    (target) => target.startsWith("src/agents/") || target.startsWith("src/commands/"),
-  );
-  if (agenticTargets) {
-    return (
-      fullSuiteVitestShards.find(
-        (shard) => shard.config === "test/vitest/vitest.full-agentic.config.ts",
-      )?.config ?? null
-    );
-  }
-
-  return null;
 }
 
 export function resolveVitestNodeArgs(env = process.env) {
@@ -91,9 +49,6 @@ export function resolveVitestSpawnParams(env = process.env, platform = process.p
 
 export function resolveVitestSpawnEnv(env = process.env) {
   const nextEnv = resolveLocalVitestEnv(env);
-  if (!nextEnv.OPENCLAW_VITEST_FS_MODULE_CACHE_PATH?.trim()) {
-    nextEnv.OPENCLAW_VITEST_FS_MODULE_CACHE_PATH = "/data/tmp/openclaw-vitest-cache";
-  }
   if (!shouldApplyNativeWorkerBudget(nextEnv)) {
     return nextEnv;
   }
@@ -310,26 +265,11 @@ function main(argv = process.argv.slice(2), env = process.env) {
     process.exit(1);
   }
 
-  const configPath = argv.some((arg) => arg === "--config" || arg.startsWith("--config="))
-    ? null
-    : resolveShardConfigForTargets(argv);
-  const vitestArgs = [
-    ...(hasExplicitConfigLoader(argv) ? [] : ["--configLoader=runner"]),
-    ...(configPath ? ["--config", configPath] : []),
-    ...argv,
-  ];
-
   const { child, teardown } = spawnWatchedVitestProcess({
-    pnpmArgs: [
-      "exec",
-      "node",
-      ...resolveVitestNodeArgs(env),
-      resolveVitestCliEntry(),
-      ...vitestArgs,
-    ],
+    pnpmArgs: ["exec", "node", ...resolveVitestNodeArgs(env), resolveVitestCliEntry(), ...argv],
     spawnParams: resolveVitestSpawnParams(env),
     env,
-    label: vitestArgs.join(" "),
+    label: argv.join(" "),
   });
 
   child.on("exit", (code, signal) => {

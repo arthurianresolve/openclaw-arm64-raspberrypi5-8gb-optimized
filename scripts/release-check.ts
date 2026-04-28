@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
+  isBundledRuntimeDepsInstallStagePath,
   PACKAGE_DIST_INVENTORY_RELATIVE_PATH,
   writePackageDistInventory,
 } from "../src/infra/package-dist-inventory.ts";
@@ -587,6 +588,7 @@ export function collectForbiddenPackPaths(paths: Iterable<string>): string[] {
   return [...paths]
     .filter(
       (path) =>
+        isBundledRuntimeDepsInstallStagePath(path) ||
         forbiddenPrefixes.some((prefix) => path.startsWith(prefix)) ||
         /(^|\/)\.openclaw-runtime-deps-[^/]+(\/|$)/u.test(path) ||
         path.endsWith("/.openclaw-runtime-deps-stamp.json") ||
@@ -619,6 +621,35 @@ export function collectForbiddenPackContentPaths(
       }
       return forbiddenPrivateQaContentMarkers.some((marker) => content.includes(marker));
     })
+    .toSorted((left, right) => left.localeCompare(right));
+}
+
+export function collectInventoryPackMismatchErrors(
+  paths: Iterable<string>,
+  rootDir = process.cwd(),
+): string[] {
+  const packedPaths = new Set(paths);
+  if (!packedPaths.has(PACKAGE_DIST_INVENTORY_RELATIVE_PATH)) {
+    return [];
+  }
+
+  const inventoryPath = resolve(rootDir, PACKAGE_DIST_INVENTORY_RELATIVE_PATH);
+  let inventory: unknown;
+  try {
+    inventory = JSON.parse(readFileSync(inventoryPath, "utf8")) as unknown;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return [`invalid package dist inventory ${PACKAGE_DIST_INVENTORY_RELATIVE_PATH}: ${message}`];
+  }
+
+  if (!Array.isArray(inventory) || inventory.some((entry) => typeof entry !== "string")) {
+    return [`invalid package dist inventory ${PACKAGE_DIST_INVENTORY_RELATIVE_PATH}`];
+  }
+
+  return inventory
+    .map((entry) => entry.replace(/\\/g, "/"))
+    .filter((entry) => !packedPaths.has(entry))
+    .map((entry) => `inventory references missing npm pack entry ${entry}`)
     .toSorted((left, right) => left.localeCompare(right));
 }
 
@@ -799,12 +830,14 @@ async function main() {
     .toSorted((left, right) => left.localeCompare(right));
   const forbidden = collectForbiddenPackPaths(paths);
   const forbiddenContent = collectForbiddenPackContentPaths(paths);
+  const inventoryMismatch = collectInventoryPackMismatchErrors(paths);
   const sizeErrors = collectNpmPackUnpackedSizeErrors(results);
 
   if (
     missing.length > 0 ||
     forbidden.length > 0 ||
     forbiddenContent.length > 0 ||
+    inventoryMismatch.length > 0 ||
     sizeErrors.length > 0
   ) {
     if (missing.length > 0) {
@@ -835,6 +868,12 @@ async function main() {
       console.error("release-check: forbidden private QA markers in npm pack:");
       for (const path of forbiddenContent) {
         console.error(`  - ${path}`);
+      }
+    }
+    if (inventoryMismatch.length > 0) {
+      console.error("release-check: package dist inventory does not match npm pack:");
+      for (const error of inventoryMismatch) {
+        console.error(`  - ${error}`);
       }
     }
     if (sizeErrors.length > 0) {

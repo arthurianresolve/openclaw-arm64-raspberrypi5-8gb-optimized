@@ -55,18 +55,26 @@ Detailed guidance: [Browser troubleshooting](/tools/browser#cdp-startup-failure-
 ```bash
 openclaw browser status
 openclaw browser doctor
+openclaw browser doctor --deep
 openclaw browser start
+openclaw browser start --headless
 openclaw browser stop
 openclaw browser --browser-profile openclaw reset-profile
 ```
 
 Notes:
 
+- `doctor --deep` adds a live snapshot probe. It is useful when basic CDP
+  readiness is green but you want proof that the current tab can be inspected.
 - For `attachOnly` and remote CDP profiles, `openclaw browser stop` closes the
   active control session and clears temporary emulation overrides even when
   OpenClaw did not launch the browser process itself.
 - For local managed profiles, `openclaw browser stop` stops the spawned browser
   process.
+- `openclaw browser start --headless` applies only to that start request and
+  only when OpenClaw launches a local managed browser. It does not rewrite
+  `browser.headless` or profile config, and it is a no-op for an already-running
+  browser.
 - On Linux hosts without `DISPLAY` or `WAYLAND_DISPLAY`, local managed profiles
   run headless automatically unless `OPENCLAW_BROWSER_HEADLESS=0`,
   `browser.headless=false`, or `browser.profiles.<name>.headless=false`
@@ -133,6 +141,10 @@ the optional label, and the raw `targetId`. Agents should pass
 `suggestedTargetId` back into `focus`, `close`, snapshots, and actions. You can
 assign a label with `open --label`, `tab new --label`, or `tab label`; labels,
 tab ids, raw target ids, and unique target-id prefixes are all accepted.
+When Chromium replaces the underlying raw target during a navigation or form
+submit, OpenClaw keeps the stable `tabId`/label attached to the replacement tab
+when it can prove the match. Raw target ids remain volatile; prefer
+`suggestedTargetId`.
 
 ## Snapshot / screenshot / actions
 
@@ -179,6 +191,10 @@ openclaw browser fill --fields '[{"ref":"1","value":"Ada"}]'
 openclaw browser wait --text "Done"
 openclaw browser evaluate --fn '(el) => el.textContent' --ref <ref>
 ```
+
+Action responses return the current raw `targetId` after action-triggered page
+replacement when OpenClaw can prove the replacement tab. Scripts should still
+store and pass `suggestedTargetId`/labels for long-lived workflows.
 
 File + dialog helpers:
 

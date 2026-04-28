@@ -28,7 +28,7 @@ function hermeticEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
     OPENCLAW_BUNDLED_PLUGINS_DIR: undefined,
     OPENCLAW_DISABLE_PLUGIN_DISCOVERY_CACHE: "1",
     OPENCLAW_DISABLE_PLUGIN_MANIFEST_CACHE: "1",
-    OPENCLAW_VERSION: "2024.4.24",
+    OPENCLAW_VERSION: "2026.4.25",
     VITEST: "true",
     ...overrides,
   };
@@ -176,6 +176,7 @@ describe("resolveInstalledPluginProviderContributionIds", () => {
       resolveInstalledPluginProviderContributionIds({
         candidates: [candidate],
         env: hermeticEnv(),
+        preferPersisted: false,
       }),
     ).toEqual(["demo", "demo-alias"]);
   });
@@ -197,6 +198,7 @@ describe("resolveInstalledPluginProviderContributionIds", () => {
         },
       },
       env: hermeticEnv(),
+      preferPersisted: false,
     };
 
     expect(resolveInstalledPluginProviderContributionIds(params)).toEqual([]);

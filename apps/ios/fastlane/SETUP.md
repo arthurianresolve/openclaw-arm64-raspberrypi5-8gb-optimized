@@ -140,7 +140,7 @@ Versioning rules:
 - Supported pinned iOS versions use CalVer: `YYYY.M.D`
 - `pnpm ios:version:pin -- --from-gateway` promotes the current root gateway version into the pinned iOS release version
 - Fastlane uses the pinned iOS version only; changing `package.json.version` alone does not change the iOS app version
-- Fastlane sets `CFBundleShortVersionString` to the pinned iOS version, for example `2024.4.24`
+- Fastlane sets `CFBundleShortVersionString` to the pinned iOS version, for example `2026.4.10`
 - Fastlane resolves `CFBundleVersion` as the next integer TestFlight build number for that short version
 - Run `pnpm ios:version:sync` after changing `apps/ios/version.json` or `apps/ios/CHANGELOG.md`
 - `pnpm ios:version:check` validates that checked-in iOS version artifacts are in sync

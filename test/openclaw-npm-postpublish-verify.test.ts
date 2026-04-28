@@ -247,8 +247,8 @@ describe("collectInstalledMirroredRootDependencyManifestErrors", () => {
       });
       writePackageFile(packageRoot, "dist/extensions/matrix/package.json", {
         dependencies: {
-          "@matrix-org/matrix-sdk-crypto-nodejs": "^0.5.1",
-          "@matrix-org/matrix-sdk-crypto-wasm": "18.2.0",
+          "@matrix-org/matrix-sdk-crypto-nodejs": "^0.4.0",
+          "@matrix-org/matrix-sdk-crypto-wasm": "18.1.0",
         },
       });
       writeFileSync(

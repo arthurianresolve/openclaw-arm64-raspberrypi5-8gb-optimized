@@ -786,10 +786,16 @@ const prompter = {
     }
     return initialValue ?? true;
   },
-  select: async ({ message }) => {
+  select: async ({ message, options }) => {
     if (message === "Select a channel") {
       channelSelectCount += 1;
       return channelSelectCount === 1 ? "whatsapp" : "__done__";
+    }
+    if (message === "Install WhatsApp plugin?") {
+      if (!options?.some((option) => option.value === "local")) {
+        throw new Error(`missing bundled local install option: ${JSON.stringify(options)}`);
+      }
+      return "local";
     }
     if (message === "WhatsApp phone setup") {
       return "separate";
@@ -1095,9 +1101,24 @@ stage_root() {
   printf "%s/.openclaw/plugin-runtime-deps" "$HOME"
 }
 
+poison_home_npm_project() {
+  printf '{"name":"openclaw-home-prefix-poison","private":true}\n' >"$HOME/package.json"
+  rm -rf "$HOME/node_modules"
+  mkdir -p "$HOME/node_modules"
+  chmod 500 "$HOME/node_modules"
+}
+
 find_external_dep_package() {
   local dep_path="$1"
   find "$(stage_root)" -maxdepth 12 -path "*/node_modules/$dep_path/package.json" -type f -print -quit 2>/dev/null || true
+}
+
+assert_no_unknown_stage_roots() {
+  if find "$(stage_root)" -maxdepth 1 -type d -name 'openclaw-unknown-*' -print -quit 2>/dev/null | grep -q .; then
+    echo "runtime deps created second-generation unknown stage roots" >&2
+    find "$(stage_root)" -maxdepth 1 -type d -name 'openclaw-*' -print | sort >&2 || true
+    exit 1
+  fi
 }
 
 package_tgz="${OPENCLAW_CURRENT_PACKAGE_TGZ:?missing OPENCLAW_CURRENT_PACKAGE_TGZ}"
@@ -1209,6 +1230,23 @@ if (mode === "memory-lancedb") {
     },
   };
 }
+if (mode === "acpx") {
+  config.plugins = {
+    ...(config.plugins || {}),
+    enabled: true,
+    allow:
+      Array.isArray(config.plugins?.allow) && config.plugins.allow.length > 0
+        ? [...new Set([...config.plugins.allow, "acpx"])]
+        : config.plugins?.allow,
+    entries: {
+      ...(config.plugins?.entries || {}),
+      acpx: {
+        ...(config.plugins?.entries?.acpx || {}),
+        enabled: true,
+      },
+    },
+  };
+}
 
 fs.mkdirSync(path.dirname(configPath), { recursive: true });
 fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
@@ -1255,6 +1293,10 @@ assert_no_package_dep_available() {
       exit 1
     fi
   done
+  if [ -f "$HOME/node_modules/$dep_path/package.json" ]; then
+    echo "bundled runtime deps should not use HOME npm project for $channel: $HOME/node_modules/$dep_path/package.json" >&2
+    exit 1
+  fi
 }
 
 assert_dep_available() {
@@ -1357,6 +1399,7 @@ echo "Installing current candidate as update baseline..."
 echo "Update targets: $UPDATE_TARGETS"
 npm install -g "$package_tgz" --no-fund --no-audit >/tmp/openclaw-update-baseline-install.log 2>&1
 command -v openclaw >/dev/null
+poison_home_npm_project
 baseline_root="$(package_root)"
 test -d "$baseline_root/dist/extensions/telegram"
 test -d "$baseline_root/dist/extensions/feishu"
@@ -1379,6 +1422,7 @@ if should_run_update_target telegram; then
   cat /tmp/openclaw-update-telegram.json
   assert_update_ok /tmp/openclaw-update-telegram.json "$candidate_version"
   assert_dep_available telegram grammy
+  assert_no_unknown_stage_roots
 
   echo "Mutating installed package: remove Telegram deps, then update-mode doctor repairs them..."
   remove_runtime_dep telegram grammy
@@ -1389,6 +1433,7 @@ if should_run_update_target telegram; then
     exit 1
   fi
   assert_dep_available telegram grammy
+  assert_no_unknown_stage_roots
 fi
 
 if should_run_update_target discord; then
@@ -1437,6 +1482,7 @@ fi
 
 if should_run_update_target acpx; then
   echo "Removing ACPX runtime package and rerunning same-version update path..."
+  write_config acpx
   remove_runtime_dep acpx acpx
   assert_no_dep_available acpx acpx
   run_update_and_capture acpx /tmp/openclaw-update-acpx.json

@@ -23,6 +23,16 @@ on:
         required: false
         default: true
         type: boolean
+      docker_lanes:
+        description: Comma/space separated Docker scheduler lane names to run against the prepared image
+        required: false
+        default: ""
+        type: string
+      package_artifact_name:
+        description: Existing workflow artifact containing openclaw-current.tgz; blank lets lanes pack the selected ref
+        required: false
+        default: ""
+        type: string
       include_live_suites:
         description: Whether to run live-provider coverage
         required: false
@@ -54,6 +64,16 @@ on:
         required: false
         default: true
         type: boolean
+      docker_lanes:
+        description: Comma/space separated Docker scheduler lane names to run against the prepared image
+        required: false
+        default: ""
+        type: string
+      package_artifact_name:
+        description: Existing workflow artifact containing openclaw-current.tgz; blank lets lanes pack the selected ref
+        required: false
+        default: ""
+        type: string
       include_live_suites:
         description: Whether to run live-provider coverage
         required: false
@@ -182,6 +202,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           INPUT_REF: ${{ inputs.ref }}
+          WORKFLOW_REF_NAME: ${{ github.ref_name }}
         shell: bash
         run: |
           set -euo pipefail
@@ -189,9 +210,15 @@ jobs:
           trusted_reason=""
 
           git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if [[ "${WORKFLOW_REF_NAME}" =~ ^release/[0-9]{4}\.[1-9][0-9]*\.[1-9][0-9]*$ ]]; then
+            git fetch --no-tags origin "+refs/heads/${WORKFLOW_REF_NAME}:refs/remotes/origin/${WORKFLOW_REF_NAME}"
+          fi
 
           if git merge-base --is-ancestor "$selected_sha" refs/remotes/origin/main; then
             trusted_reason="main-ancestor"
+          elif [[ "${WORKFLOW_REF_NAME}" =~ ^release/[0-9]{4}\.[1-9][0-9]*\.[1-9][0-9]*$ ]] &&
+            [[ "$selected_sha" == "$(git rev-parse "refs/remotes/origin/${WORKFLOW_REF_NAME}")" ]]; then
+            trusted_reason="release-branch-head"
           elif git tag --points-at "$selected_sha" | grep -Eq '^v'; then
             trusted_reason="release-tag"
           else
@@ -208,7 +235,7 @@ jobs:
 
           if [[ -z "$trusted_reason" ]]; then
             echo "Ref '${INPUT_REF}' resolved to $selected_sha, which is not trusted for secret-bearing live/E2E checks." >&2
-            echo "Allowed refs must be on main, point to a release tag, or match an open PR head in ${GITHUB_REPOSITORY}." >&2
+            echo "Allowed refs must be on main, match the current release branch head, point to a release tag, or match an open PR head in ${GITHUB_REPOSITORY}." >&2
             exit 1
           fi
 
@@ -303,7 +330,7 @@ jobs:
             requires_live_suites: false
           - suite_id: openai-ws-stream-live-e2e
             label: OpenAI WebSocket live E2E
-            command: pnpm test:e2e -- src/agents/openai-ws-stream.e2e.test.ts
+            command: pnpm test:e2e src/agents/openai-ws-stream.e2e.test.ts
             timeout_minutes: 90
             requires_repo_e2e: false
             requires_live_suites: true
@@ -363,83 +390,23 @@ jobs:
 
   validate_docker_e2e:
     needs: [validate_selected_ref, prepare_docker_e2e_image]
-    if: inputs.include_release_path_suites
+    if: inputs.include_release_path_suites && inputs.docker_lanes == ''
+    name: Docker E2E (${{ matrix.label }})
     runs-on: blacksmith-32vcpu-ubuntu-2404
     timeout-minutes: ${{ matrix.timeout_minutes }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - suite_id: docker-onboard
-            label: Onboarding Docker E2E
-            command: pnpm test:docker:onboard
-            timeout_minutes: 60
-            release_path: true
-          - suite_id: docker-npm-onboard-channel-agent
-            label: Npm Onboard Channel Agent Docker E2E
-            command: pnpm test:docker:npm-onboard-channel-agent
-            timeout_minutes: 90
-            release_path: true
-          - suite_id: docker-gateway-network
-            label: Gateway Network Docker E2E
-            command: pnpm test:docker:gateway-network
-            timeout_minutes: 60
-            release_path: true
-          - suite_id: docker-openai-web-search-minimal
-            label: OpenAI Web Search Minimal Docker E2E
-            command: pnpm test:docker:openai-web-search-minimal
-            timeout_minutes: 60
-            release_path: true
-          - suite_id: docker-mcp-channels
-            label: MCP Channels Docker E2E
-            command: pnpm test:docker:mcp-channels
-            timeout_minutes: 60
-            release_path: true
-          - suite_id: docker-pi-bundle-mcp-tools
-            label: Pi Bundle MCP Tools Docker E2E
-            command: pnpm test:docker:pi-bundle-mcp-tools
-            timeout_minutes: 60
-            release_path: true
-          - suite_id: docker-cron-mcp-cleanup
-            label: Cron MCP Cleanup Docker E2E
-            command: pnpm test:docker:cron-mcp-cleanup
-            timeout_minutes: 60
-            release_path: true
-          - suite_id: docker-plugins
-            label: Plugins Docker E2E
-            command: pnpm test:docker:plugins
-            timeout_minutes: 75
-            release_path: true
-          - suite_id: docker-plugin-update
-            label: Plugin Update Docker E2E
-            command: pnpm test:docker:plugin-update
-            timeout_minutes: 60
-            release_path: true
-          - suite_id: docker-config-reload
-            label: Config Reload Docker E2E
-            command: pnpm test:docker:config-reload
-            timeout_minutes: 60
-            release_path: true
-          - suite_id: docker-bundled-channel-deps
-            label: Bundled Channel Runtime Deps Docker E2E
-            command: pnpm test:docker:bundled-channel-deps
-            timeout_minutes: 75
-            release_path: true
-          - suite_id: docker-doctor-switch
-            label: Doctor Install Switch Docker E2E
-            command: pnpm test:docker:doctor-switch
-            timeout_minutes: 60
-            release_path: true
-          - suite_id: docker-qr
-            label: QR Import Docker E2E
-            command: pnpm test:docker:qr
-            timeout_minutes: 60
-            release_path: true
-          - suite_id: docker-install-e2e
-            label: Installer Docker E2E
-            command: pnpm test:install:e2e
+          - chunk_id: core
+            label: core
             timeout_minutes: 120
-            release_path: true
+          - chunk_id: package-update
+            label: package/update
+            timeout_minutes: 180
+          - chunk_id: plugins-integrations
+            label: plugins/integrations
+            timeout_minutes: 180
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
@@ -486,7 +453,12 @@ jobs:
       OPENCLAW_GEMINI_SETTINGS_JSON: ${{ secrets.OPENCLAW_GEMINI_SETTINGS_JSON }}
       FIREWORKS_API_KEY: ${{ secrets.FIREWORKS_API_KEY }}
       OPENCLAW_DOCKER_E2E_IMAGE: ${{ needs.prepare_docker_e2e_image.outputs.image }}
+      OPENCLAW_CURRENT_PACKAGE_TGZ: ${{ inputs.package_artifact_name != '' && '.artifacts/docker-e2e-package/openclaw-current.tgz' || '' }}
+      OPENCLAW_BUNDLED_CHANNEL_PACKAGE_TGZ: ${{ inputs.package_artifact_name != '' && '.artifacts/docker-e2e-package/openclaw-current.tgz' || '' }}
+      OPENCLAW_NPM_ONBOARD_PACKAGE_TGZ: ${{ inputs.package_artifact_name != '' && '.artifacts/docker-e2e-package/openclaw-current.tgz' || '' }}
       OPENCLAW_SKIP_DOCKER_BUILD: "1"
+      INCLUDE_OPENWEBUI: ${{ inputs.include_openwebui }}
+      DOCKER_E2E_CHUNK: ${{ matrix.chunk_id }}
     steps:
       - name: Checkout selected ref
         uses: actions/checkout@v6
@@ -511,22 +483,41 @@ jobs:
       - name: Hydrate live auth/profile inputs
         run: bash scripts/ci-hydrate-live-auth.sh
 
-      - name: Configure suite-specific env
+      - name: Pull shared Docker E2E image
         shell: bash
         run: |
           set -euo pipefail
-          case "${{ matrix.suite_id }}" in
-            docker-install-e2e)
-              echo "OPENCLAW_E2E_MODELS=both" >> "$GITHUB_ENV"
-              ;;
-          esac
+          docker pull "${OPENCLAW_DOCKER_E2E_IMAGE}"
 
-      - name: Validate suite credentials
+      - name: Download package-under-test artifact
+        if: inputs.package_artifact_name != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.package_artifact_name }}
+          path: .artifacts/docker-e2e-package
+
+      - name: Normalize package-under-test artifact
+        if: inputs.package_artifact_name != ''
         shell: bash
         run: |
           set -euo pipefail
-          case "${{ matrix.suite_id }}" in
-            docker-install-e2e)
+          target=".artifacts/docker-e2e-package/openclaw-current.tgz"
+          if [[ ! -f "$target" ]]; then
+            mapfile -t tgzs < <(find .artifacts/docker-e2e-package -type f -name '*.tgz' | sort)
+            if [[ "${#tgzs[@]}" -ne 1 ]]; then
+              echo "Expected exactly one package tarball in .artifacts/docker-e2e-package; found ${#tgzs[@]}." >&2
+              printf '%s\n' "${tgzs[@]}" >&2
+              exit 1
+            fi
+            cp "${tgzs[0]}" "$target"
+          fi
+
+      - name: Validate chunk credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${DOCKER_E2E_CHUNK}" in
+            package-update)
               [[ -n "${OPENAI_API_KEY:-}" ]] || {
                 echo "OPENAI_API_KEY is required for installer Docker E2E." >&2
                 exit 1
@@ -536,14 +527,258 @@ jobs:
                 exit 1
               fi
               ;;
+            plugins-integrations)
+              if [[ "${INCLUDE_OPENWEBUI}" == "true" ]]; then
+                [[ -n "${OPENAI_API_KEY:-}" ]] || {
+                  echo "OPENAI_API_KEY is required for the Open WebUI Docker smoke." >&2
+                  exit 1
+                }
+              fi
+              ;;
           esac
 
-      - name: Run ${{ matrix.label }}
-        run: ${{ matrix.command }}
+      - name: Run Docker E2E chunk
+        shell: bash
+        run: |
+          set -euo pipefail
+          export OPENCLAW_DOCKER_ALL_PROFILE=release-path
+          export OPENCLAW_DOCKER_ALL_CHUNK="${DOCKER_E2E_CHUNK}"
+          export OPENCLAW_DOCKER_ALL_BUILD=0
+          export OPENCLAW_DOCKER_ALL_PREFLIGHT=0
+          export OPENCLAW_DOCKER_ALL_FAIL_FAST=0
+          export OPENCLAW_DOCKER_ALL_INCLUDE_OPENWEBUI="${INCLUDE_OPENWEBUI}"
+          export OPENCLAW_DOCKER_ALL_LOG_DIR=".artifacts/docker-tests/release-${DOCKER_E2E_CHUNK}"
+          export OPENCLAW_DOCKER_ALL_TIMINGS_FILE=".artifacts/docker-tests/release-${DOCKER_E2E_CHUNK}-timings.json"
+          export OPENCLAW_DOCKER_ALL_PNPM_COMMAND="$(command -v pnpm)"
+
+          pnpm test:docker:all
+
+      - name: Summarize Docker E2E chunk
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          summary=".artifacts/docker-tests/release-${DOCKER_E2E_CHUNK}/summary.json"
+          if [[ ! -f "$summary" ]]; then
+            echo "Docker chunk summary missing: \`$summary\`" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          node --input-type=module - "$summary" <<'NODE' >> "$GITHUB_STEP_SUMMARY"
+          import fs from "node:fs";
+          const summary = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          const lanes = Array.isArray(summary.lanes) ? summary.lanes : [];
+          console.log(`### Docker E2E chunk: ${summary.chunk ?? "unknown"}`);
+          console.log("");
+          console.log(`Status: \`${summary.status}\``);
+          console.log("");
+          console.log("| Lane | Status | Seconds | Timed out | Rerun |");
+          console.log("| --- | ---: | ---: | --- | --- |");
+          for (const lane of lanes) {
+            const status = lane.status === 0 ? "pass" : `fail ${lane.status}`;
+            const rerun = String(lane.rerunCommand ?? "").replaceAll("`", "\\`");
+            console.log(`| \`${lane.name}\` | ${status} | ${lane.elapsedSeconds ?? ""} | ${lane.timedOut ? "yes" : "no"} | \`${rerun}\` |`);
+          }
+          NODE
+
+      - name: Upload Docker E2E chunk artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: docker-e2e-${{ matrix.chunk_id }}
+          path: .artifacts/docker-tests/
+          if-no-files-found: ignore
+
+  validate_docker_lanes:
+    needs: [validate_selected_ref, prepare_docker_e2e_image]
+    if: inputs.docker_lanes != ''
+    name: Docker E2E targeted lanes
+    runs-on: blacksmith-32vcpu-ubuntu-2404
+    timeout-minutes: 180
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ANTHROPIC_API_TOKEN: ${{ secrets.ANTHROPIC_API_TOKEN }}
+      ANTHROPIC_API_KEY_OLD: ${{ secrets.ANTHROPIC_API_KEY_OLD }}
+      BYTEPLUS_API_KEY: ${{ secrets.BYTEPLUS_API_KEY }}
+      CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+      DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      KIMI_API_KEY: ${{ secrets.KIMI_API_KEY }}
+      MODELSTUDIO_API_KEY: ${{ secrets.MODELSTUDIO_API_KEY }}
+      MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+      MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      OPENCODE_ZEN_API_KEY: ${{ secrets.OPENCODE_ZEN_API_KEY }}
+      OPENCLAW_LIVE_BROWSER_CDP_URL: ${{ secrets.OPENCLAW_LIVE_BROWSER_CDP_URL }}
+      OPENCLAW_LIVE_SETUP_TOKEN: ${{ secrets.OPENCLAW_LIVE_SETUP_TOKEN }}
+      OPENCLAW_LIVE_SETUP_TOKEN_MODEL: ${{ secrets.OPENCLAW_LIVE_SETUP_TOKEN_MODEL }}
+      OPENCLAW_LIVE_SETUP_TOKEN_PROFILE: ${{ secrets.OPENCLAW_LIVE_SETUP_TOKEN_PROFILE }}
+      OPENCLAW_LIVE_SETUP_TOKEN_VALUE: ${{ secrets.OPENCLAW_LIVE_SETUP_TOKEN_VALUE }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      QWEN_API_KEY: ${{ secrets.QWEN_API_KEY }}
+      FAL_KEY: ${{ secrets.FAL_KEY }}
+      RUNWAY_API_KEY: ${{ secrets.RUNWAY_API_KEY }}
+      DEEPGRAM_API_KEY: ${{ secrets.DEEPGRAM_API_KEY }}
+      TOGETHER_API_KEY: ${{ secrets.TOGETHER_API_KEY }}
+      VYDRA_API_KEY: ${{ secrets.VYDRA_API_KEY }}
+      XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+      ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+      Z_AI_API_KEY: ${{ secrets.Z_AI_API_KEY }}
+      BYTEPLUS_ACCESS_KEY_ID: ${{ secrets.BYTEPLUS_ACCESS_KEY_ID }}
+      BYTEPLUS_SECRET_ACCESS_KEY: ${{ secrets.BYTEPLUS_SECRET_ACCESS_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      OPENCLAW_CODEX_AUTH_JSON: ${{ secrets.OPENCLAW_CODEX_AUTH_JSON }}
+      OPENCLAW_CODEX_CONFIG_TOML: ${{ secrets.OPENCLAW_CODEX_CONFIG_TOML }}
+      OPENCLAW_CLAUDE_JSON: ${{ secrets.OPENCLAW_CLAUDE_JSON }}
+      OPENCLAW_CLAUDE_CREDENTIALS_JSON: ${{ secrets.OPENCLAW_CLAUDE_CREDENTIALS_JSON }}
+      OPENCLAW_CLAUDE_SETTINGS_JSON: ${{ secrets.OPENCLAW_CLAUDE_SETTINGS_JSON }}
+      OPENCLAW_CLAUDE_SETTINGS_LOCAL_JSON: ${{ secrets.OPENCLAW_CLAUDE_SETTINGS_LOCAL_JSON }}
+      OPENCLAW_GEMINI_SETTINGS_JSON: ${{ secrets.OPENCLAW_GEMINI_SETTINGS_JSON }}
+      FIREWORKS_API_KEY: ${{ secrets.FIREWORKS_API_KEY }}
+      OPENCLAW_DOCKER_E2E_IMAGE: ${{ needs.prepare_docker_e2e_image.outputs.image }}
+      OPENCLAW_CURRENT_PACKAGE_TGZ: ${{ inputs.package_artifact_name != '' && '.artifacts/docker-e2e-package/openclaw-current.tgz' || '' }}
+      OPENCLAW_BUNDLED_CHANNEL_PACKAGE_TGZ: ${{ inputs.package_artifact_name != '' && '.artifacts/docker-e2e-package/openclaw-current.tgz' || '' }}
+      OPENCLAW_NPM_ONBOARD_PACKAGE_TGZ: ${{ inputs.package_artifact_name != '' && '.artifacts/docker-e2e-package/openclaw-current.tgz' || '' }}
+      OPENCLAW_SKIP_DOCKER_BUILD: "1"
+      INCLUDE_OPENWEBUI: ${{ inputs.include_openwebui }}
+      DOCKER_E2E_LANES: ${{ inputs.docker_lanes }}
+    steps:
+      - name: Checkout selected ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate_selected_ref.outputs.selected_sha }}
+          fetch-depth: 1
+
+      - name: Log in to GHCR for shared Docker E2E image
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Setup Node environment
+        uses: ./.github/actions/setup-node-env
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          pnpm-version: ${{ env.PNPM_VERSION }}
+          install-bun: "true"
+
+      - name: Hydrate live auth/profile inputs
+        run: bash scripts/ci-hydrate-live-auth.sh
+
+      - name: Pull shared Docker E2E image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull "${OPENCLAW_DOCKER_E2E_IMAGE}"
+
+      - name: Download package-under-test artifact
+        if: inputs.package_artifact_name != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.package_artifact_name }}
+          path: .artifacts/docker-e2e-package
+
+      - name: Normalize package-under-test artifact
+        if: inputs.package_artifact_name != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          target=".artifacts/docker-e2e-package/openclaw-current.tgz"
+          if [[ ! -f "$target" ]]; then
+            mapfile -t tgzs < <(find .artifacts/docker-e2e-package -type f -name '*.tgz' | sort)
+            if [[ "${#tgzs[@]}" -ne 1 ]]; then
+              echo "Expected exactly one package tarball in .artifacts/docker-e2e-package; found ${#tgzs[@]}." >&2
+              printf '%s\n' "${tgzs[@]}" >&2
+              exit 1
+            fi
+            cp "${tgzs[0]}" "$target"
+          fi
+
+      - name: Validate targeted lane credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          lanes=" ${DOCKER_E2E_LANES//,/ } "
+          if [[ "$lanes" == *" install-e2e "* ]]; then
+            [[ -n "${OPENAI_API_KEY:-}" ]] || {
+              echo "OPENAI_API_KEY is required for installer Docker E2E." >&2
+              exit 1
+            }
+            if [[ -z "${ANTHROPIC_API_TOKEN:-}" && -z "${ANTHROPIC_API_KEY:-}" ]]; then
+              echo "ANTHROPIC_API_TOKEN or ANTHROPIC_API_KEY is required for installer Docker E2E." >&2
+              exit 1
+            fi
+          fi
+          if [[ "$lanes" == *" openwebui "* || "$lanes" == *" openai-web-search-minimal "* ]]; then
+            [[ -n "${OPENAI_API_KEY:-}" ]] || {
+              echo "OPENAI_API_KEY is required for selected OpenAI Docker lanes." >&2
+              exit 1
+            }
+          fi
+
+      - name: Run targeted Docker E2E lanes
+        shell: bash
+        run: |
+          set -euo pipefail
+          lanes=" ${DOCKER_E2E_LANES//,/ } "
+          export OPENCLAW_DOCKER_ALL_LANES="${DOCKER_E2E_LANES}"
+          export OPENCLAW_DOCKER_ALL_PREFLIGHT=0
+          export OPENCLAW_DOCKER_ALL_FAIL_FAST=0
+          export OPENCLAW_DOCKER_ALL_INCLUDE_OPENWEBUI="${INCLUDE_OPENWEBUI}"
+          export OPENCLAW_DOCKER_ALL_LOG_DIR=".artifacts/docker-tests/targeted"
+          export OPENCLAW_DOCKER_ALL_TIMINGS_FILE=".artifacts/docker-tests/targeted-timings.json"
+          export OPENCLAW_DOCKER_ALL_PNPM_COMMAND="$(command -v pnpm)"
+          if [[ "$lanes" == *" live-"* ]]; then
+            export OPENCLAW_DOCKER_ALL_BUILD=1
+          else
+            export OPENCLAW_DOCKER_ALL_BUILD=0
+          fi
+
+          pnpm test:docker:all
+
+      - name: Summarize targeted Docker E2E lanes
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          summary=".artifacts/docker-tests/targeted/summary.json"
+          if [[ ! -f "$summary" ]]; then
+            echo "Docker targeted summary missing: \`$summary\`" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          node --input-type=module - "$summary" <<'NODE' >> "$GITHUB_STEP_SUMMARY"
+          import fs from "node:fs";
+          const summary = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          const lanes = Array.isArray(summary.lanes) ? summary.lanes : [];
+          console.log("### Docker E2E targeted lanes");
+          console.log("");
+          console.log(`Status: \`${summary.status}\``);
+          console.log("");
+          console.log("| Lane | Status | Seconds | Timed out | Rerun |");
+          console.log("| --- | ---: | ---: | --- | --- |");
+          for (const lane of lanes) {
+            const status = lane.status === 0 ? "pass" : `fail ${lane.status}`;
+            const rerun = String(lane.rerunCommand ?? "").replaceAll("`", "\\`");
+            console.log(`| \`${lane.name}\` | ${status} | ${lane.elapsedSeconds ?? ""} | ${lane.timedOut ? "yes" : "no"} | \`${rerun}\` |`);
+          }
+          NODE
+
+      - name: Upload targeted Docker E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: docker-e2e-targeted
+          path: .artifacts/docker-tests/
+          if-no-files-found: ignore
 
   validate_docker_openwebui:
     needs: [validate_selected_ref, prepare_docker_e2e_image]
-    if: inputs.include_openwebui
+    if: inputs.include_openwebui && !inputs.include_release_path_suites && inputs.docker_lanes == ''
     runs-on: blacksmith-32vcpu-ubuntu-2404
     timeout-minutes: 75
     env:
@@ -586,7 +821,7 @@ jobs:
 
   prepare_docker_e2e_image:
     needs: validate_selected_ref
-    if: inputs.include_release_path_suites || inputs.include_openwebui
+    if: inputs.include_release_path_suites || inputs.include_openwebui || inputs.docker_lanes != ''
     runs-on: blacksmith-32vcpu-ubuntu-2404
     timeout-minutes: 90
     permissions:
@@ -636,7 +871,8 @@ jobs:
           cache-from: type=gha,scope=docker-e2e
           cache-to: type=gha,mode=max,scope=docker-e2e
           tags: ${{ steps.image.outputs.image }}
-          provenance: false
+          sbom: true
+          provenance: mode=max
           push: true
 
   validate_live_models_docker:

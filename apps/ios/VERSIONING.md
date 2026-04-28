@@ -20,26 +20,28 @@ Supported pinned format:
 
 Examples:
 
-- `2024.4.24`
+- `2026.4.6`
+- `2026.4.10`
 
 The root gateway version in `package.json` may still be one of:
 
 - `YYYY.M.D`
+- `YYYY.M.D-beta.N`
 - `YYYY.M.D-N`
 
 When you pin iOS from the gateway version, the iOS tooling strips the gateway suffix and keeps only the base CalVer.
 
 Examples:
 
-- gateway `2024.4.24` -> iOS `2024.4.24`
-- gateway `2024.4.24-1` -> iOS `2024.4.24`
-- gateway `2024.4.24-2` -> iOS `2024.4.24`
+- gateway `2026.4.10` -> iOS `2026.4.10`
+- gateway `2026.4.10-beta.3` -> iOS `2026.4.10`
+- gateway `2026.4.10-2` -> iOS `2026.4.10`
 
 ## Apple bundle mapping
 
-Pinned iOS version `2024.4.24` maps to:
+Pinned iOS version `2026.4.10` maps to:
 
-- `CFBundleShortVersionString = 2024.4.24`
+- `CFBundleShortVersionString = 2026.4.10`
 - `CFBundleVersion = numeric build number only`
 
 `CFBundleShortVersionString` stays fixed for a TestFlight train until you intentionally pin a newer iOS release version.
@@ -94,7 +96,7 @@ Pinned iOS version `2024.4.24` maps to:
 
 When generating `apps/ios/fastlane/metadata/en-US/release_notes.txt`, the tooling reads the first available changelog section in this order:
 
-1. exact pinned version, for example `## 2024.4.24`
+1. exact pinned version, for example `## 2026.4.10`
 2. `## Unreleased`
 
 Recommended workflow:
@@ -109,7 +111,7 @@ pnpm ios:version
 pnpm ios:version:check
 pnpm ios:version:sync
 pnpm ios:version:pin -- --from-gateway
-pnpm ios:version:pin -- --version 2024.4.24
+pnpm ios:version:pin -- --version 2026.4.10
 ```
 
 ## Normal TestFlight iteration workflow

@@ -73,30 +73,6 @@ export async function setupSkills(
     "Skills status",
   );
 
-  if (unsupportedOs.length > 0) {
-    const recreateUnsupported = await prompter.confirm({
-      message:
-        "Some skills are incompatible with this Linux host. Recreate their functionality for the local environment instead?",
-      initialValue: false,
-    });
-    if (recreateUnsupported) {
-      const preview = unsupportedOs
-        .slice(0, 4)
-        .map((skill) => skill.name)
-        .join(", ");
-      await prompter.note(
-        [
-          "The listed skills are not installed because they are incompatible with this host.",
-          preview ? `Skills: ${preview}` : undefined,
-          "Recreate the behavior as a local tool, skill, or plugin implementation that fits Linux.",
-        ]
-          .filter(Boolean)
-          .join("\n"),
-        "Recreate locally",
-      );
-    }
-  }
-
   const shouldConfigure = await prompter.confirm({
     message: "Configure skills now? (recommended)",
     initialValue: true,
@@ -219,21 +195,6 @@ export async function setupSkills(
         `Tip: run \`${formatCliCommand("openclaw doctor")}\` to review skills + requirements.`,
       );
       runtime.log("Docs: https://docs.openclaw.ai/skills");
-      if (result.incompatible) {
-        const recreate = await prompter.confirm({
-          message: `Recreate ${name} functionality for this local Linux environment instead?`,
-          initialValue: false,
-        });
-        if (recreate) {
-          await prompter.note(
-            [
-              "The skill was not installed because it is incompatible with this host.",
-              "Recreate the behavior as a local tool, skill, or plugin implementation that fits Linux.",
-            ].join("\n"),
-            "Recreate locally",
-          );
-        }
-      }
     }
   }
 

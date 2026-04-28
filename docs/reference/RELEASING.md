@@ -30,8 +30,9 @@ OpenClaw has three public release lanes:
 
 ## Release cadence
 
-- Releases move beta-first
-- Stable follows only after the latest beta is validated
+- Releases move tarball-first: maintainers validate the prepared npm tarball
+  before publishing it to npm
+- Stable follows only after the latest prepared/published candidate is validated
 - Maintainers normally cut releases from a `release/YYYY.M.D` branch created
   from current `main`, so release validation and fixes do not block new
   development on `main`
@@ -51,6 +52,10 @@ OpenClaw has three public release lanes:
 - Run `pnpm build && pnpm ui:build` before `pnpm release:check` so the expected
   `dist/*` release artifacts and Control UI bundle exist for the pack
   validation step
+- Run `pnpm qa:otel:smoke` when validating release telemetry. It exercises
+  QA-lab through a local OTLP/HTTP receiver and verifies the exported trace
+  span names, bounded attributes, and content/identifier redaction without
+  requiring Opik, Langfuse, or another external collector.
 - Run `pnpm release:check` before every tagged release
 - Release checks now run in a separate manual workflow:
   `OpenClaw Release Checks`
@@ -86,18 +91,25 @@ OpenClaw has three public release lanes:
 - npm release preflight no longer waits on the separate release checks lane
 - Run `RELEASE_TAG=vYYYY.M.D node --import tsx scripts/openclaw-npm-release-check.ts`
   (or the matching beta/correction tag) before approval
+- Expensive release validation should target the prepared npm tarball from the
+  successful preflight run before npm publish. The `OpenClaw NPM Release`
+  preflight uploads an `openclaw-npm-preflight-<tag-or-sha>` artifact containing
+  the exact `.tgz` that the real publish job later promotes.
 - After npm publish, run
   `node --import tsx scripts/openclaw-npm-postpublish-verify.ts YYYY.M.D`
   (or the matching beta/correction version) to verify the published registry
   install path in a fresh temp prefix
-- After a beta publish, run `OPENCLAW_NPM_TELEGRAM_PACKAGE_SPEC=openclaw@YYYY.M.D-beta.N OPENCLAW_NPM_TELEGRAM_CREDENTIAL_SOURCE=convex OPENCLAW_NPM_TELEGRAM_CREDENTIAL_ROLE=ci pnpm test:docker:npm-telegram-live`
+- Before a beta publish, run `OPENCLAW_NPM_TELEGRAM_PACKAGE_TGZ=/path/to/openclaw-YYYY.M.D-beta.N.tgz OPENCLAW_NPM_TELEGRAM_CREDENTIAL_SOURCE=convex OPENCLAW_NPM_TELEGRAM_CREDENTIAL_ROLE=ci pnpm test:docker:npm-telegram-live`
   to verify installed-package onboarding, Telegram setup, and real Telegram E2E
-  against the published npm package using the shared leased Telegram credential
-  pool. Local maintainer one-offs may omit the Convex vars and pass the three
+  against the prepared package tarball using the shared leased Telegram
+  credential pool. After publish, the same lane may be rerun with
+  `OPENCLAW_NPM_TELEGRAM_PACKAGE_SPEC=openclaw@YYYY.M.D-beta.N` as registry
+  proof. Local maintainer one-offs may omit the Convex vars and pass the three
   `OPENCLAW_QA_TELEGRAM_*` env credentials directly.
-- Maintainers can run the same post-publish check from GitHub Actions via the
-  manual `NPM Telegram Beta E2E` workflow. It is intentionally manual-only and
-  does not run on every merge.
+- Maintainers can run the same package check from GitHub Actions via the manual
+  `NPM Telegram Package E2E` workflow. Pass `preflight_run_id` and
+  `preflight_artifact_ref` to test the prepared preflight tarball before npm
+  publish. It is intentionally manual-only and does not run on every merge.
 - Maintainer release automation now uses preflight-then-promote:
   - real npm publish must pass a successful npm `preflight_run_id`
   - the real npm publish must be dispatched from the same `main` or
@@ -143,9 +155,9 @@ OpenClaw has three public release lanes:
 
 `OpenClaw NPM Release` accepts these operator-controlled inputs:
 
-- `tag`: required release tag such as `v2024.4.24`, `v2024.4.24-1`, or the
-  current full 40-character workflow-branch commit SHA for validation-only
-  preflight when `preflight_only=true`
+- `tag`: required release tag such as `v2026.4.2`, `v2026.4.2-1`, or
+  `v2026.4.2-beta.1`; when `preflight_only=true`, it may also be the current
+  full 40-character workflow-branch commit SHA for validation-only preflight
 - `preflight_only`: `true` for validation/build/package only, `false` for the
   real publish path
 - `preflight_run_id`: required on the real publish path so the workflow reuses
@@ -185,13 +197,15 @@ When cutting a stable npm release:
    QA Lab parity, Matrix, and Telegram coverage
    - This is separate on purpose so live coverage stays available without
      recoupling long-running or flaky checks to the publish workflow
-4. Save the successful `preflight_run_id`
-5. Run `OpenClaw NPM Release` again with `preflight_only=false`, the same
+4. Run Docker, Parallels, QA Lab, and NPM Telegram package validation against
+   the prepared tarball artifact from the successful preflight run
+5. Save the successful `preflight_run_id`
+6. Run `OpenClaw NPM Release` again with `preflight_only=false`, the same
    `tag`, the same `npm_dist_tag`, and the saved `preflight_run_id`
-6. If the release landed on `beta`, use the private
+7. If the release landed on `beta`, use the private
    `openclaw/releases-private/.github/workflows/openclaw-npm-dist-tags.yml`
    workflow to promote that stable version from `beta` to `latest`
-7. If the release intentionally published directly to `latest` and `beta`
+8. If the release intentionally published directly to `latest` and `beta`
    should follow the same stable build immediately, use that same private
    workflow to point both dist-tags at the stable version, or let its scheduled
    self-healing sync move `beta` later

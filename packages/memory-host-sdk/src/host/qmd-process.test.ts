@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const spawnMock = vi.hoisted(() => vi.fn());
 
@@ -19,30 +19,43 @@ import { checkQmdBinaryAvailability, resolveCliSpawnInvocation } from "./qmd-pro
 function createMockChild() {
   const child = new EventEmitter() as EventEmitter & {
     kill: ReturnType<typeof vi.fn>;
+    stdout?: EventEmitter;
+    stderr?: EventEmitter;
   };
   child.kill = vi.fn();
   return child;
 }
 
+let fixtureRoot = "";
 let tempDir = "";
 let platformSpy: { mockRestore(): void } | null = null;
+let fixtureId = 0;
 const originalPath = process.env.PATH;
 const originalPathExt = process.env.PATHEXT;
 
-beforeEach(async () => {
-  tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-qmd-win-spawn-"));
+beforeAll(async () => {
+  fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-qmd-win-spawn-"));
   platformSpy = vi.spyOn(process, "platform", "get").mockReturnValue("win32");
 });
 
-afterEach(async () => {
+afterAll(async () => {
   platformSpy?.mockRestore();
+  platformSpy = null;
+  if (fixtureRoot) {
+    await fs.rm(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+beforeEach(async () => {
+  tempDir = path.join(fixtureRoot, `case-${fixtureId++}`);
+  await fs.mkdir(tempDir, { recursive: true });
+});
+
+afterEach(() => {
   process.env.PATH = originalPath;
   process.env.PATHEXT = originalPathExt;
   spawnMock.mockReset();
-  if (tempDir) {
-    await fs.rm(tempDir, { recursive: true, force: true });
-    tempDir = "";
-  }
+  tempDir = "";
 });
 
 describe("resolveCliSpawnInvocation", () => {
@@ -114,10 +127,8 @@ describe("resolveCliSpawnInvocation", () => {
 describe("checkQmdBinaryAvailability", () => {
   it("returns available when the qmd process spawns successfully", async () => {
     const child = createMockChild();
-    (child as EventEmitter & { stdout?: EventEmitter; stderr?: EventEmitter }).stdout =
-      new EventEmitter();
-    (child as EventEmitter & { stdout?: EventEmitter; stderr?: EventEmitter }).stderr =
-      new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
     spawnMock.mockImplementationOnce(() => {
       queueMicrotask(() => {
         child.emit("spawn");
@@ -134,10 +145,8 @@ describe("checkQmdBinaryAvailability", () => {
 
   it("returns unavailable when the qmd process cannot be spawned", async () => {
     const child = createMockChild();
-    (child as EventEmitter & { stdout?: EventEmitter; stderr?: EventEmitter }).stdout =
-      new EventEmitter();
-    (child as EventEmitter & { stdout?: EventEmitter; stderr?: EventEmitter }).stderr =
-      new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
     const err = Object.assign(new Error("spawn qmd ENOENT"), { code: "ENOENT" });
     spawnMock.mockImplementationOnce(() => {
       queueMicrotask(() => child.emit("error", err));
@@ -151,10 +160,8 @@ describe("checkQmdBinaryAvailability", () => {
 
   it("does not treat close-before-spawn as a successful availability probe", async () => {
     const child = createMockChild();
-    (child as EventEmitter & { stdout?: EventEmitter; stderr?: EventEmitter }).stdout =
-      new EventEmitter();
-    (child as EventEmitter & { stdout?: EventEmitter; stderr?: EventEmitter }).stderr =
-      new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
     const err = Object.assign(new Error("spawn qmd ENOENT"), { code: "ENOENT" });
     spawnMock.mockImplementationOnce(() => {
       queueMicrotask(() => child.emit("close"));
@@ -169,10 +176,8 @@ describe("checkQmdBinaryAvailability", () => {
 
   it("returns unavailable when qmd exits non-zero during version probe", async () => {
     const child = createMockChild();
-    (child as EventEmitter & { stdout?: EventEmitter; stderr?: EventEmitter }).stdout =
-      new EventEmitter();
-    (child as EventEmitter & { stdout?: EventEmitter; stderr?: EventEmitter }).stderr =
-      new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
     spawnMock.mockImplementationOnce(() => {
       queueMicrotask(() => {
         child.emit("spawn");

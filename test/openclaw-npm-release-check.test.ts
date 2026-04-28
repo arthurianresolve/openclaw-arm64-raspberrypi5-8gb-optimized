@@ -8,6 +8,7 @@ import {
   collectControlUiPackErrors,
   collectForbiddenPackedContentErrors,
   collectForbiddenPackedPathErrors,
+  collectInventoryPackMismatchErrors,
   collectPackedTestCargoErrors,
   collectReleasePackageMetadataErrors,
   collectReleaseTagErrors,
@@ -313,6 +314,30 @@ describe("collectControlUiPackErrors", () => {
 });
 
 describe("collectForbiddenPackedPathErrors", () => {
+  it("rejects dist inventories that reference entries missing from npm pack", () => {
+    const rootDir = mkdtempSync(join(tmpdir(), "openclaw-pack-inventory-"));
+
+    try {
+      mkdirSync(join(rootDir, "dist"), { recursive: true });
+      writeFileSync(
+        join(rootDir, PACKAGE_DIST_INVENTORY_RELATIVE_PATH),
+        JSON.stringify(["dist/current.js", "dist/extensions/qa-channel/runtime-api.js"]),
+        "utf8",
+      );
+
+      expect(
+        collectInventoryPackMismatchErrors(
+          [PACKAGE_DIST_INVENTORY_RELATIVE_PATH, "dist/current.js"],
+          rootDir,
+        ),
+      ).toEqual([
+        "inventory references missing npm pack entry dist/extensions/qa-channel/runtime-api.js",
+      ]);
+    } finally {
+      rmSync(rootDir, { recursive: true, force: true });
+    }
+  });
+
   it("rejects generated docs artifacts in npm pack output", () => {
     expect(
       collectForbiddenPackedPathErrors([

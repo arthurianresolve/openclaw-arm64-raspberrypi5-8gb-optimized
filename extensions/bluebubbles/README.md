@@ -2,6 +2,10 @@
 
 This package contains the **BlueBubbles external channel plugin** for OpenClaw.
 
+If you’re looking for **how to use BlueBubbles as an agent/tool user**, see:
+
+- `skills/bluebubbles/SKILL.md`
+
 ## Layout
 
 - Package entry: `index.ts`.

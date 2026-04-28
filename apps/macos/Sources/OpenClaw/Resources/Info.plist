@@ -15,7 +15,7 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>2024.4.24</string>
+    <string>2026.4.25</string>
     <key>CFBundleVersion</key>
     <string>2026042500</string>
     <key>CFBundleIconFile</key>
@@ -60,7 +60,7 @@
     <key>NSAppleEventsUsageDescription</key>
     <string>OpenClaw needs Automation (AppleScript) permission to drive Terminal and other apps for agent actions.</string>
     <key>NSRemindersUsageDescription</key>
-    <string>OpenClaw can access Reminders when requested by the agent.</string>
+    <string>OpenClaw can access Reminders when requested by the agent for the apple-reminders skill.</string>
 
     <key>NSAppTransportSecurity</key>
     <dict>

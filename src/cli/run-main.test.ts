@@ -6,6 +6,7 @@ import {
   shouldEnsureCliPath,
   shouldStartCrestodianForBareRoot,
   shouldStartCrestodianForModernOnboard,
+  shouldUseBrowserHelpFastPath,
   shouldUseRootHelpFastPath,
 } from "./run-main.js";
 
@@ -23,6 +24,25 @@ const memoryWikiCommandAliasRegistry: PluginManifestRegistry = {
       source: "bundled",
       manifestPath: "/tmp/memory-wiki/openclaw.plugin.json",
       commandAliases: [{ name: "wiki" }],
+    },
+  ],
+  diagnostics: [],
+};
+
+const memoryCoreCommandAliasRegistry: PluginManifestRegistry = {
+  plugins: [
+    {
+      id: "memory-core",
+      channels: [],
+      providers: [],
+      cliBackends: [],
+      skills: [],
+      hooks: [],
+      origin: "bundled",
+      rootDir: "/tmp/memory-core",
+      source: "bundled",
+      manifestPath: "/tmp/memory-core/openclaw.plugin.json",
+      commandAliases: [{ name: "dreaming", kind: "runtime-slash", cliCommand: "memory" }],
     },
   ],
   diagnostics: [],
@@ -131,6 +151,20 @@ describe("shouldUseRootHelpFastPath", () => {
   });
 });
 
+describe("shouldUseBrowserHelpFastPath", () => {
+  it("uses the fast path for browser command help only", () => {
+    expect(shouldUseBrowserHelpFastPath(["node", "openclaw", "browser", "--help"])).toBe(true);
+    expect(shouldUseBrowserHelpFastPath(["node", "openclaw", "browser", "-h"])).toBe(true);
+    expect(
+      shouldUseBrowserHelpFastPath(["node", "openclaw", "--profile", "work", "browser", "-h"]),
+    ).toBe(true);
+    expect(shouldUseBrowserHelpFastPath(["node", "openclaw", "browser", "status", "--help"])).toBe(
+      false,
+    );
+    expect(shouldUseBrowserHelpFastPath(["node", "openclaw", "status", "--help"])).toBe(false);
+  });
+});
+
 describe("resolveMissingPluginCommandMessage", () => {
   it("explains plugins.allow misses for a bundled plugin command", () => {
     expect(
@@ -167,7 +201,13 @@ describe("resolveMissingPluginCommandMessage", () => {
   });
 
   it("explains that dreaming is a runtime slash command, not a CLI command", () => {
-    const message = resolveMissingPluginCommandMessage("dreaming", {});
+    const message = resolveMissingPluginCommandMessage(
+      "dreaming",
+      {},
+      {
+        registry: memoryCoreCommandAliasRegistry,
+      },
+    );
     expect(message).toContain("runtime slash command");
     expect(message).toContain("/dreaming");
     expect(message).toContain("memory-core");
@@ -175,36 +215,54 @@ describe("resolveMissingPluginCommandMessage", () => {
   });
 
   it("returns the runtime command message even when plugins.allow is set", () => {
-    const message = resolveMissingPluginCommandMessage("dreaming", {
-      plugins: {
-        allow: ["memory-core"],
+    const message = resolveMissingPluginCommandMessage(
+      "dreaming",
+      {
+        plugins: {
+          allow: ["memory-core"],
+        },
       },
-    });
+      {
+        registry: memoryCoreCommandAliasRegistry,
+      },
+    );
     expect(message).toContain("runtime slash command");
     expect(message).not.toContain("plugins.allow");
   });
 
   it("points command names in plugins.allow at their parent plugin", () => {
-    const message = resolveMissingPluginCommandMessage("dreaming", {
-      plugins: {
-        allow: ["dreaming"],
+    const message = resolveMissingPluginCommandMessage(
+      "dreaming",
+      {
+        plugins: {
+          allow: ["dreaming"],
+        },
       },
-    });
+      {
+        registry: memoryCoreCommandAliasRegistry,
+      },
+    );
     expect(message).toContain('"dreaming" is not a plugin');
     expect(message).toContain('"memory-core"');
     expect(message).toContain("plugins.allow");
   });
 
   it("explains parent plugin disablement for runtime command aliases", () => {
-    const message = resolveMissingPluginCommandMessage("dreaming", {
-      plugins: {
-        entries: {
-          "memory-core": {
-            enabled: false,
+    const message = resolveMissingPluginCommandMessage(
+      "dreaming",
+      {
+        plugins: {
+          entries: {
+            "memory-core": {
+              enabled: false,
+            },
           },
         },
       },
-    });
+      {
+        registry: memoryCoreCommandAliasRegistry,
+      },
+    );
     expect(message).toContain("plugins.entries.memory-core.enabled=false");
     expect(message).not.toContain("runtime slash command");
   });

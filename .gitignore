@@ -45,7 +45,6 @@ bin/
 bin/clawdbot-mac
 bin/docs-list
 apps/macos/.build-local/
-fixtures/linux-native/.build/
 apps/macos/.swiftpm/
 apps/shared/MoltbotKit/.swiftpm/
 apps/shared/OpenClawKit/.swiftpm/
@@ -60,7 +59,6 @@ apps/ios/Clawdbot.xcodeproj/
 apps/ios/Clawdbot.xcodeproj/**
 apps/macos/.build/**
 apps/macos-mlx-tts/.build/**
-fixtures/linux-native/.build/**
 **/*.bun-build
 apps/ios/*.xcfilelist
 
@@ -98,6 +96,36 @@ USER.md
 
 # local tooling
 .serena/
+
+# Local project-agent skill installs. Only repo-owned skills are visible by
+# default; promoting a new repo skill should require an intentional `git add -f`.
+.agents/skills/*
+!.agents/skills/blacksmith-testbox/
+!.agents/skills/blacksmith-testbox/**
+!.agents/skills/openclaw-ghsa-maintainer/
+!.agents/skills/openclaw-ghsa-maintainer/**
+!.agents/skills/openclaw-parallels-smoke/
+!.agents/skills/openclaw-parallels-smoke/**
+!.agents/skills/openclaw-pr-maintainer/
+!.agents/skills/openclaw-pr-maintainer/**
+!.agents/skills/openclaw-qa-testing/
+!.agents/skills/openclaw-qa-testing/**
+!.agents/skills/openclaw-release-maintainer/
+!.agents/skills/openclaw-release-maintainer/**
+!.agents/skills/openclaw-secret-scanning-maintainer/
+!.agents/skills/openclaw-secret-scanning-maintainer/**
+!.agents/skills/openclaw-test-heap-leaks/
+!.agents/skills/openclaw-test-heap-leaks/**
+!.agents/skills/openclaw-test-performance/
+!.agents/skills/openclaw-test-performance/**
+!.agents/skills/optimizetests/
+!.agents/skills/optimizetests/**
+!.agents/skills/parallels-discord-roundtrip/
+!.agents/skills/parallels-discord-roundtrip/**
+!.agents/skills/security-triage/
+!.agents/skills/security-triage/**
+!.agents/skills/tag-duplicate-prs-issues/
+!.agents/skills/tag-duplicate-prs-issues/**
 
 # Agent credentials and memory (NEVER COMMIT)
 /memory/
@@ -148,6 +176,7 @@ changelog/fragments/
 
 # Local scratch workspace
 .tmp/
+.vmux*
 .artifacts/
 test/fixtures/openclaw-vitest-unit-report.json
 analysis/

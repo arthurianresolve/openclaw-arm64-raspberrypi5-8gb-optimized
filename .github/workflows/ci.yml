@@ -1231,6 +1231,7 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=6144
           OPENCLAW_NODE_TEST_CONFIGS_JSON: ${{ toJson(matrix.configs) }}
           OPENCLAW_NODE_TEST_INCLUDE_PATTERNS_JSON: ${{ toJson(matrix.includePatterns) }}
+          OPENCLAW_VITEST_SHARD_NAME: ${{ matrix.shard_name }}
           OPENCLAW_TEST_PROJECTS_PARALLEL: "2"
         shell: bash
         run: |
@@ -2092,108 +2093,6 @@ jobs:
           set -euo pipefail
           for attempt in 1 2 3; do
             if swift test --package-path apps/macos --parallel --enable-code-coverage --show-codecov-path; then
-              exit 0
-            fi
-            echo "swift test failed (attempt $attempt/3). Retrying…"
-            sleep $((attempt * 20))
-          done
-          exit 1
-
-  linux-swift-fixture:
-    permissions:
-      contents: read
-    name: "linux-swift-fixture"
-    needs: [preflight]
-    if: needs.preflight.outputs.run_node == 'true'
-    runs-on: ${{ github.repository == 'openclaw/openclaw' && 'blacksmith-8vcpu-ubuntu-2404' || 'ubuntu-24.04' }}
-    timeout-minutes: 15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-          submodules: false
-
-      - name: Setup Swift 6.2
-        uses: swift-actions/setup-swift@v3
-        with:
-          swift-version: "6.2"
-
-      - name: Detect Swift toolchain cache key
-        id: swift-toolchain
-        run: |
-          set -euo pipefail
-          swift_version="$(swift --version | head -n 1)"
-          toolchain_key="$(printf '%s\n' "$swift_version" | sha256sum | awk '{print $1}')"
-          echo "key=$toolchain_key" >> "$GITHUB_OUTPUT"
-
-      - name: Validate Swift toolchain floor
-        run: |
-          set -euo pipefail
-          swift_version="$(swift --version | head -n 1)"
-          swift_semver="$(printf '%s\n' "$swift_version" | sed -nE 's/^Swift version ([0-9]+)\.([0-9]+).*/\1.\2/p')"
-          if [ -z "$swift_semver" ]; then
-            echo "Unable to parse Swift version from: $swift_version" >&2
-            exit 1
-          fi
-          swift_major="${swift_semver%%.*}"
-          swift_minor="${swift_semver#*.}"
-          if [ "$swift_major" -lt 6 ] || { [ "$swift_major" -eq 6 ] && [ "$swift_minor" -lt 2 ]; }; then
-            echo "Swift $swift_semver is unsupported for linux-native fixture (require >= 6.2)." >&2
-            exit 1
-          fi
-          echo "Linux fixture Swift toolchain: $swift_version"
-
-      - name: Cache SwiftPM
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/org.swift.swiftpm
-          key: ${{ runner.os }}-swiftpm-linux-fixture-${{ hashFiles('fixtures/linux-native/Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-swiftpm-linux-fixture-
-
-      - name: Cache Swift build directory
-        id: swift-build-cache
-        uses: actions/cache@v5
-        with:
-          path: fixtures/linux-native/.build
-          key: ${{ runner.os }}-swift-build-linux-fixture-${{ steps.swift-toolchain.outputs.key }}-${{ hashFiles('fixtures/linux-native/Package.swift', 'fixtures/linux-native/Package.resolved', 'fixtures/linux-native/Sources/**', 'fixtures/linux-native/Tests/**') }}
-          restore-keys: |
-            ${{ runner.os }}-swift-build-linux-fixture-${{ steps.swift-toolchain.outputs.key }}-
-
-      - name: Preserve Swift build cache hit
-        if: steps.swift-build-cache.outputs.cache-hit == 'true'
-        run: |
-          set -euo pipefail
-          for dir in fixtures/linux-native/Sources fixtures/linux-native/Tests fixtures/linux-native/.build/checkouts; do
-            if [ -d "$dir" ]; then
-              find "$dir" -type f -exec touch -t 200001010000 {} +
-            fi
-          done
-          touch -t 200001010000 \
-            fixtures/linux-native/Package.swift \
-            fixtures/linux-native/Package.resolved
-
-      - name: Show toolchain
-        run: swift --version
-
-      - name: Swift build
-        run: |
-          set -euo pipefail
-          for attempt in 1 2 3; do
-            if swift build --package-path fixtures/linux-native; then
-              exit 0
-            fi
-            echo "swift build failed (attempt $attempt/3). Retrying…"
-            sleep $((attempt * 20))
-          done
-          exit 1
-
-      - name: Swift test
-        run: |
-          set -euo pipefail
-          for attempt in 1 2 3; do
-            if swift test --package-path fixtures/linux-native --parallel; then
               exit 0
             fi
             echo "swift test failed (attempt $attempt/3). Retrying…"

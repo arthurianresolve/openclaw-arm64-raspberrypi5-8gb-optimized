@@ -1,19 +1,17 @@
 ---
 summary: "How the installer scripts work (install.sh, install-cli.sh, install.ps1), flags, and automation"
 read_when:
-  - You want to understand the forked `install.sh`
+  - You want to understand `openclaw.ai/install.sh`
   - You want to automate installs (CI / headless)
   - You want to install from a GitHub checkout
 title: "Installer internals"
 ---
 
-This fork release centers on `install.sh` for Linux ARM64. The `install-cli.sh`
-and `install.ps1` sections remain as upstream references and are not part of
-the supported fork install path.
+OpenClaw ships three installer scripts, served from `openclaw.ai`.
 
 | Script                             | Platform             | What it does                                                                                                   |
 | ---------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------- |
-| [`install.sh`](#installsh)         | Linux ARM64          | Installs Node if needed, installs OpenClaw via git, and can run onboarding.                                    |
+| [`install.sh`](#installsh)         | macOS / Linux / WSL  | Installs Node if needed, installs OpenClaw via npm (default) or git, and can run onboarding.                   |
 | [`install-cli.sh`](#install-clish) | macOS / Linux / WSL  | Installs Node + OpenClaw into a local prefix (`~/.openclaw`) with npm or git checkout modes. No root required. |
 | [`install.ps1`](#installps1)       | Windows (PowerShell) | Installs Node if needed, installs OpenClaw via npm (default) or git, and can run onboarding.                   |
 
@@ -22,11 +20,11 @@ the supported fork install path.
 <Tabs>
   <Tab title="install.sh">
     ```bash
-    curl -fsSL --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/arthurianresolve/excaliclaw/main/scripts/install.sh | bash
+    curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install.sh | bash
     ```
 
     ```bash
-    curl -fsSL --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/arthurianresolve/excaliclaw/main/scripts/install.sh | bash -s -- --help
+    curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install.sh | bash -s -- --help
     ```
 
   </Tab>
@@ -70,17 +68,17 @@ Recommended for most interactive installs on macOS/Linux/WSL.
 
 <Steps>
   <Step title="Detect OS">
-    Supports Linux ARM64 only. The installer exits early on macOS, x86_64, and other unsupported architectures.
+    Supports macOS and Linux (including WSL). If macOS is detected, installs Homebrew if missing.
   </Step>
   <Step title="Ensure Node.js 24 by default">
-    Checks Node version and installs Node 24 if needed via NodeSource setup scripts on Linux apt/dnf/yum. OpenClaw still supports Node 22 LTS, currently `22.14+`, for compatibility.
+    Checks Node version and installs Node 24 if needed (Homebrew on macOS, NodeSource setup scripts on Linux apt/dnf/yum). OpenClaw still supports Node 22 LTS, currently `22.14+`, for compatibility.
   </Step>
   <Step title="Ensure Git">
     Installs Git if missing.
   </Step>
   <Step title="Install OpenClaw">
-    - `git` method (default in this fork): clone/update repo under `/data/openclaw`, install deps with pnpm, build, then install the wrapper under your local bin path
-    - `npm` method remains available for packaged installs, but the fork is intended to be run from the `/data/openclaw` checkout
+    - `npm` method (default): global npm install
+    - `git` method: clone/update repo, install deps with pnpm, build, then install wrapper at `~/.local/bin/openclaw`
   </Step>
   <Step title="Post-install tasks">
     - Refreshes a loaded gateway service best-effort (`openclaw gateway install --force`, then restart)
@@ -106,27 +104,27 @@ The script exits with code `2` for invalid method selection or invalid `--instal
 <Tabs>
   <Tab title="Default">
     ```bash
-    curl -fsSL --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/arthurianresolve/excaliclaw/main/scripts/install.sh | bash
+    curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install.sh | bash
     ```
   </Tab>
   <Tab title="Skip onboarding">
     ```bash
-    curl -fsSL --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/arthurianresolve/excaliclaw/main/scripts/install.sh | bash -s -- --no-onboard
+    curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install.sh | bash -s -- --no-onboard
     ```
   </Tab>
   <Tab title="Git install">
     ```bash
-    curl -fsSL --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/arthurianresolve/excaliclaw/main/scripts/install.sh | bash -s -- --install-method git
+    curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install.sh | bash -s -- --install-method git
     ```
   </Tab>
   <Tab title="GitHub main via npm">
     ```bash
-    curl -fsSL --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/arthurianresolve/excaliclaw/main/scripts/install.sh | bash -s -- --version main
+    curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install.sh | bash -s -- --version main
     ```
   </Tab>
   <Tab title="Dry run">
     ```bash
-    curl -fsSL --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/arthurianresolve/excaliclaw/main/scripts/install.sh | bash -s -- --dry-run
+    curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install.sh | bash -s -- --dry-run
     ```
   </Tab>
 </Tabs>
@@ -134,39 +132,39 @@ The script exits with code `2` for invalid method selection or invalid `--instal
 <AccordionGroup>
   <Accordion title="Flags reference">
 
-| Flag                                  | Description                                                    |
-| ------------------------------------- | -------------------------------------------------------------- |
-| `--install-method npm\|git`           | Choose install method (default: `git`). Alias: `--method`      |
-| `--npm`                               | Shortcut for npm method                                        |
-| `--git`                               | Shortcut for git method. Alias: `--github`                     |
-| `--version <version\|dist-tag\|spec>` | npm version, dist-tag, or package spec (default: `latest`)     |
-| `--beta`                              | Use beta dist-tag if available, else fallback to `latest`      |
-| `--git-dir <path>`                    | Checkout directory (default: `/data/openclaw`). Alias: `--dir` |
-| `--no-git-update`                     | Skip `git pull` for existing checkout                          |
-| `--no-prompt`                         | Disable prompts                                                |
-| `--no-onboard`                        | Skip onboarding                                                |
-| `--onboard`                           | Enable onboarding                                              |
-| `--dry-run`                           | Print actions without applying changes                         |
-| `--verbose`                           | Enable debug output (`set -x`, npm notice-level logs)          |
-| `--help`                              | Show usage (`-h`)                                              |
+| Flag                                  | Description                                                |
+| ------------------------------------- | ---------------------------------------------------------- |
+| `--install-method npm\|git`           | Choose install method (default: `npm`). Alias: `--method`  |
+| `--npm`                               | Shortcut for npm method                                    |
+| `--git`                               | Shortcut for git method. Alias: `--github`                 |
+| `--version <version\|dist-tag\|spec>` | npm version, dist-tag, or package spec (default: `latest`) |
+| `--beta`                              | Use beta dist-tag if available, else fallback to `latest`  |
+| `--git-dir <path>`                    | Checkout directory (default: `~/openclaw`). Alias: `--dir` |
+| `--no-git-update`                     | Skip `git pull` for existing checkout                      |
+| `--no-prompt`                         | Disable prompts                                            |
+| `--no-onboard`                        | Skip onboarding                                            |
+| `--onboard`                           | Enable onboarding                                          |
+| `--dry-run`                           | Print actions without applying changes                     |
+| `--verbose`                           | Enable debug output (`set -x`, npm notice-level logs)      |
+| `--help`                              | Show usage (`-h`)                                          |
 
   </Accordion>
 
   <Accordion title="Environment variables reference">
 
-| Variable                                                | Description                                    |
-| ------------------------------------------------------- | ---------------------------------------------- |
-| `OPENCLAW_INSTALL_METHOD=git\|npm`                      | Install method                                 |
-| `OPENCLAW_VERSION=latest\|next\|main\|<semver>\|<spec>` | npm version, dist-tag, or package spec         |
-| `OPENCLAW_BETA=0\|1`                                    | Use beta if available                          |
-| `OPENCLAW_GIT_DIR=<path>`                               | Checkout directory (default: `/data/openclaw`) |
-| `OPENCLAW_GIT_UPDATE=0\|1`                              | Toggle git updates                             |
-| `OPENCLAW_NO_PROMPT=1`                                  | Disable prompts                                |
-| `OPENCLAW_NO_ONBOARD=1`                                 | Skip onboarding                                |
-| `OPENCLAW_DRY_RUN=1`                                    | Dry run mode                                   |
-| `OPENCLAW_VERBOSE=1`                                    | Debug mode                                     |
-| `OPENCLAW_NPM_LOGLEVEL=error\|warn\|notice`             | npm log level                                  |
-| `SHARP_IGNORE_GLOBAL_LIBVIPS=0\|1`                      | Control sharp/libvips behavior (default: `1`)  |
+| Variable                                                | Description                                   |
+| ------------------------------------------------------- | --------------------------------------------- |
+| `OPENCLAW_INSTALL_METHOD=git\|npm`                      | Install method                                |
+| `OPENCLAW_VERSION=latest\|next\|main\|<semver>\|<spec>` | npm version, dist-tag, or package spec        |
+| `OPENCLAW_BETA=0\|1`                                    | Use beta if available                         |
+| `OPENCLAW_GIT_DIR=<path>`                               | Checkout directory                            |
+| `OPENCLAW_GIT_UPDATE=0\|1`                              | Toggle git updates                            |
+| `OPENCLAW_NO_PROMPT=1`                                  | Disable prompts                               |
+| `OPENCLAW_NO_ONBOARD=1`                                 | Skip onboarding                               |
+| `OPENCLAW_DRY_RUN=1`                                    | Dry run mode                                  |
+| `OPENCLAW_VERBOSE=1`                                    | Debug mode                                    |
+| `OPENCLAW_NPM_LOGLEVEL=error\|warn\|notice`             | npm log level                                 |
+| `SHARP_IGNORE_GLOBAL_LIBVIPS=0\|1`                      | Control sharp/libvips behavior (default: `1`) |
 
   </Accordion>
 </AccordionGroup>
@@ -294,6 +292,9 @@ by default, plus git-checkout installs under the same prefix flow.
     - Refreshes a loaded gateway service best-effort (`openclaw gateway install --force`, then restart)
     - Runs `openclaw doctor --non-interactive` on upgrades and git installs (best effort)
   </Step>
+  <Step title="Handle failures">
+    `iwr ... | iex` and scriptblock installs report a terminating error without closing the current PowerShell session. Direct `powershell -File` / `pwsh -File` installs still exit non-zero for automation.
+  </Step>
 </Steps>
 
 ### Examples (install.ps1)
@@ -374,13 +375,13 @@ Use non-interactive flags/env vars for predictable runs.
 <Tabs>
   <Tab title="install.sh (non-interactive npm)">
     ```bash
-    curl -fsSL --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/arthurianresolve/excaliclaw/main/scripts/install.sh | bash -s -- --no-prompt --no-onboard
+    curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install.sh | bash -s -- --no-prompt --no-onboard
     ```
   </Tab>
   <Tab title="install.sh (non-interactive git)">
     ```bash
     OPENCLAW_INSTALL_METHOD=git OPENCLAW_NO_PROMPT=1 \
-      curl -fsSL --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/arthurianresolve/excaliclaw/main/scripts/install.sh | bash
+      curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install.sh | bash
     ```
   </Tab>
   <Tab title="install-cli.sh (JSON)">
@@ -412,7 +413,7 @@ Use non-interactive flags/env vars for predictable runs.
     The scripts default `SHARP_IGNORE_GLOBAL_LIBVIPS=1` to avoid sharp building against system libvips. To override:
 
     ```bash
-    SHARP_IGNORE_GLOBAL_LIBVIPS=0 curl -fsSL --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/arthurianresolve/excaliclaw/main/scripts/install.sh | bash
+    SHARP_IGNORE_GLOBAL_LIBVIPS=0 curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install.sh | bash
     ```
 
   </Accordion>

@@ -1,6 +1,6 @@
 {
   "name": "@openclaw/matrix",
-  "version": "2024.4.24",
+  "version": "2026.4.25",
   "description": "OpenClaw Matrix channel plugin",
   "type": "module",
   "dependencies": {
@@ -18,7 +18,7 @@
     "openclaw": "workspace:*"
   },
   "peerDependencies": {
-    "openclaw": ">=2024.4.24"
+    "openclaw": ">=2026.4.25"
   },
   "peerDependenciesMeta": {
     "openclaw": {

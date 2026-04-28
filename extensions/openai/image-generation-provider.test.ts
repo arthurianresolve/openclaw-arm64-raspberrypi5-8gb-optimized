@@ -194,13 +194,19 @@ describe("openai image generation provider", () => {
     const provider = buildOpenAIImageGenerationProvider();
 
     expect(provider.defaultModel).toBe("gpt-image-2");
-    expect(provider.models).toEqual(["gpt-image-2"]);
+    expect(provider.models).toEqual([
+      "gpt-image-2",
+      "gpt-image-1.5",
+      "gpt-image-1",
+      "gpt-image-1-mini",
+    ]);
     expect(provider.capabilities.geometry?.sizes).toEqual(
       expect.arrayContaining(["2048x2048", "3840x2160", "2160x3840"]),
     );
     expect(provider.capabilities.output).toEqual({
       formats: ["png", "jpeg", "webp"],
       qualities: ["low", "medium", "high", "auto"],
+      backgrounds: ["transparent", "opaque", "auto"],
     });
   });
 
@@ -426,6 +432,70 @@ describe("openai image generation provider", () => {
       mimeType: "image/jpeg",
       fileName: "image-1.jpg",
     });
+  });
+
+  it("routes transparent default-model requests to the OpenAI image model that supports alpha", async () => {
+    mockGeneratedPngResponse();
+
+    const provider = buildOpenAIImageGenerationProvider();
+    const result = await provider.generateImage({
+      provider: "openai",
+      model: "gpt-image-2",
+      prompt: "Transparent sticker",
+      cfg: {},
+      outputFormat: "png",
+      background: "transparent",
+    });
+
+    expect(postJsonRequestMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://api.openai.com/v1/images/generations",
+        body: expect.objectContaining({
+          model: "gpt-image-1.5",
+          output_format: "png",
+          background: "transparent",
+        }),
+      }),
+    );
+    expect(result.model).toBe("gpt-image-1.5");
+  });
+
+  it("does not reroute transparent requests for custom OpenAI-compatible endpoints", async () => {
+    mockGeneratedPngResponse();
+
+    const provider = buildOpenAIImageGenerationProvider();
+    await provider.generateImage({
+      provider: "openai",
+      model: "gpt-image-2",
+      prompt: "Transparent custom endpoint sticker",
+      cfg: {
+        models: {
+          providers: {
+            openai: {
+              baseUrl: "https://openai-compatible.example.com/v1",
+              models: [],
+            },
+          },
+        },
+      },
+      outputFormat: "png",
+      providerOptions: {
+        openai: {
+          background: "transparent",
+        },
+      },
+    });
+
+    expect(postJsonRequestMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://openai-compatible.example.com/v1/images/generations",
+        body: expect.objectContaining({
+          model: "gpt-image-2",
+          output_format: "png",
+          background: "transparent",
+        }),
+      }),
+    );
   });
 
   it("allows loopback image requests for the synthetic mock-openai provider", async () => {
@@ -682,6 +752,43 @@ describe("openai image generation provider", () => {
         },
       ],
     });
+  });
+
+  it("routes transparent default-model Codex OAuth requests to the alpha-capable image model", async () => {
+    mockCodexAuthOnly();
+    mockCodexImageStream({ imageData: "codex-transparent-image" });
+
+    const provider = buildOpenAIImageGenerationProvider();
+    const result = await provider.generateImage({
+      provider: "openai",
+      model: "gpt-image-2",
+      prompt: "Draw a transparent Codex sticker",
+      cfg: {},
+      authStore: { version: 1, profiles: {} },
+      outputFormat: "png",
+      providerOptions: {
+        openai: {
+          background: "transparent",
+        },
+      },
+    });
+
+    expect(postJsonRequestMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://chatgpt.com/backend-api/codex/responses",
+        body: expect.objectContaining({
+          tools: [
+            expect.objectContaining({
+              type: "image_generation",
+              model: "gpt-image-1.5",
+              output_format: "png",
+              background: "transparent",
+            }),
+          ],
+        }),
+      }),
+    );
+    expect(result.model).toBe("gpt-image-1.5");
   });
 
   it("uses configured Codex OAuth directly instead of probing an available OpenAI API key", async () => {
@@ -1181,6 +1288,107 @@ describe("openai image generation provider", () => {
       );
     });
 
+    it("omits model from Azure generation body because deployment is URL-scoped", async () => {
+      mockGeneratedPngResponse();
+
+      const provider = buildOpenAIImageGenerationProvider();
+      await provider.generateImage({
+        provider: "openai",
+        model: "gpt-image-2-1",
+        prompt: "Azure cat",
+        cfg: {
+          models: {
+            providers: {
+              openai: {
+                baseUrl: "https://myresource.openai.azure.com/openai/v1",
+                models: [],
+              },
+            },
+          },
+        },
+      });
+
+      expect(postJsonRequestMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: "https://myresource.openai.azure.com/openai/deployments/gpt-image-2-1/images/generations?api-version=2024-12-01-preview",
+          body: {
+            prompt: "Azure cat",
+            n: 1,
+            size: "1024x1024",
+          },
+          timeoutMs: 600_000,
+        }),
+      );
+    });
+
+    it("lets explicit timeoutMs override the Azure image default", async () => {
+      mockGeneratedPngResponse();
+
+      const provider = buildOpenAIImageGenerationProvider();
+      await provider.generateImage({
+        provider: "openai",
+        model: "gpt-image-2-1",
+        prompt: "Azure cat",
+        cfg: {
+          models: {
+            providers: {
+              openai: {
+                baseUrl: "https://myresource.openai.azure.com/openai/v1",
+                models: [],
+              },
+            },
+          },
+        },
+        timeoutMs: 123_456,
+      });
+
+      expect(postJsonRequestMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timeoutMs: 123_456,
+        }),
+      );
+    });
+
+    it("does not reroute transparent background requests for Azure deployment names", async () => {
+      mockGeneratedPngResponse();
+
+      const provider = buildOpenAIImageGenerationProvider();
+      await provider.generateImage({
+        provider: "openai",
+        model: "gpt-image-2",
+        prompt: "Transparent Azure sticker",
+        cfg: {
+          models: {
+            providers: {
+              openai: {
+                baseUrl: "https://myresource.openai.azure.com",
+                models: [],
+              },
+            },
+          },
+        },
+        outputFormat: "png",
+        providerOptions: {
+          openai: {
+            background: "transparent",
+          },
+        },
+      });
+
+      expect(postJsonRequestMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: "https://myresource.openai.azure.com/openai/deployments/gpt-image-2/images/generations?api-version=2024-12-01-preview",
+          body: {
+            prompt: "Transparent Azure sticker",
+            n: 1,
+            size: "1024x1024",
+            output_format: "png",
+            background: "transparent",
+          },
+        }),
+      );
+    });
+
     it("uses api-key header and deployment-scoped URL for .cognitiveservices.azure.com hosts", async () => {
       mockGeneratedPngResponse();
 
@@ -1306,6 +1514,41 @@ describe("openai image generation provider", () => {
           body: expect.any(FormData),
         }),
       );
+    });
+
+    it("omits model from Azure edit form because deployment is URL-scoped", async () => {
+      mockGeneratedPngResponse();
+
+      const provider = buildOpenAIImageGenerationProvider();
+      await provider.generateImage({
+        provider: "openai",
+        model: "gpt-image-2-1",
+        prompt: "Change background",
+        cfg: {
+          models: {
+            providers: {
+              openai: {
+                baseUrl: "https://myresource.openai.azure.com/openai/v1",
+                models: [],
+              },
+            },
+          },
+        },
+        inputImages: [
+          {
+            buffer: Buffer.from("png-bytes"),
+            mimeType: "image/png",
+            fileName: "reference.png",
+          },
+        ],
+      });
+
+      const editCallArgs = postMultipartRequestMock.mock.calls[0]?.[0] as {
+        body: FormData;
+      };
+      expect(editCallArgs.body.has("model")).toBe(false);
+      expect(editCallArgs.body.get("prompt")).toBe("Change background");
+      expect(editCallArgs.body.get("size")).toBe("1024x1024");
     });
 
     it("strips trailing /v1 from Azure base URL", async () => {

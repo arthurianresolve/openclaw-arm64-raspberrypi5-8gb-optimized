@@ -66,7 +66,7 @@ android {
         minSdk = 31
         targetSdk = 36
         versionCode = 2026042500
-        versionName = "2024.4.24"
+        versionName = "2026.4.25"
         ndk {
             // Support all major ABIs — native libs are tiny (~47 KB per ABI)
             abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
@@ -182,7 +182,7 @@ ktlint {
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2026.04.01")
+    val composeBom = platform("androidx.compose:compose-bom:2026.03.01")
     implementation(composeBom)
     androidTestImplementation(composeBom)
 

@@ -60,12 +60,12 @@ and provider plugins have dedicated guides linked above.
       "openclaw": {
         "extensions": ["./index.ts"],
         "compat": {
-          "pluginApi": ">=2024.4.24",
-          "minGatewayVersion": "2024.4.24"
+          "pluginApi": ">=2026.3.24-beta.2",
+          "minGatewayVersion": "2026.3.24-beta.2"
         },
         "build": {
-          "openclawVersion": "2024.4.24",
-          "pluginSdkVersion": "2024.4.24"
+          "openclawVersion": "2026.3.24-beta.2",
+          "pluginSdkVersion": "2026.3.24-beta.2"
         }
       }
     }

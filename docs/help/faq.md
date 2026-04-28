@@ -350,14 +350,39 @@ lives on the [First-run FAQ](/help/faq-first-run).
   </Accordion>
 
   <Accordion title="Can I run Apple macOS-only skills from Linux?">
-    Not directly. Skills are gated by `metadata.openclaw.os` plus required binaries, and skills only appear in the system prompt when they are eligible on the **Gateway host**.
+    Not directly. macOS skills are gated by `metadata.openclaw.os` plus required binaries, and skills only appear in the system prompt when they are eligible on the **Gateway host**. On Linux, `darwin`-only skills (like `apple-notes`, `apple-reminders`, `things-mac`) will not load unless you override the gating.
 
     You have three supported patterns:
 
     **Option A - run the Gateway on a Mac (simplest).**
     Run the Gateway where the macOS binaries exist, then connect from Linux in [remote mode](#gateway-ports-already-running-and-remote-mode) or over Tailscale. The skills load normally because the Gateway host is macOS.
 
-    If you need the same outcome on Linux, use a Linux-supported skill or tool instead.
+    **Option B - use a macOS node (no SSH).**
+    Run the Gateway on Linux, pair a macOS node (menubar app), and set **Node Run Commands** to "Always Ask" or "Always Allow" on the Mac. OpenClaw can treat macOS-only skills as eligible when the required binaries exist on the node. The agent runs those skills via the `nodes` tool. If you choose "Always Ask", approving "Always Allow" in the prompt adds that command to the allowlist.
+
+    **Option C - proxy macOS binaries over SSH (advanced).**
+    Keep the Gateway on Linux, but make the required CLI binaries resolve to SSH wrappers that run on a Mac. Then override the skill to allow Linux so it stays eligible.
+
+    1. Create an SSH wrapper for the binary (example: `memo` for Apple Notes):
+
+       ```bash
+       #!/usr/bin/env bash
+       set -euo pipefail
+       exec ssh -T user@mac-host /opt/homebrew/bin/memo "$@"
+       ```
+
+    2. Put the wrapper on `PATH` on the Linux host (for example `~/bin/memo`).
+    3. Override the skill metadata (workspace or `~/.openclaw/skills`) to allow Linux:
+
+       ```markdown
+       ---
+       name: apple-notes
+       description: Manage Apple Notes via the memo CLI on macOS.
+       metadata: { "openclaw": { "os": ["darwin", "linux"], "requires": { "bins": ["memo"] } } }
+       ---
+       ```
+
+    4. Start a new session so the skills snapshot refreshes.
 
   </Accordion>
 

@@ -31,6 +31,7 @@ import { shouldSuppressBuiltInModel } from "../agents/model-suppression.js";
 import { ensureOpenClawModelsJson } from "../agents/models-config.js";
 import { isRateLimitErrorMessage } from "../agents/pi-embedded-helpers/errors.js";
 import { discoverAuthStorage, discoverModels } from "../agents/pi-model-discovery.js";
+import { STREAM_ERROR_FALLBACK_TEXT } from "../agents/stream-message-shared.js";
 import { clearRuntimeConfigSnapshot, loadConfig } from "../config/io.js";
 import type { ModelsConfig, ModelProviderConfig, OpenClawConfig } from "../config/types.js";
 import { isTruthyEnvValue } from "../infra/env.js";
@@ -736,6 +737,16 @@ describe("shouldSkipEmptyResponseForLiveModel", () => {
   );
 });
 
+describe("isEmptyStreamText", () => {
+  it.each([
+    { text: "request ended without sending any chunks", expected: true },
+    { text: `not meaningful: ${STREAM_ERROR_FALLBACK_TEXT}`, expected: true },
+    { text: "not meaningful: let me think", expected: false },
+  ])("returns $expected for $text", ({ text, expected }) => {
+    expect(isEmptyStreamText(text)).toBe(expected);
+  });
+});
+
 describe("isPromptProbeMiss", () => {
   it.each([
     { error: "not meaningful: let me think", expected: true },
@@ -763,7 +774,10 @@ function isMissingProfileError(error: string): boolean {
 }
 
 function isEmptyStreamText(text: string): boolean {
-  return text.includes("request ended without sending any chunks");
+  return (
+    text.includes("request ended without sending any chunks") ||
+    text.includes(STREAM_ERROR_FALLBACK_TEXT)
+  );
 }
 
 function buildAnthropicRefusalToken(): string {
@@ -1498,7 +1512,6 @@ async function runGatewayModelSuite(params: GatewayModelSuiteParams) {
       process.env.ANTHROPIC_API_KEY = anthropicKeys[0];
       logProgress(`[${params.label}] anthropic keys loaded: ${anthropicKeys.length}`);
     }
-    const sessionKey = `agent:${agentId}:${params.label}`;
     const failures: Array<{ model: string; error: string }> = [];
     let skippedCount = 0;
     const total = params.candidates.length;
@@ -1506,6 +1519,10 @@ async function runGatewayModelSuite(params: GatewayModelSuiteParams) {
     for (const [index, model] of params.candidates.entries()) {
       const modelKey = `${model.provider}/${model.id}`;
       const progressLabel = `[${params.label}] ${index + 1}/${total} ${modelKey}`;
+      // Use a separate session per model: live providers can finalize late after
+      // skip/retry paths, and a reset on a reused key does not isolate those
+      // delayed transcript writes from the next model probe.
+      const sessionKey = `agent:${agentId}:${params.label}:model-${index + 1}`;
 
       const attemptMax =
         model.provider === "anthropic" && anthropicKeys.length > 0 ? anthropicKeys.length : 1;

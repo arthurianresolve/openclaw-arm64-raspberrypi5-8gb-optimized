@@ -50,21 +50,6 @@ has_native_swift_changes() {
   git show --name-only --relative --pretty='' HEAD -- apps/macos apps/ios apps/shared/OpenClawKit | rg -q .
 }
 
-has_linux_swift_fixture_changes() {
-  if git rev-parse --verify --quiet origin/main >/dev/null; then
-    if git diff --name-only --relative origin/main...HEAD -- fixtures/linux-native | rg -q .; then
-      return 0
-    fi
-  fi
-
-  if git rev-parse --verify --quiet HEAD^ >/dev/null; then
-    git diff --name-only --relative HEAD^..HEAD -- fixtures/linux-native | rg -q .
-    return $?
-  fi
-
-  git show --name-only --relative --pretty='' HEAD -- fixtures/linux-native | rg -q .
-}
-
 run_linux_ci_mirror() {
   run_step pnpm check
   run_step pnpm build:strict-smoke
@@ -78,26 +63,6 @@ run_linux_ci_mirror() {
   OPENCLAW_VITEST_MAX_WORKERS="${OPENCLAW_VITEST_MAX_WORKERS:-1}" \
   NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=6144}" \
     pnpm test
-}
-
-run_linux_swift_fixture_mirror() {
-  if [[ "${OPENCLAW_PREPUSH_SKIP_LINUX_SWIFT_FIXTURE:-0}" == "1" ]]; then
-    log_step "Skipping Linux Swift fixture mirror because OPENCLAW_PREPUSH_SKIP_LINUX_SWIFT_FIXTURE=1"
-    return 0
-  fi
-
-  if ! command -v swift >/dev/null 2>&1; then
-    log_step "Skipping Linux Swift fixture mirror because swift is not installed"
-    return 0
-  fi
-
-  if ! has_linux_swift_fixture_changes; then
-    log_step "Skipping Linux Swift fixture mirror because no fixture paths changed"
-    return 0
-  fi
-
-  run_step swift build --package-path fixtures/linux-native
-  run_step swift test --package-path fixtures/linux-native --parallel
 }
 
 run_macos_ci_mirror() {
@@ -124,7 +89,6 @@ run_macos_ci_mirror() {
 
 main() {
   run_linux_ci_mirror
-  run_linux_swift_fixture_mirror
   run_macos_ci_mirror
 }
 

@@ -66,10 +66,10 @@ Release behavior:
 - The beta flow does not modify `apps/ios/.local-signing.xcconfig` or `apps/ios/LocalSigning.xcconfig`.
 - `apps/ios/version.json` is the pinned iOS release version source.
 - `apps/ios/CHANGELOG.md` is the iOS-only changelog and release-note source.
-- The pinned iOS version must use CalVer like `2024.4.24`.
+- The pinned iOS version must use CalVer like `2026.4.10`.
 - That pinned value becomes:
-  - `CFBundleShortVersionString = 2024.4.24`
-  - `CFBundleVersion = next TestFlight build number for 2024.4.24`
+  - `CFBundleShortVersionString = 2026.4.10`
+  - `CFBundleVersion = next TestFlight build number for 2026.4.10`
 - Changing the root gateway version does not change the iOS app version until you explicitly pin from the gateway.
 - See `apps/ios/VERSIONING.md` for the full workflow.
 
@@ -165,7 +165,7 @@ pnpm ios:version
 pnpm ios:version:check
 pnpm ios:version:sync
 pnpm ios:version:pin -- --from-gateway
-pnpm ios:version:pin -- --version 2024.4.24
+pnpm ios:version:pin -- --version 2026.4.10
 ```
 
 Recommended flow:

@@ -498,6 +498,36 @@ export function collectControlUiPackErrors(paths: Iterable<string>): string[] {
   return errors;
 }
 
+export function collectInventoryPackMismatchErrors(
+  paths: Iterable<string>,
+  rootDir = process.cwd(),
+): string[] {
+  const packedPaths = new Set([...paths].map(normalizePackedPath));
+  if (!packedPaths.has(PACKAGE_DIST_INVENTORY_RELATIVE_PATH)) {
+    return [];
+  }
+
+  let inventory: unknown;
+  try {
+    inventory = JSON.parse(
+      readFileSync(join(rootDir, PACKAGE_DIST_INVENTORY_RELATIVE_PATH), "utf8"),
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return [`invalid package dist inventory ${PACKAGE_DIST_INVENTORY_RELATIVE_PATH}: ${message}`];
+  }
+
+  if (!Array.isArray(inventory) || inventory.some((entry) => typeof entry !== "string")) {
+    return [`invalid package dist inventory ${PACKAGE_DIST_INVENTORY_RELATIVE_PATH}`];
+  }
+
+  return inventory
+    .map((entry) => normalizePackedPath(entry))
+    .filter((entry) => !packedPaths.has(entry))
+    .map((entry) => `inventory references missing npm pack entry ${entry}`)
+    .toSorted((left, right) => left.localeCompare(right));
+}
+
 function collectPackedTarballErrors(): string[] {
   const errors: string[] = [];
   let stdout = "";
@@ -532,6 +562,7 @@ function collectPackedTarballErrors(): string[] {
 
   return [
     ...collectControlUiPackErrors(packedPaths),
+    ...collectInventoryPackMismatchErrors(packedPaths),
     ...collectForbiddenPackedPathErrors(packedPaths),
     ...collectForbiddenPackedContentErrors(packedPaths),
     ...collectPackedTestCargoErrors(packedPaths),

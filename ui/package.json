@@ -6,7 +6,7 @@
     "build": "vite build",
     "dev": "vite",
     "preview": "vite preview",
-    "test": "node ../scripts/run-vitest.mjs run --config ui/vitest.config.ts"
+    "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "@create-markdown/preview": "^2.0.3",

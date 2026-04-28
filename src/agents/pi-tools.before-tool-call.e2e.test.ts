@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  onInternalDiagnosticEvent,
   onDiagnosticEvent,
   resetDiagnosticEventsForTest,
   type DiagnosticEventPayload,
@@ -90,7 +91,7 @@ describe("before_tool_call loop detection behavior", () => {
     run: (emitted: DiagnosticEventPayload[], flush: () => Promise<void>) => Promise<void>,
   ) {
     const emitted: DiagnosticEventPayload[] = [];
-    const stop = onDiagnosticEvent((evt) => {
+    const stop = onInternalDiagnosticEvent((evt) => {
       if (evt.type.startsWith("tool.execution.")) {
         emitted.push(evt);
       }
@@ -391,7 +392,12 @@ describe("before_tool_call loop detection behavior", () => {
         paramsSummary: {
           kind: "object",
         },
-        trace,
+        trace: {
+          traceId: trace.traceId,
+          parentSpanId: trace.spanId,
+          spanId: expect.any(String),
+          traceFlags: trace.traceFlags,
+        },
       });
       expect(emitted[0]?.trace).not.toBe(trace);
       expect(Object.isFrozen(emitted[0]?.trace)).toBe(true);

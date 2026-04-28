@@ -11,6 +11,7 @@ import {
   collectBundledExtensionManifestErrors,
   collectBundledPluginRootRuntimeMirrorErrors,
   collectForbiddenPackContentPaths,
+  collectInventoryPackMismatchErrors,
   collectInstalledBundledPluginRuntimeDepErrors,
   bundledRuntimeDependencySentinelCandidates,
   collectRootDistBundledRuntimeMirrors,
@@ -178,7 +179,7 @@ describe("bundled plugin root runtime mirrors", () => {
       ["@larksuiteoapi/node-sdk", { conflicts: [], pluginIds: ["feishu"], spec: "^1.60.0" }],
       [
         "@matrix-org/matrix-sdk-crypto-nodejs",
-        { conflicts: [], pluginIds: ["matrix"], spec: "^0.5.1" },
+        { conflicts: [], pluginIds: ["matrix"], spec: "^0.4.0" },
       ],
       [
         "@matrix-org/matrix-sdk-crypto-wasm",
@@ -434,10 +435,12 @@ describe("collectForbiddenPackPaths", () => {
     expect(
       collectForbiddenPackPaths([
         "dist/index.js",
+        "dist/extensions/browser/.OpenClaw-Install-Stage/package.json",
         "dist/extensions/codex/.openclaw-runtime-deps-backup-node_modules-old/zod/index.js",
         "dist/extensions/discord/.openclaw-runtime-deps-stamp.json",
       ]),
     ).toEqual([
+      "dist/extensions/browser/.OpenClaw-Install-Stage/package.json",
       "dist/extensions/codex/.openclaw-runtime-deps-backup-node_modules-old/zod/index.js",
       "dist/extensions/discord/.openclaw-runtime-deps-stamp.json",
     ]);
@@ -486,20 +489,28 @@ describe("collectForbiddenPackPaths", () => {
     }
   });
 
-  it("allows legacy QA compatibility paths in the generated dist inventory", () => {
+  it("fails when the generated dist inventory references entries missing from npm pack", () => {
     const tempRoot = mkdtempSync(join(tmpdir(), "openclaw-release-inventory-"));
 
     try {
       mkdirSync(join(tempRoot, "dist"), { recursive: true });
       writeFileSync(
         join(tempRoot, PACKAGE_DIST_INVENTORY_RELATIVE_PATH),
-        JSON.stringify(["dist/extensions/qa-lab/runtime-api.js"]),
+        JSON.stringify(["dist/current.js", "dist/extensions/qa-channel/runtime-api.js"]),
         "utf8",
       );
 
       expect(
         collectForbiddenPackContentPaths([PACKAGE_DIST_INVENTORY_RELATIVE_PATH], tempRoot),
       ).toEqual([]);
+      expect(
+        collectInventoryPackMismatchErrors(
+          [PACKAGE_DIST_INVENTORY_RELATIVE_PATH, "dist/current.js"],
+          tempRoot,
+        ),
+      ).toEqual([
+        "inventory references missing npm pack entry dist/extensions/qa-channel/runtime-api.js",
+      ]);
     } finally {
       rmSync(tempRoot, { recursive: true, force: true });
     }
@@ -685,7 +696,7 @@ describe("bundledRuntimeDependencySentinelCandidates", () => {
       mkdirSync(join(packageRoot, "dist", "extensions", "browser"), { recursive: true });
       writeFileSync(
         join(packageRoot, "package.json"),
-        JSON.stringify({ name: "openclaw", version: "2024.4.24" }, null, 2),
+        JSON.stringify({ name: "openclaw", version: "2026.4.25-beta.1" }, null, 2),
       );
       symlinkSync(packageRoot, aliasRoot, "dir");
 

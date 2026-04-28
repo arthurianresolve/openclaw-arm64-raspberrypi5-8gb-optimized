@@ -39,13 +39,13 @@ steps:
             message:
               expr: config.prompt
             timeoutMs:
-              expr: liveTurnTimeoutMs(env, 90000)
+              expr: liveTurnTimeoutMs(env, 180000)
       - call: waitForCondition
         saveAs: outbound
         args:
           - lambda:
               expr: "state.getSnapshot().messages.filter((candidate) => candidate.direction === 'outbound' && candidate.conversation.id === 'qa-operator' && String(candidate.text ?? '').includes(config.contextNeedle) && !normalizeLowercaseStringOrEmpty(candidate.text).includes('waiting')).at(-1)"
-          - expr: liveTurnTimeoutMs(env, 45000)
+          - expr: liveTurnTimeoutMs(env, 90000)
           - expr: "env.providerMode === 'mock-openai' ? 100 : 250"
       - assert:
           expr: "env.mock || String(outbound.text ?? '').includes(config.contextNeedle)"

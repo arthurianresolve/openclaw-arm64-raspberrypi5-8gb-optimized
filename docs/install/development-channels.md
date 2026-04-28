@@ -56,7 +56,7 @@ update **without** changing your persisted channel:
 
 ```bash
 # Install a specific version
-openclaw update --tag 2024.4.24
+openclaw update --tag 2026.4.1-beta.1
 
 # Install from the beta dist-tag (one-off, does not persist)
 openclaw update --tag beta
@@ -65,7 +65,7 @@ openclaw update --tag beta
 openclaw update --tag main
 
 # Install a specific npm package spec
-openclaw update --tag openclaw@2024.4.24
+openclaw update --tag openclaw@2026.4.1-beta.1
 ```
 
 Notes:
@@ -86,7 +86,7 @@ Preview what `openclaw update` would do without making changes:
 ```bash
 openclaw update --dry-run
 openclaw update --channel beta --dry-run
-openclaw update --tag 2024.4.24 --dry-run
+openclaw update --tag 2026.4.1-beta.1 --dry-run
 openclaw update --dry-run --json
 ```
 

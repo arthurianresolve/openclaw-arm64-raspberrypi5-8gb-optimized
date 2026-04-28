@@ -33,12 +33,22 @@ On Raspberry Pi or other CPU-only ARM64 hosts, install the repo's wrapper after
 installing upstream QMD:
 
 ```bash
-./scripts/setup-qmd-system.sh --enable-service --enable-linger
+./scripts/setup-qmd-system.sh --state-root /data/openclaw/state/qmd-home --enable-service --enable-linger
 ```
 
 That wrapper keeps QMD on a writable XDG home, forces CPU mode with
 `QMD_LLAMA_GPU=none`, and defaults `qmd query` to `--no-rerank` so first-party
 OpenClaw deployments do not stall on slow reranking.
+
+If you also run the gateway on a Raspberry Pi, prefer the combined host helper:
+
+```bash
+./scripts/setup-raspberry-pi-system.sh --enable-qmd-service --enable-linger
+```
+
+That adds a gateway service drop-in with `OPENCLAW_NO_RESPAWN=1`,
+`NODE_COMPILE_CACHE=/data/openclaw/cache/node-compile`, and the same
+`QMD_WRAPPER_HOME=/data/openclaw/state/qmd-home` used by the wrapper.
 
 ### Enable
 

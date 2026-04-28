@@ -2,6 +2,7 @@
 set -eu
 
 REAL_QMD_BIN="__REAL_QMD_BIN__"
+DEFAULT_QMD_WRAPPER_HOME="__DEFAULT_QMD_WRAPPER_HOME__"
 
 if [ ! -x "$REAL_QMD_BIN" ]; then
   printf '%s\n' "openclaw-qmd: real QMD binary not found at $REAL_QMD_BIN" >&2
@@ -9,7 +10,7 @@ if [ ! -x "$REAL_QMD_BIN" ]; then
 fi
 
 REAL_HOME="${HOME:-/tmp}"
-QMD_WRAPPER_HOME="${QMD_WRAPPER_HOME:-$REAL_HOME/.local/state/qmd-home}"
+QMD_WRAPPER_HOME="${QMD_WRAPPER_HOME:-$DEFAULT_QMD_WRAPPER_HOME}"
 LEGACY_QMD_CONFIG_DIR="$REAL_HOME/.config/qmd"
 LEGACY_QMD_CACHE_DIR="$REAL_HOME/.cache/qmd"
 

@@ -8,6 +8,8 @@ TARGET_BIN_DIR="${OPENCLAW_QMD_BIN_DIR:-$HOME/.local/bin}"
 TARGET_BIN="$TARGET_BIN_DIR/qmd"
 TARGET_SERVICE_DIR="$HOME/.config/systemd/user"
 TARGET_SERVICE="$TARGET_SERVICE_DIR/qmd-mcp.service"
+DEFAULT_STATE_ROOT="$HOME/.local/state/qmd-home"
+STATE_ROOT="${OPENCLAW_QMD_STATE_ROOT:-$DEFAULT_STATE_ROOT}"
 ENABLE_SERVICE=0
 ENABLE_LINGER=0
 PREWARM=0
@@ -24,6 +26,7 @@ Options:
   --enable-service   Enable and start qmd-mcp.service after install
   --enable-linger    Run `loginctl enable-linger $USER` after install
   --prewarm          Run a small `qmd query` after install to hydrate models
+  --state-root PATH  Set the default QMD wrapper state root (default: ~/.local/state/qmd-home)
   --force            Overwrite an existing ~/.local/bin/qmd without a backup
   -h, --help         Show this message
 EOF
@@ -60,6 +63,14 @@ while [ $# -gt 0 ]; do
     --prewarm)
       PREWARM=1
       ;;
+    --state-root)
+      if [ $# -lt 2 ]; then
+        printf '%s\n' "--state-root requires a path argument" >&2
+        exit 1
+      fi
+      STATE_ROOT="$2"
+      shift
+      ;;
     --force)
       FORCE=1
       ;;
@@ -76,6 +87,11 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+if [ -z "$STATE_ROOT" ]; then
+  printf '%s\n' "State root must not be empty" >&2
+  exit 1
+fi
+
 REAL_QMD_BIN="$(find_real_qmd || true)"
 if [ -z "$REAL_QMD_BIN" ]; then
   printf '%s\n' "No upstream qmd binary found on PATH. Install @tobilu/qmd first." >&2
@@ -83,6 +99,7 @@ if [ -z "$REAL_QMD_BIN" ]; then
 fi
 
 mkdir -p "$TARGET_BIN_DIR" "$TARGET_SERVICE_DIR"
+mkdir -p "$STATE_ROOT"
 
 if [ -e "$TARGET_BIN" ] && [ "$FORCE" -ne 1 ]; then
   backup_path="$TARGET_BIN.openclaw-backup.$(date +%Y%m%d%H%M%S)"
@@ -90,13 +107,17 @@ if [ -e "$TARGET_BIN" ] && [ "$FORCE" -ne 1 ]; then
   printf '%s\n' "Backed up existing $TARGET_BIN to $backup_path"
 fi
 
-sed "s#__REAL_QMD_BIN__#$REAL_QMD_BIN#g" "$WRAPPER_TEMPLATE" >"$TARGET_BIN"
+sed \
+  -e "s#__REAL_QMD_BIN__#$REAL_QMD_BIN#g" \
+  -e "s#__DEFAULT_QMD_WRAPPER_HOME__#$STATE_ROOT#g" \
+  "$WRAPPER_TEMPLATE" >"$TARGET_BIN"
 chmod +x "$TARGET_BIN"
-cp "$SERVICE_TEMPLATE" "$TARGET_SERVICE"
+sed "s#__QMD_WRAPPER_HOME__#$STATE_ROOT#g" "$SERVICE_TEMPLATE" >"$TARGET_SERVICE"
 
 printf '%s\n' "Installed wrapper: $TARGET_BIN"
 printf '%s\n' "Real QMD binary:   $REAL_QMD_BIN"
 printf '%s\n' "Installed service: $TARGET_SERVICE"
+printf '%s\n' "QMD state root:    $STATE_ROOT"
 
 if command -v systemctl >/dev/null 2>&1 && can_use_user_systemd; then
   systemctl --user daemon-reload

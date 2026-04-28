@@ -33,7 +33,7 @@ declare module "convex/server" {
     route(config: {
       path: string;
       method: string;
-      handler: (ctx: any, request: Request) => Promise<Response> | Response;
+      handler: (ctx: unknown, request: Request) => Promise<Response> | Response;
     }): void;
   };
 }

@@ -1909,8 +1909,8 @@ describe("update-cli", () => {
         makeOkUpdateResult({
           mode: "npm",
           root: updatedRoot,
-          before: { version: "2026.4.23" },
-          after: { version: "2026.4.24" },
+          before: { version: "2026.4.24" },
+          after: { version: "2026.4.25" },
         }),
     });
     prepareRestartScript.mockResolvedValue(null);
@@ -1953,7 +1953,7 @@ describe("update-cli", () => {
         .mock.calls.map((call) => String(call[0]))
         .join("\n"),
     ).toContain(
-      "Gateway version mismatch: expected 2026.4.24, running gateway reported 2026.4.23.",
+      "Gateway version mismatch: expected 2026.4.25, running gateway reported 2026.4.24.",
     );
     expect(doctorCommand).not.toHaveBeenCalled();
   });
@@ -1966,17 +1966,17 @@ describe("update-cli", () => {
         makeOkUpdateResult({
           mode: "npm",
           root: updatedRoot,
-          before: { version: "2026.4.24" },
-          after: { version: "2026.4.23" },
+          before: { version: "2026.4.25" },
+          after: { version: "2026.4.24" },
         }),
     });
-    readPackageVersion.mockResolvedValue("2026.4.23");
+    readPackageVersion.mockResolvedValue("2026.4.24");
     serviceLoaded.mockResolvedValue(true);
     probeGateway.mockResolvedValue({
       ok: true,
       close: null,
       server: {
-        version: "2026.4.23",
+        version: "2026.4.24",
         connId: "updated-gateway",
       },
       auth: { role: "operator", scopes: ["operator.read"], capability: "read_only" },

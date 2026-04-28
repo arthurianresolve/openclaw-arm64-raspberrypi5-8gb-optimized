@@ -29,7 +29,7 @@ This page covers running the regular test suites and Docker/Parallels runners. T
 
 Most days:
 
-- Full gate (expected before push): `pnpm build && pnpm check && pnpm check:test-types && pnpm test`
+- Full gate (expected before push): `pnpm build && pnpm check && pnpm check:types:extended && pnpm test`
 - Faster local full-suite run on a roomy machine: `pnpm test:max`
 - Direct Vitest watch loop: `pnpm test:watch`
 - Direct file targeting now routes extension/channel paths too: `pnpm test extensions/discord/src/monitor/message-handler.preflight.test.ts`

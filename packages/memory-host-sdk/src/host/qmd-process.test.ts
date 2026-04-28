@@ -19,6 +19,8 @@ import { checkQmdBinaryAvailability, resolveCliSpawnInvocation } from "./qmd-pro
 function createMockChild() {
   const child = new EventEmitter() as EventEmitter & {
     kill: ReturnType<typeof vi.fn>;
+    stdout?: EventEmitter;
+    stderr?: EventEmitter;
   };
   child.kill = vi.fn();
   return child;
@@ -125,19 +127,26 @@ describe("resolveCliSpawnInvocation", () => {
 describe("checkQmdBinaryAvailability", () => {
   it("returns available when the qmd process spawns successfully", async () => {
     const child = createMockChild();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
     spawnMock.mockImplementationOnce(() => {
-      queueMicrotask(() => child.emit("spawn"));
+      queueMicrotask(() => {
+        child.emit("spawn");
+        child.stdout?.emit("data", Buffer.from("2.1.0\n"));
+        child.emit("close", 0);
+      });
       return child;
     });
 
     await expect(
       checkQmdBinaryAvailability({ command: "qmd", env: process.env, cwd: tempDir }),
-    ).resolves.toEqual({ available: true });
-    expect(child.kill).toHaveBeenCalled();
+    ).resolves.toEqual({ available: true, version: "2.1.0" });
   });
 
   it("returns unavailable when the qmd process cannot be spawned", async () => {
     const child = createMockChild();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
     const err = Object.assign(new Error("spawn qmd ENOENT"), { code: "ENOENT" });
     spawnMock.mockImplementationOnce(() => {
       queueMicrotask(() => child.emit("error", err));
@@ -151,6 +160,8 @@ describe("checkQmdBinaryAvailability", () => {
 
   it("does not treat close-before-spawn as a successful availability probe", async () => {
     const child = createMockChild();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
     const err = Object.assign(new Error("spawn qmd ENOENT"), { code: "ENOENT" });
     spawnMock.mockImplementationOnce(() => {
       queueMicrotask(() => child.emit("close"));
@@ -161,5 +172,23 @@ describe("checkQmdBinaryAvailability", () => {
     await expect(
       checkQmdBinaryAvailability({ command: "qmd", env: process.env, cwd: tempDir }),
     ).resolves.toEqual({ available: false, error: "spawn qmd ENOENT" });
+  });
+
+  it("returns unavailable when qmd exits non-zero during version probe", async () => {
+    const child = createMockChild();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    spawnMock.mockImplementationOnce(() => {
+      queueMicrotask(() => {
+        child.emit("spawn");
+        child.stderr?.emit("data", Buffer.from("boom\n"));
+        child.emit("close", 1);
+      });
+      return child;
+    });
+
+    await expect(
+      checkQmdBinaryAvailability({ command: "qmd", env: process.env, cwd: tempDir }),
+    ).resolves.toEqual({ available: false, error: "boom" });
   });
 });

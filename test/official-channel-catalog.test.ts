@@ -127,7 +127,9 @@ describe("buildOfficialChannelCatalog", () => {
   it("keeps official external catalog npm sources exactly pinned", () => {
     const repoRoot = makeRepoRoot("openclaw-official-channel-catalog-policy-");
     const entries = buildOfficialChannelCatalog({ repoRoot }).entries.filter(
-      (entry) => entry.source === "external",
+      (entry) =>
+        typeof (entry.openclaw?.install as { expectedIntegrity?: string } | undefined)
+          ?.expectedIntegrity === "string",
     );
 
     expect(entries.length).toBeGreaterThan(0);

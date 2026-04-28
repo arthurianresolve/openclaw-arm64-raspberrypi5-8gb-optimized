@@ -170,7 +170,10 @@ export function buildGuardedModelFetch(model: Model<Api>, timeoutMs?: number): t
   const requestConfig = resolveModelRequestPolicy(model);
   const dispatcherPolicy = buildProviderRequestDispatcherPolicy(requestConfig);
   const requestTimeoutMs = resolveModelRequestTimeoutMs(model, timeoutMs);
-  return async (input, init) => {
+  const fetchWithOptionalPreconnect = fetch as typeof fetch & {
+    preconnect?: (...args: any[]) => unknown;
+  };
+  const guardedFetch = async (input: URL | RequestInfo, init?: RequestInit) => {
     const request = input instanceof Request ? new Request(input, init) : undefined;
     const url =
       request?.url ??
@@ -220,4 +223,10 @@ export function buildGuardedModelFetch(model: Model<Api>, timeoutMs?: number): t
     }
     return buildManagedResponse(response, result.release);
   };
+  return Object.assign(guardedFetch, {
+    preconnect:
+      typeof fetchWithOptionalPreconnect.preconnect === "function"
+        ? fetchWithOptionalPreconnect.preconnect.bind(fetch)
+        : undefined,
+  }) as typeof fetch;
 }

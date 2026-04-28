@@ -6,7 +6,7 @@
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { showPagedSelectList } from "./ui/paged-select";
+import { showPagedSelectList } from "./ui/paged-select.js";
 
 interface FileEntry {
   path: string;
@@ -105,6 +105,7 @@ export default function (pi: ExtensionAPI) {
         }
       };
 
+      const fileByPath = new Map(files.map((file) => [file.path, file] as const));
       const items = files.map((file) => {
         const ops: string[] = [];
         if (file.operations.has("read")) {
@@ -117,7 +118,7 @@ export default function (pi: ExtensionAPI) {
           ops.push("E");
         }
         return {
-          value: file,
+          value: file.path,
           label: `${ops.join("")} ${file.path}`,
         };
       });
@@ -126,7 +127,10 @@ export default function (pi: ExtensionAPI) {
         title: " Select file to open",
         items,
         onSelect: (item) => {
-          void openSelected(item.value as FileEntry);
+          const selected = fileByPath.get(item.value);
+          if (selected) {
+            void openSelected(selected);
+          }
         },
       });
     },

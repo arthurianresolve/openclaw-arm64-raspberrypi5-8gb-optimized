@@ -175,7 +175,7 @@ async function main() {
     agentId: "default",
     isGroup: false,
     deps: {
-      runDoctor: async (_runtime, options) => {
+      runDoctor: async (_runtime: unknown, options: { repair?: boolean }) => {
         doctorRuns.push(options.repair ? "repair" : "check");
       },
     },
@@ -191,7 +191,7 @@ async function main() {
     agentId: "default",
     isGroup: false,
     deps: {
-      runDoctor: async (_runtime, options) => {
+      runDoctor: async (_runtime: unknown, options: { repair?: boolean }) => {
         doctorRuns.push(options.repair ? "repair" : "check");
       },
     },
@@ -221,7 +221,8 @@ async function main() {
   );
   assert(
     updatedConfig.agents?.list?.some(
-      (agent) => agent.id === "work" && agent.workspace === "/tmp/openclaw-work",
+      (agent: { id?: string; workspace?: string }) =>
+        agent.id === "work" && agent.workspace === "/tmp/openclaw-work",
     ),
     "agent config was not updated",
   );

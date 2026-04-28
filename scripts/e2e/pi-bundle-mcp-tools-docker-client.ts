@@ -55,7 +55,7 @@ function applyPolicy(params: {
       sessionKey: "agent:main:docker-pi-bundle-mcp",
       agentId: "main",
       senderIsOwner: true,
-      warn: (message) => {
+      warn: (message: string) => {
         warnings.push(message);
       },
     }),
@@ -105,13 +105,16 @@ async function main() {
 
     const result = await probeTool.execute("docker-mcp-probe", {}, undefined, undefined);
     assert(
-      result.content.some((item) => item.type === "text" && item.text === "pi-bundle-mcp-tools-ok"),
+      result.content.some(
+        (item: { type?: string; text?: string }) =>
+          item.type === "text" && item.text === "pi-bundle-mcp-tools-ok",
+      ),
       "expected materialized MCP tool execution result",
     );
 
     const coding = applyPolicy({ tools: materialized.tools, config: cfg });
     assert(
-      coding.tools.some((tool) => tool.name === probeTool.name),
+      coding.tools.some((tool: { name?: string }) => tool.name === probeTool.name),
       "expected coding profile to keep bundle MCP tools",
     );
 
@@ -120,7 +123,7 @@ async function main() {
       config: { ...cfg, tools: { profile: "messaging" } },
     });
     assert(
-      messaging.tools.some((tool) => tool.name === probeTool.name),
+      messaging.tools.some((tool: { name?: string }) => tool.name === probeTool.name),
       "expected messaging profile to keep bundle MCP tools",
     );
 

@@ -419,10 +419,18 @@ try {
     await context.grantPermissions(["microphone"], { origin: url });
     const page = await context.newPage();
     await page.goto(url);
-    await page.waitForFunction(() => globalThis.__relaySmokeDone === true, undefined, {
-      timeout: 15_000,
-    });
-    const result = (await page.evaluate(() => globalThis.__relaySmokeResult)) as {
+    await page.waitForFunction(
+      () =>
+        (globalThis as typeof globalThis & { __relaySmokeDone?: boolean }).__relaySmokeDone ===
+        true,
+      undefined,
+      {
+        timeout: 15_000,
+      },
+    );
+    const result = (await page.evaluate(
+      () => (globalThis as typeof globalThis & { __relaySmokeResult?: unknown }).__relaySmokeResult,
+    )) as {
       error?: string;
       requests?: Array<{ method?: string }>;
       statuses?: Array<{ status?: string }>;

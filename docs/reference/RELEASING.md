@@ -90,8 +90,10 @@ the maintainer-only release runbook.
 
 ## Release preflight
 
-- Run `pnpm check:test-types` before release preflight so test TypeScript stays
-  covered outside the faster local `pnpm check` gate
+- Run `pnpm check:types:extended` before release preflight so the broader
+  TypeScript gate stays green outside the faster local `pnpm check` path. This
+  lane covers tooling, root tests, QA Convex, and the extra src/ui/package test
+  shards in addition to the required prod/test paths.
 - Run `pnpm check:architecture` before release preflight so the broader import
   cycle and architecture boundary checks are green outside the faster local gate
 - Run `pnpm build && pnpm ui:build` before `pnpm release:check` so the expected

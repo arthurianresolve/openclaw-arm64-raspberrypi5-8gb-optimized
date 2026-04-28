@@ -1,4 +1,4 @@
-import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import { request as httpRequest } from "node:http";
@@ -29,7 +29,7 @@ export type GatewayInstance = {
   homeDir: string;
   stateDir: string;
   configPath: string;
-  child: ChildProcessWithoutNullStreams;
+  child: ChildProcess;
   stdout: string[];
   stderr: string[];
 };
@@ -124,7 +124,7 @@ const getFreePort = async () => {
 };
 
 async function waitForPortOpen(
-  proc: ChildProcessWithoutNullStreams,
+  proc: ChildProcess,
   chunksOut: string[],
   chunksErr: string[],
   port: number,
@@ -168,10 +168,7 @@ async function waitForPortOpen(
   );
 }
 
-async function waitForGatewayExit(
-  child: ChildProcessWithoutNullStreams,
-  timeoutMs: number,
-): Promise<boolean> {
+async function waitForGatewayExit(child: ChildProcess, timeoutMs: number): Promise<boolean> {
   return await Promise.race([
     new Promise<boolean>((resolve) => {
       if (child.exitCode !== null || child.signalCode !== null) {
@@ -213,7 +210,7 @@ export async function spawnGatewayInstance(name: string): Promise<GatewayInstanc
 
   const stdout: string[] = [];
   const stderr: string[] = [];
-  let child: ChildProcessWithoutNullStreams | null = null;
+  let child: ChildProcess | null = null;
 
   try {
     const cwd = process.cwd();
@@ -435,8 +432,10 @@ export async function waitForNodeStatus(
   );
   try {
     while (Date.now() < deadline) {
-      const list = await client.request("node.list", {});
-      const match = list.nodes?.find((n) => n.nodeId === nodeId);
+      const list = (await client.request("node.list", {})) as {
+        nodes?: Array<{ nodeId?: string; connected?: boolean; paired?: boolean }>;
+      };
+      const match = list.nodes?.find((n: { nodeId?: string }) => n.nodeId === nodeId);
       if (match?.connected && match?.paired) {
         return;
       }

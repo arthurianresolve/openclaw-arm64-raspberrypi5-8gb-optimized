@@ -157,7 +157,14 @@ export function createScopedVitestConfig(
   },
 ) {
   const base = sharedVitestConfig as Record<string, unknown>;
-  const baseTest = sharedVitestConfig.test ?? {};
+  const baseTest = (sharedVitestConfig.test ?? {}) as {
+    coverage?: {
+      exclude?: string[];
+    };
+    exclude?: string[];
+    sequence?: Record<string, unknown>;
+    setupFiles?: string[];
+  };
   const scopedDir = options?.dir;
   const resolvedScopedDir = scopedDir ? path.join(repoRoot, scopedDir) : undefined;
   const env = options?.env;

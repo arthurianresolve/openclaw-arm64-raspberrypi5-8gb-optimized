@@ -50,7 +50,7 @@ function createProbe(
       capability,
     },
     server: {
-      version: "2026.4.24",
+      version: "2026.4.25",
       connId: "conn-test",
     },
     health: null,

@@ -39,9 +39,9 @@ function createRuntime(): { runtime: RuntimeEnv; lines: string[] } {
   return {
     lines,
     runtime: {
-      log: (...args) => lines.push(args.join(" ")),
-      error: (...args) => lines.push(args.join(" ")),
-      exit: (code) => {
+      log: (...args: unknown[]) => lines.push(args.map(String).join(" ")),
+      error: (...args: unknown[]) => lines.push(args.map(String).join(" ")),
+      exit: (code: number) => {
         throw new Error(`exit ${code}`);
       },
     },
@@ -135,7 +135,7 @@ async function main() {
       config.agents.defaults.model.primary === spec.model,
     "first-run setup did not write default model",
   );
-  const reef = config.agents?.list?.find((agent) => agent.id === spec.agentId);
+  const reef = config.agents?.list?.find((agent: { id?: string }) => agent.id === spec.agentId);
   assert(reef, "Crestodian did not create reef agent");
   assert(reef.workspace === spec.dockerAgentWorkspace, "Crestodian did not write reef workspace");
   assert(reef.model === spec.model, "Crestodian did not write reef model");

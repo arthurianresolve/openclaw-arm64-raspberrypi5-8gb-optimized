@@ -20,9 +20,9 @@ function createRuntime(): { runtime: RuntimeEnv; lines: string[] } {
   return {
     lines,
     runtime: {
-      log: (...args) => lines.push(args.join(" ")),
-      error: (...args) => lines.push(args.join(" ")),
-      exit: (code) => {
+      log: (...args: unknown[]) => lines.push(args.map(String).join(" ")),
+      error: (...args: unknown[]) => lines.push(args.map(String).join(" ")),
+      exit: (code: number) => {
         throw new Error(`exit ${code}`);
       },
     },

@@ -43,9 +43,11 @@ describe("web provider boundaries", () => {
     const jsonOutput = await webSearchJsonOutputPromise;
 
     expect(inventory).toEqual([]);
-    expect(inventory.some((entry) => entry.file.startsWith(BUNDLED_PLUGIN_PATH_PREFIX))).toBe(
-      false,
-    );
+    expect(
+      inventory.some((entry: (typeof inventory)[number]) =>
+        entry.file.startsWith(BUNDLED_PLUGIN_PATH_PREFIX),
+      ),
+    ).toBe(false);
     expect(
       [...inventory].toSorted(
         (left, right) =>

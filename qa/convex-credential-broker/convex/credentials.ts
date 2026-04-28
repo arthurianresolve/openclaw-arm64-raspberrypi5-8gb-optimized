@@ -256,7 +256,7 @@ export const acquireLease = internalMutation({
 
     const activeRows = (await ctx.db
       .query("credential_sets")
-      .withIndex("by_kind_status", (q) => q.eq("kind", args.kind).eq("status", "active"))
+      .withIndex("by_kind_status", (q: any) => q.eq("kind", args.kind).eq("status", "active"))
       .collect()) as CredentialSetRecord[];
 
     const availableRows = activeRows.filter((row) => !leaseIsActive(row.lease, nowMs));
@@ -566,12 +566,14 @@ export const listCredentialSets = internalQuery({
       if (normalizedStatus === "all") {
         rows = (await ctx.db
           .query("credential_sets")
-          .withIndex("by_kind_lastLeasedAtMs", (q) => q.eq("kind", kind))
+          .withIndex("by_kind_lastLeasedAtMs", (q: any) => q.eq("kind", kind))
           .collect()) as CredentialSetRecord[];
       } else {
         rows = (await ctx.db
           .query("credential_sets")
-          .withIndex("by_kind_status", (q) => q.eq("kind", kind).eq("status", normalizedStatus))
+          .withIndex("by_kind_status", (q: any) =>
+            q.eq("kind", kind).eq("status", normalizedStatus),
+          )
           .collect()) as CredentialSetRecord[];
       }
     } else {
@@ -597,7 +599,7 @@ export const cleanupLeaseEvents = internalMutation({
     const cutoffMs = Date.now() - LEASE_EVENT_RETENTION_MS;
     const staleRows = await ctx.db
       .query("lease_events")
-      .withIndex("by_occurredAtMs", (q) => q.lt("occurredAtMs", cutoffMs))
+      .withIndex("by_occurredAtMs", (q: any) => q.lt("occurredAtMs", cutoffMs))
       .take(EVENT_RETENTION_BATCH_SIZE);
 
     for (const row of staleRows) {
@@ -622,7 +624,7 @@ export const cleanupAdminEvents = internalMutation({
     const cutoffMs = Date.now() - ADMIN_EVENT_RETENTION_MS;
     const staleRows = await ctx.db
       .query("admin_events")
-      .withIndex("by_occurredAtMs", (q) => q.lt("occurredAtMs", cutoffMs))
+      .withIndex("by_occurredAtMs", (q: any) => q.lt("occurredAtMs", cutoffMs))
       .take(EVENT_RETENTION_BATCH_SIZE);
 
     for (const row of staleRows) {

@@ -53,7 +53,7 @@ describe("scripts/ci-run-timings.mjs", () => {
 
   it("selects the push CI run for the current main SHA", () => {
     expect(
-      selectLatestMainPushCiRun(
+      (selectLatestMainPushCiRun as any)(
         [
           {
             databaseId: 3,
@@ -78,7 +78,7 @@ describe("scripts/ci-run-timings.mjs", () => {
 
   it("falls back to the newest push CI run when the exact SHA has not appeared yet", () => {
     expect(
-      selectLatestMainPushCiRun(
+      (selectLatestMainPushCiRun as any)(
         [
           {
             databaseId: 4,

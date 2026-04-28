@@ -87,7 +87,7 @@ describe("run-tsgo sparse guard", () => {
     }
 
     expect(
-      getSparseTsgoGuardError(["-p", "tsconfig.core.test.json"], {
+      (getSparseTsgoGuardError as any)(["-p", "tsconfig.core.test.json"], {
         cwd,
         isSparseCheckoutEnabled: () => true,
         sparseCheckoutPatterns: [

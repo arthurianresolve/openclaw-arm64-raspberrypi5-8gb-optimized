@@ -362,7 +362,7 @@ describe("stageBundledPluginRuntimeDeps", () => {
       ) {
         return result;
       }
-      return (result as fs.Dirent[]).map((entry) => {
+      return (result as unknown as fs.Dirent[]).map((entry) => {
         if (entry.name !== "package.json") {
           return entry;
         }

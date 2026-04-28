@@ -19,6 +19,8 @@ import { checkQmdBinaryAvailability, resolveCliSpawnInvocation } from "./qmd-pro
 function createMockChild() {
   const child = new EventEmitter() as EventEmitter & {
     kill: ReturnType<typeof vi.fn>;
+    stdout?: EventEmitter;
+    stderr?: EventEmitter;
   };
   child.kill = vi.fn();
   return child;
@@ -125,10 +127,8 @@ describe("resolveCliSpawnInvocation", () => {
 describe("checkQmdBinaryAvailability", () => {
   it("returns available when the qmd process spawns successfully", async () => {
     const child = createMockChild();
-    (child as EventEmitter & { stdout?: EventEmitter; stderr?: EventEmitter }).stdout =
-      new EventEmitter();
-    (child as EventEmitter & { stdout?: EventEmitter; stderr?: EventEmitter }).stderr =
-      new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
     spawnMock.mockImplementationOnce(() => {
       queueMicrotask(() => {
         child.emit("spawn");
@@ -145,10 +145,8 @@ describe("checkQmdBinaryAvailability", () => {
 
   it("returns unavailable when the qmd process cannot be spawned", async () => {
     const child = createMockChild();
-    (child as EventEmitter & { stdout?: EventEmitter; stderr?: EventEmitter }).stdout =
-      new EventEmitter();
-    (child as EventEmitter & { stdout?: EventEmitter; stderr?: EventEmitter }).stderr =
-      new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
     const err = Object.assign(new Error("spawn qmd ENOENT"), { code: "ENOENT" });
     spawnMock.mockImplementationOnce(() => {
       queueMicrotask(() => child.emit("error", err));
@@ -162,10 +160,8 @@ describe("checkQmdBinaryAvailability", () => {
 
   it("does not treat close-before-spawn as a successful availability probe", async () => {
     const child = createMockChild();
-    (child as EventEmitter & { stdout?: EventEmitter; stderr?: EventEmitter }).stdout =
-      new EventEmitter();
-    (child as EventEmitter & { stdout?: EventEmitter; stderr?: EventEmitter }).stderr =
-      new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
     const err = Object.assign(new Error("spawn qmd ENOENT"), { code: "ENOENT" });
     spawnMock.mockImplementationOnce(() => {
       queueMicrotask(() => child.emit("close"));
@@ -180,10 +176,8 @@ describe("checkQmdBinaryAvailability", () => {
 
   it("returns unavailable when qmd exits non-zero during version probe", async () => {
     const child = createMockChild();
-    (child as EventEmitter & { stdout?: EventEmitter; stderr?: EventEmitter }).stdout =
-      new EventEmitter();
-    (child as EventEmitter & { stdout?: EventEmitter; stderr?: EventEmitter }).stderr =
-      new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
     spawnMock.mockImplementationOnce(() => {
       queueMicrotask(() => {
         child.emit("spawn");

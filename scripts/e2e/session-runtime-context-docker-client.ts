@@ -92,7 +92,19 @@ async function verifyRuntimeContextTranscriptShape(root: string) {
   });
   sessionManager.appendMessage({
     role: "assistant",
-    content: "done",
+    content: [{ type: "text", text: "done" }],
+    api: "openai-codex-responses",
+    provider: "openai-codex",
+    model: "gpt-5.4-codex",
+    usage: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
+    stopReason: "stop",
     timestamp: Date.now() + 1,
   });
 

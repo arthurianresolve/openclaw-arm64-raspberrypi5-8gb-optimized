@@ -46,6 +46,8 @@ Need to install Node? See [Node setup](/install/node).
 
     <Note>
     Other install methods (Docker, Nix, npm): [Install](/install).
+    On Raspberry Pi / ARM64 hosts with SSD-backed storage, prefer the hackable
+    install under `/data/openclaw`; see [Raspberry Pi](/install/raspberry-pi).
     </Note>
 
   </Step>

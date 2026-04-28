@@ -171,11 +171,12 @@ and troubleshooting see the main [FAQ](/help/faq).
     Short version: it works, but expect rough edges.
 
     - Use a **64-bit** OS and keep Node >= 22.
-    - Prefer the **hackable (git) install** so you can see logs and update fast.
+    - Prefer the **hackable (git) install** under `/data/openclaw` if you have SSD/NVMe storage.
+    - After onboarding, run `./scripts/setup-raspberry-pi-system.sh --enable-qmd-service --enable-linger` from the repo root.
     - Start without channels/skills, then add them one by one.
     - If you hit weird binary issues, it is usually an **ARM compatibility** problem.
 
-    Docs: [Linux](/platforms/linux), [Install](/install).
+    Docs: [Raspberry Pi](/install/raspberry-pi), [Linux](/platforms/linux), [Install](/install).
 
   </Accordion>
 

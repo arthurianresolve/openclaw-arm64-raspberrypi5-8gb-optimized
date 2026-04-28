@@ -35,6 +35,28 @@ describe("noteStartupOptimizationHints", () => {
     expect(message).toContain("export OPENCLAW_NO_RESPAWN=1");
   });
 
+  it("suggests the /data-backed Pi helper when ARM64 hosts still use legacy cache/state paths", () => {
+    const noteFn = vi.fn();
+
+    noteStartupOptimizationHints(
+      {
+        NODE_COMPILE_CACHE: "/var/tmp/openclaw-compile-cache",
+        OPENCLAW_NO_RESPAWN: "1",
+        QMD_WRAPPER_HOME: "/home/pi/.local/state/qmd-home",
+        HOME: "/home/pi",
+      },
+      { platform: "linux", arch: "arm64", totalMemBytes: 8 * 1024 ** 3, noteFn },
+    );
+
+    expect(noteFn).toHaveBeenCalledTimes(1);
+    const [message, title] = noteFn.mock.calls[0] ?? [];
+    expect(title).toBe("Startup optimization");
+    expect(message).toContain("moving OpenClaw cache/QMD state under /data/openclaw");
+    expect(message).toContain(
+      "./scripts/setup-raspberry-pi-system.sh --enable-qmd-service --enable-linger",
+    );
+  });
+
   it("warns when compile cache is disabled via env override", () => {
     const noteFn = vi.fn();
 

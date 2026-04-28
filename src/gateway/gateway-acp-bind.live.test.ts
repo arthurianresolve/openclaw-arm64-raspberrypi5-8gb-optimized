@@ -6,7 +6,11 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { getAcpRuntimeBackend } from "../acp/runtime/registry.js";
 import { isLiveTestEnabled } from "../agents/live-test-helpers.js";
-import { clearConfigCache, clearRuntimeConfigSnapshot, loadConfig } from "../config/config.js";
+import {
+  clearConfigCache,
+  clearRuntimeConfigSnapshot,
+  getRuntimeConfig,
+} from "../config/config.js";
 import { isTruthyEnvValue } from "../infra/env.js";
 import { clearPluginLoaderCache } from "../plugins/loader.js";
 import {
@@ -42,6 +46,10 @@ const ACP_CRON_MCP_PROBE_VERIFY_POLL_MS = 1_000;
 const DEFAULT_LIVE_CODEX_MODEL = "gpt-5.5";
 const DEFAULT_LIVE_PARENT_MODEL = "openai/gpt-5.4";
 type LiveAcpAgent = "claude" | "codex" | "droid" | "gemini" | "opencode";
+
+class AcpBindSkipError extends Error {
+  readonly name = "AcpBindSkipError";
+}
 
 function createSlackCurrentConversationBindingRegistry() {
   return createTestRegistry([
@@ -257,9 +265,55 @@ function isRetryableAcpBindWarmupText(texts: string[]): boolean {
     combined.includes("acp runtime backend is currently unavailable") ||
     combined.includes("try again in a moment") ||
     combined.includes("acp runtime backend is not configured") ||
-    combined.includes("acp dispatch is disabled")
+    combined.includes("acp dispatch is disabled") ||
+    combined.includes("startup timed out before initialize completed")
   );
 }
+
+function isSkippableAcpBindText(params: { liveAgent: LiveAcpAgent; texts: string[] }): boolean {
+  if (params.liveAgent !== "codex") {
+    return false;
+  }
+  const combined = params.texts.join("\n\n").toLowerCase();
+  return (
+    combined.includes("acp_session_init_failed") && combined.includes("authentication required")
+  );
+}
+
+describe("isRetryableAcpBindWarmupText", () => {
+  it.each([
+    {
+      texts: ["ACP runtime backend is currently unavailable; try again in a moment."],
+      expected: true,
+    },
+    {
+      texts: [
+        "ACP error (ACP_SESSION_INIT_FAILED): Gemini CLI ACP startup timed out before initialize completed.",
+      ],
+      expected: true,
+    },
+    { texts: ["ACP error (ACP_SESSION_INIT_FAILED): ACP metadata is missing."], expected: false },
+  ])("returns $expected for $texts", ({ texts, expected }) => {
+    expect(isRetryableAcpBindWarmupText(texts)).toBe(expected);
+  });
+});
+
+describe("isSkippableAcpBindText", () => {
+  it.each([
+    {
+      liveAgent: "codex" as const,
+      texts: ["ACP error (ACP_SESSION_INIT_FAILED): Authentication required"],
+      expected: true,
+    },
+    {
+      liveAgent: "gemini" as const,
+      texts: ["ACP error (ACP_SESSION_INIT_FAILED): Authentication required"],
+      expected: false,
+    },
+  ])("returns $expected for $liveAgent", ({ liveAgent, texts, expected }) => {
+    expect(isSkippableAcpBindText({ liveAgent, texts })).toBe(expected);
+  });
+});
 
 function formatAssistantTextPreview(texts: string[], maxChars = 600): string {
   const combined = texts.join("\n\n").trim();
@@ -343,6 +397,13 @@ async function bindConversationAndWait(params: {
       return { mainAssistantTexts, spawnedSessionKey };
     }
     if (!isRetryableAcpBindWarmupText(mainAssistantTexts)) {
+      if (isSkippableAcpBindText({ liveAgent: params.liveAgent, texts: mainAssistantTexts })) {
+        throw new AcpBindSkipError(
+          `SKIP: ${params.liveAgent} ACP bind unavailable: ${formatAssistantTextPreview(
+            mainAssistantTexts,
+          )}`,
+        );
+      }
       throw new Error(
         `bind command did not produce an ACP session: ${formatAssistantTextPreview(mainAssistantTexts)}`,
       );
@@ -539,7 +600,7 @@ describeLive("gateway live (ACP bind)", () => {
         await prepareCodexHomeForLiveBindTest();
       }
 
-      const cfg = loadConfig();
+      const cfg = getRuntimeConfig();
       const acpxEntry = cfg.plugins?.entries?.acpx;
       const existingAgentOverrides: Record<string, { command?: string }> =
         typeof acpxEntry?.config === "object" &&
@@ -643,14 +704,24 @@ describeLive("gateway live (ACP bind)", () => {
       pinActivePluginChannelRegistry(channelRegistry);
 
       try {
-        const { mainAssistantTexts, spawnedSessionKey } = await bindConversationAndWait({
-          client,
-          sessionKey: originalSessionKey,
-          liveAgent,
-          originatingChannel: "slack",
-          originatingTo: conversationId,
-          originatingAccountId: accountId,
-        });
+        let bindResult: Awaited<ReturnType<typeof bindConversationAndWait>>;
+        try {
+          bindResult = await bindConversationAndWait({
+            client,
+            sessionKey: originalSessionKey,
+            liveAgent,
+            originatingChannel: "slack",
+            originatingTo: conversationId,
+            originatingAccountId: accountId,
+          });
+        } catch (error) {
+          if (error instanceof AcpBindSkipError) {
+            console.error(error.message);
+            return;
+          }
+          throw error;
+        }
+        const { mainAssistantTexts, spawnedSessionKey } = bindResult;
         logLiveStep("bind command completed");
         expect(mainAssistantTexts.join("\n\n")).toContain("Bound this conversation to");
         expect(spawnedSessionKey).toMatch(new RegExp(`^agent:${liveAgent}:acp:`));

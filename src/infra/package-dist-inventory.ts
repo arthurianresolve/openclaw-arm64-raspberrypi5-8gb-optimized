@@ -1,6 +1,5 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { NPM_UPDATE_COMPAT_SIDECAR_PATHS } from "./npm-update-compat-sidecars.js";
 
 export const PACKAGE_DIST_INVENTORY_RELATIVE_PATH = "dist/postinstall-inventory.json";
 const LEGACY_QA_CHANNEL_DIR = ["qa", "channel"].join("-");
@@ -10,12 +9,21 @@ const OMITTED_QA_EXTENSION_PREFIXES = [
   `dist/extensions/${LEGACY_QA_LAB_DIR}/`,
   "dist/extensions/qa-matrix/",
 ];
-const OMITTED_PRIVATE_QA_PLUGIN_SDK_PREFIXES = [`dist/plugin-sdk/extensions/${LEGACY_QA_LAB_DIR}/`];
+const OMITTED_PRIVATE_QA_PLUGIN_SDK_PREFIXES = [
+  `dist/plugin-sdk/extensions/${LEGACY_QA_CHANNEL_DIR}/`,
+  `dist/plugin-sdk/extensions/${LEGACY_QA_LAB_DIR}/`,
+];
 const OMITTED_PRIVATE_QA_PLUGIN_SDK_FILES = new Set([
+  `dist/plugin-sdk/${LEGACY_QA_CHANNEL_DIR}.d.ts`,
+  `dist/plugin-sdk/${LEGACY_QA_CHANNEL_DIR}.js`,
+  `dist/plugin-sdk/${LEGACY_QA_CHANNEL_DIR}-protocol.d.ts`,
+  `dist/plugin-sdk/${LEGACY_QA_CHANNEL_DIR}-protocol.js`,
   `dist/plugin-sdk/${LEGACY_QA_LAB_DIR}.d.ts`,
   `dist/plugin-sdk/${LEGACY_QA_LAB_DIR}.js`,
   "dist/plugin-sdk/qa-runtime.d.ts",
   "dist/plugin-sdk/qa-runtime.js",
+  `dist/plugin-sdk/src/plugin-sdk/${LEGACY_QA_CHANNEL_DIR}.d.ts`,
+  `dist/plugin-sdk/src/plugin-sdk/${LEGACY_QA_CHANNEL_DIR}-protocol.d.ts`,
   `dist/plugin-sdk/src/plugin-sdk/${LEGACY_QA_LAB_DIR}.d.ts`,
   "dist/plugin-sdk/src/plugin-sdk/qa-runtime.d.ts",
 ]);
@@ -25,6 +33,7 @@ const OMITTED_DIST_SUBTREE_PATTERNS = [
   /^dist\/extensions\/[^/]+\/node_modules(?:\/|$)/u,
   /^dist\/extensions\/[^/]+\/\.openclaw-runtime-deps-[^/]+(?:\/|$)/u,
   /^dist\/extensions\/qa-matrix(?:\/|$)/u,
+  new RegExp(`^dist/plugin-sdk/extensions/${LEGACY_QA_CHANNEL_DIR}(?:/|$)`, "u"),
   new RegExp(`^dist/plugin-sdk/extensions/${LEGACY_QA_LAB_DIR}(?:/|$)`, "u"),
 ] as const;
 const INSTALL_STAGE_DEBRIS_DIR_PATTERN = /^\.openclaw-install-stage(?:-[^/]+)?$/iu;
@@ -260,9 +269,6 @@ export async function collectPackageDistInventoryErrors(packageRoot: string): Pr
 
   for (const relativePath of expectedFiles) {
     if (!actualSet.has(relativePath)) {
-      if (NPM_UPDATE_COMPAT_SIDECAR_PATHS.has(relativePath)) {
-        continue;
-      }
       errors.push(`missing packaged dist file ${relativePath}`);
     }
   }

@@ -1,10 +1,13 @@
+// Crestodian rescue-message Docker harness.
+// Imports packaged dist modules so the Docker lane verifies the npm tarball,
+// while this small test driver stays mounted from the checkout.
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { handleCrestodianCommand } from "../../src/auto-reply/reply/commands-crestodian.js";
-import { clearConfigCache } from "../../src/config/config.js";
-import type { OpenClawConfig } from "../../src/config/types.openclaw.js";
-import { runCrestodianRescueMessage } from "../../src/crestodian/rescue-message.js";
+import { handleCrestodianCommand } from "../../dist/auto-reply/reply/commands-crestodian.js";
+import { clearConfigCache } from "../../dist/config/config.js";
+import type { OpenClawConfig } from "../../dist/config/types.openclaw.js";
+import { runCrestodianRescueMessage } from "../../dist/crestodian/rescue-message.js";
 
 type CommandResult = Awaited<ReturnType<typeof handleCrestodianCommand>>;
 
@@ -172,7 +175,7 @@ async function main() {
     agentId: "default",
     isGroup: false,
     deps: {
-      runDoctor: async (_runtime, options) => {
+      runDoctor: async (_runtime: unknown, options: { repair?: boolean }) => {
         doctorRuns.push(options.repair ? "repair" : "check");
       },
     },
@@ -188,7 +191,7 @@ async function main() {
     agentId: "default",
     isGroup: false,
     deps: {
-      runDoctor: async (_runtime, options) => {
+      runDoctor: async (_runtime: unknown, options: { repair?: boolean }) => {
         doctorRuns.push(options.repair ? "repair" : "check");
       },
     },
@@ -218,7 +221,8 @@ async function main() {
   );
   assert(
     updatedConfig.agents?.list?.some(
-      (agent) => agent.id === "work" && agent.workspace === "/tmp/openclaw-work",
+      (agent: { id?: string; workspace?: string }) =>
+        agent.id === "work" && agent.workspace === "/tmp/openclaw-work",
     ),
     "agent config was not updated",
   );

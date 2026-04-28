@@ -1,7 +1,7 @@
 import { type Api, completeSimple, type Model } from "@mariozechner/pi-ai";
 import { Type } from "typebox";
 import { describe, expect, it } from "vitest";
-import { loadConfig } from "../config/config.js";
+import { getRuntimeConfig } from "../config/config.js";
 import { parseLiveCsvFilter } from "../media-generation/live-test-helpers.js";
 import { runTasksWithConcurrency } from "../utils/run-with-concurrency.js";
 import { resolveOpenClawAgentDir } from "./agent-paths.js";
@@ -219,6 +219,14 @@ describe("isProviderUnavailableErrorMessage", () => {
       isProviderUnavailableErrorMessage("provider returned error: 502 Internal Server Error"),
     ).toBe(true);
   });
+
+  it("matches transient xAI model unavailability", () => {
+    expect(
+      isProviderUnavailableErrorMessage(
+        "Error Code null: Service temporarily unavailable. The model did not respond to this request.",
+      ),
+    ).toBe(true);
+  });
 });
 
 function isChatGPTUsageLimitErrorMessage(raw: string): boolean {
@@ -257,8 +265,10 @@ function isProviderUnavailableErrorMessage(raw: string): boolean {
     isCloudflareOrHtmlErrorPage(raw) ||
     msg.includes("no allowed providers are available") ||
     msg.includes("provider unavailable") ||
+    msg.includes("service temporarily unavailable") ||
     msg.includes("upstream provider unavailable") ||
     msg.includes("upstream error from google") ||
+    msg.includes("the model did not respond") ||
     msg.includes("temporarily rate-limited upstream") ||
     msg.includes("unable to access non-serverless model") ||
     msg.includes("create and start a new dedicated endpoint") ||
@@ -689,7 +699,7 @@ describeLive("live models (profile keys)", () => {
     async () => {
       logProgress("[live-models] loading config");
       const cfg = await withLiveStageTimeout(
-        Promise.resolve().then(() => loadConfig()),
+        Promise.resolve().then(() => getRuntimeConfig()),
         "[live-models] load config",
       );
       logProgress("[live-models] preparing models.json");

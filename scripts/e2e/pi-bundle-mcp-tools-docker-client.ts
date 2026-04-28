@@ -1,16 +1,19 @@
+// Pi bundle MCP tools Docker harness.
+// Imports packaged dist modules so tool materialization is verified against the
+// npm tarball installed in the functional image.
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
-import { materializeBundleMcpToolsForRun } from "../../src/agents/pi-bundle-mcp-materialize.ts";
+import { materializeBundleMcpToolsForRun } from "../../dist/agents/pi-bundle-mcp-materialize.js";
 import {
   disposeAllSessionMcpRuntimes,
   getOrCreateSessionMcpRuntime,
-} from "../../src/agents/pi-bundle-mcp-runtime.ts";
-import { applyFinalEffectiveToolPolicy } from "../../src/agents/pi-embedded-runner/effective-tool-policy.ts";
-import type { OpenClawConfig } from "../../src/config/types.openclaw.ts";
-import { getPluginToolMeta } from "../../src/plugins/tools.ts";
+} from "../../dist/agents/pi-bundle-mcp-runtime.js";
+import { applyFinalEffectiveToolPolicy } from "../../dist/agents/pi-embedded-runner/effective-tool-policy.js";
+import type { OpenClawConfig } from "../../dist/config/types.openclaw.js";
+import { getPluginToolMeta } from "../../dist/plugins/tools.js";
 
 const require = createRequire(import.meta.url);
 
@@ -52,7 +55,7 @@ function applyPolicy(params: {
       sessionKey: "agent:main:docker-pi-bundle-mcp",
       agentId: "main",
       senderIsOwner: true,
-      warn: (message) => {
+      warn: (message: string) => {
         warnings.push(message);
       },
     }),
@@ -102,13 +105,16 @@ async function main() {
 
     const result = await probeTool.execute("docker-mcp-probe", {}, undefined, undefined);
     assert(
-      result.content.some((item) => item.type === "text" && item.text === "pi-bundle-mcp-tools-ok"),
+      result.content.some(
+        (item: { type?: string; text?: string }) =>
+          item.type === "text" && item.text === "pi-bundle-mcp-tools-ok",
+      ),
       "expected materialized MCP tool execution result",
     );
 
     const coding = applyPolicy({ tools: materialized.tools, config: cfg });
     assert(
-      coding.tools.some((tool) => tool.name === probeTool.name),
+      coding.tools.some((tool: { name?: string }) => tool.name === probeTool.name),
       "expected coding profile to keep bundle MCP tools",
     );
 
@@ -117,7 +123,7 @@ async function main() {
       config: { ...cfg, tools: { profile: "messaging" } },
     });
     assert(
-      messaging.tools.some((tool) => tool.name === probeTool.name),
+      messaging.tools.some((tool: { name?: string }) => tool.name === probeTool.name),
       "expected messaging profile to keep bundle MCP tools",
     );
 

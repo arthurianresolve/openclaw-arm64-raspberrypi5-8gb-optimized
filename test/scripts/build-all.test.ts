@@ -137,6 +137,7 @@ describe("resolveBuildAllSteps", () => {
     ).toEqual([
       "canvas:a2ui:bundle",
       "tsdown",
+      "check-cli-bootstrap-imports",
       "runtime-postbuild",
       "build-stamp",
       "build:plugin-sdk:dts",
@@ -156,7 +157,7 @@ describe("resolveBuildAllSteps", () => {
       resolveBuildAllSteps("gatewayWatch").map(
         (step: (typeof BUILD_ALL_STEPS)[number]) => step.label,
       ),
-    ).toEqual(["tsdown", "runtime-postbuild", "build-stamp"]);
+    ).toEqual(["tsdown", "check-cli-bootstrap-imports", "runtime-postbuild", "build-stamp"]);
   });
 
   it("does not cache plugin-sdk entry shims over compiled JS", () => {

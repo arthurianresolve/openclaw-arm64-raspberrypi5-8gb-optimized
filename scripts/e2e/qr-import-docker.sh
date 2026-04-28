@@ -15,18 +15,11 @@ if [[ "${OPENCLAW_QR_SMOKE_FORCE_INSTALL:-0}" == "1" ]]; then
 fi
 
 echo "Building Docker image..."
-if ((${#DOCKER_BUILD_ARGS[@]} > 0)); then
-  docker_build_run qr-import-build \
-    "${DOCKER_BUILD_ARGS[@]}" \
-    -t "$IMAGE_NAME" \
-    -f "$ROOT_DIR/scripts/e2e/Dockerfile.qr-import" \
-    "$ROOT_DIR"
-else
-  docker_build_run qr-import-build \
-    -t "$IMAGE_NAME" \
-    -f "$ROOT_DIR/scripts/e2e/Dockerfile.qr-import" \
-    "$ROOT_DIR"
-fi
+docker_build_run qr-import-build \
+  "${DOCKER_BUILD_ARGS[@]}" \
+  -t "$IMAGE_NAME" \
+  -f "$ROOT_DIR/scripts/e2e/Dockerfile.qr-import" \
+  "$ROOT_DIR"
 
 echo "Running qrcode-tui import smoke..."
 run_logged qr-import-run docker run --rm -t "$IMAGE_NAME" node -e "import('@vincentkoc/qrcode-tui').then(async (m)=>{process.stdout.write(await m.renderTerminal('qr-smoke',{small:true}))})"

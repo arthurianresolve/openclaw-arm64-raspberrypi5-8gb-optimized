@@ -16,5 +16,11 @@
     "../src/types/**/*.d.ts",
     "../ui/src/ui/data/**/*.ts"
   ],
-  "exclude": ["pre-commit/**"]
+  "exclude": [
+    "pre-commit/**",
+    "e2e/*docker-client.ts",
+    "e2e/mcp-channels-harness.ts",
+    "e2e/pi-bundle-mcp-tools-docker-client.ts",
+    "e2e/session-runtime-context-docker-client.ts"
+  ]
 }

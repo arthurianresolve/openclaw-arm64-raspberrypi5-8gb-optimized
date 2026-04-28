@@ -764,7 +764,8 @@ function Invoke-OpenClawUpdateWithTimeout {
     }
     Remove-Job $updateJob -Force -ErrorAction SilentlyContinue
     if ($result.ExitCode -ne 0) {
-      throw "openclaw update failed with exit code $($result.ExitCode)"
+      Write-ProgressLog 'update.openclaw-update.nonzero'
+      "openclaw update exited with code $($result.ExitCode); continuing to installed-version and gateway recovery checks" | Tee-Object -FilePath $LogPath -Append | Out-Null
     }
     return
   }

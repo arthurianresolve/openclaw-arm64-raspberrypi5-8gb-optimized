@@ -10010,6 +10010,9 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
                   type: "string",
                   enum: ["off", "partial"],
                 },
+                c2cStreamApi: {
+                  type: "boolean",
+                },
               },
               required: ["mode"],
               additionalProperties: {},
@@ -10249,6 +10252,9 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
                         default: "partial",
                         type: "string",
                         enum: ["off", "partial"],
+                      },
+                      c2cStreamApi: {
+                        type: "boolean",
                       },
                     },
                     required: ["mode"],

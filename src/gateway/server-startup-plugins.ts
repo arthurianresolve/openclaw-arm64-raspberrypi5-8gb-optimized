@@ -5,18 +5,16 @@ import { applyPluginAutoEnable } from "../config/plugin-auto-enable.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { resolveOpenClawPackageRootSync } from "../infra/openclaw-root.js";
 import {
-  repairBundledRuntimeDepsInstallRoot,
+  repairBundledRuntimeDepsInstallRootAsync,
   resolveBundledRuntimeDependencyPackageInstallRoot,
   scanBundledPluginRuntimeDeps,
 } from "../plugins/bundled-runtime-deps.js";
-import {
-  resolveConfiguredDeferredChannelPluginIds,
-  resolveGatewayStartupPluginIds,
-} from "../plugins/channel-plugin-ids.js";
+import { loadPluginLookUpTable } from "../plugins/plugin-lookup-table.js";
+import type { PluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.js";
 import { createEmptyPluginRegistry } from "../plugins/registry.js";
 import { getActivePluginRegistry, setActivePluginRegistry } from "../plugins/runtime.js";
+import { mergeActivationSectionsIntoRuntimeConfig } from "./plugin-activation-runtime-config.js";
 import { listGatewayMethods } from "./server-methods-list.js";
-import { coreGatewayHandlers } from "./server-methods.js";
 import { loadGatewayStartupPlugins } from "./server-plugin-bootstrap.js";
 import { runStartupSessionMigration } from "./server-startup-session-migration.js";
 
@@ -27,11 +25,11 @@ type GatewayPluginBootstrapLog = {
   debug: (message: string) => void;
 };
 
-function prestageGatewayBundledRuntimeDeps(params: {
+async function prestageGatewayBundledRuntimeDeps(params: {
   cfg: OpenClawConfig;
   pluginIds: readonly string[];
   log: GatewayPluginBootstrapLog;
-}): void {
+}): Promise<void> {
   if (params.pluginIds.length === 0) {
     return;
   }
@@ -48,7 +46,7 @@ function prestageGatewayBundledRuntimeDeps(params: {
     scanResult = scanBundledPluginRuntimeDeps({
       packageRoot,
       config: params.cfg,
-      pluginIds: [...params.pluginIds],
+      selectedPluginIds: [...params.pluginIds],
       env: process.env,
     });
   } catch (error) {
@@ -76,7 +74,7 @@ function prestageGatewayBundledRuntimeDeps(params: {
     `[plugins] staging bundled runtime deps before gateway startup (${missingSpecs.length} missing, ${installSpecs.length} install specs): ${missingSpecs.join(", ")}`,
   );
   try {
-    repairBundledRuntimeDepsInstallRoot({
+    await repairBundledRuntimeDepsInstallRootAsync({
       installRoot,
       missingSpecs,
       installSpecs,
@@ -96,10 +94,13 @@ function prestageGatewayBundledRuntimeDeps(params: {
 
 export async function prepareGatewayPluginBootstrap(params: {
   cfgAtStart: OpenClawConfig;
+  activationSourceConfig?: OpenClawConfig;
   startupRuntimeConfig: OpenClawConfig;
+  pluginMetadataSnapshot?: PluginMetadataSnapshot;
   minimalTestGateway: boolean;
   log: GatewayPluginBootstrapLog;
 }) {
+  const activationSourceConfig = params.activationSourceConfig ?? params.cfgAtStart;
   const startupMaintenanceConfig =
     params.cfgAtStart.channels === undefined && params.startupRuntimeConfig.channels !== undefined
       ? {
@@ -132,29 +133,33 @@ export async function prepareGatewayPluginBootstrap(params: {
 
   initSubagentRegistry();
 
-  const gatewayPluginConfigAtStart = params.minimalTestGateway
+  const gatewayPluginConfig = params.minimalTestGateway
     ? params.cfgAtStart
-    : applyPluginAutoEnable({
-        config: params.cfgAtStart,
-        env: process.env,
-      }).config;
-  const defaultAgentId = resolveDefaultAgentId(gatewayPluginConfigAtStart);
-  const defaultWorkspaceDir = resolveAgentWorkspaceDir(gatewayPluginConfigAtStart, defaultAgentId);
-  const deferredConfiguredChannelPluginIds = params.minimalTestGateway
-    ? []
-    : resolveConfiguredDeferredChannelPluginIds({
-        config: gatewayPluginConfigAtStart,
+    : mergeActivationSectionsIntoRuntimeConfig({
+        runtimeConfig: params.cfgAtStart,
+        activationConfig: applyPluginAutoEnable({
+          config: activationSourceConfig,
+          env: process.env,
+          ...(params.pluginMetadataSnapshot?.manifestRegistry
+            ? { manifestRegistry: params.pluginMetadataSnapshot.manifestRegistry }
+            : {}),
+        }).config,
+      });
+  const defaultAgentId = resolveDefaultAgentId(gatewayPluginConfig);
+  const defaultWorkspaceDir = resolveAgentWorkspaceDir(gatewayPluginConfig, defaultAgentId);
+  const pluginLookUpTable = params.minimalTestGateway
+    ? undefined
+    : loadPluginLookUpTable({
+        config: gatewayPluginConfig,
         workspaceDir: defaultWorkspaceDir,
         env: process.env,
+        activationSourceConfig,
+        metadataSnapshot: params.pluginMetadataSnapshot,
       });
-  const startupPluginIds = params.minimalTestGateway
-    ? []
-    : resolveGatewayStartupPluginIds({
-        config: gatewayPluginConfigAtStart,
-        activationSourceConfig: params.cfgAtStart,
-        workspaceDir: defaultWorkspaceDir,
-        env: process.env,
-      });
+  const deferredConfiguredChannelPluginIds = [
+    ...(pluginLookUpTable?.startup.configuredDeferredChannelPluginIds ?? []),
+  ];
+  const startupPluginIds = [...(pluginLookUpTable?.startup.pluginIds ?? [])];
 
   const baseMethods = listGatewayMethods();
   const emptyPluginRegistry = createEmptyPluginRegistry();
@@ -162,19 +167,20 @@ export async function prepareGatewayPluginBootstrap(params: {
   let baseGatewayMethods = baseMethods;
 
   if (!params.minimalTestGateway) {
-    prestageGatewayBundledRuntimeDeps({
-      cfg: gatewayPluginConfigAtStart,
+    await prestageGatewayBundledRuntimeDeps({
+      cfg: gatewayPluginConfig,
       pluginIds: startupPluginIds,
       log: params.log,
     });
     ({ pluginRegistry, gatewayMethods: baseGatewayMethods } = loadGatewayStartupPlugins({
-      cfg: gatewayPluginConfigAtStart,
-      activationSourceConfig: params.cfgAtStart,
+      cfg: gatewayPluginConfig,
+      activationSourceConfig,
       workspaceDir: defaultWorkspaceDir,
       log: params.log,
-      coreGatewayHandlers,
+      coreGatewayMethodNames: baseMethods,
       baseMethods,
       pluginIds: startupPluginIds,
+      pluginLookUpTable,
       preferSetupRuntimeForChannelPlugins: deferredConfiguredChannelPluginIds.length > 0,
       suppressPluginInfoLogs: deferredConfiguredChannelPluginIds.length > 0,
     }));
@@ -184,10 +190,11 @@ export async function prepareGatewayPluginBootstrap(params: {
   }
 
   return {
-    gatewayPluginConfigAtStart,
+    gatewayPluginConfigAtStart: gatewayPluginConfig,
     defaultWorkspaceDir,
     deferredConfiguredChannelPluginIds,
     startupPluginIds,
+    pluginLookUpTable,
     baseMethods,
     pluginRegistry,
     baseGatewayMethods,

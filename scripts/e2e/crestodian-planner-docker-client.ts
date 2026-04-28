@@ -1,10 +1,13 @@
+// Crestodian planner Docker harness.
+// Imports packaged dist modules so the Docker lane verifies the npm tarball,
+// while this small test driver stays mounted from the checkout.
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { clearConfigCache } from "../../src/config/config.js";
-import type { OpenClawConfig } from "../../src/config/types.openclaw.js";
-import { runCrestodian } from "../../src/crestodian/crestodian.js";
-import type { RuntimeEnv } from "../../src/runtime.js";
+import { clearConfigCache } from "../../dist/config/config.js";
+import type { OpenClawConfig } from "../../dist/config/types.openclaw.js";
+import { runCrestodian } from "../../dist/crestodian/crestodian.js";
+import type { RuntimeEnv } from "../../dist/runtime.js";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -17,9 +20,9 @@ function createRuntime(): { runtime: RuntimeEnv; lines: string[] } {
   return {
     lines,
     runtime: {
-      log: (...args) => lines.push(args.join(" ")),
-      error: (...args) => lines.push(args.join(" ")),
-      exit: (code) => {
+      log: (...args: unknown[]) => lines.push(args.map(String).join(" ")),
+      error: (...args: unknown[]) => lines.push(args.map(String).join(" ")),
+      exit: (code: number) => {
         throw new Error(`exit ${code}`);
       },
     },

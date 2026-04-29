@@ -30,6 +30,7 @@ Quick "get unstuck" path for the most common problems:
 
 - [Testing](/help/testing) — test suites and Docker runners
 - [Live tests](/help/testing-live) — network-touching provider and CLI smokes
+- [Codesight memory plan (Pi ARM64)](/help/codesight-memory-pi-plan) — phased implementation + acceptance criteria
 
 ## Community and meta
 

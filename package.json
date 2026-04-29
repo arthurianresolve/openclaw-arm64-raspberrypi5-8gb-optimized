@@ -1652,6 +1652,7 @@
     "tool-display:check": "node --import tsx scripts/tool-display.ts --check",
     "tool-display:write": "node --import tsx scripts/tool-display.ts --write",
     "ts-topology": "node --import tsx scripts/ts-topology.ts",
+    "tsc:core:noemit": "node scripts/run-tsc.mjs -p tsconfig.core.json --noEmit",
     "tsgo": "pnpm tsgo:core",
     "tsgo:all": "node scripts/run-tsgo.mjs -b tsconfig.projects.json",
     "tsgo:core": "node scripts/run-tsgo.mjs -p tsconfig.core.json --incremental --tsBuildInfoFile .artifacts/tsgo-cache/core.tsbuildinfo",

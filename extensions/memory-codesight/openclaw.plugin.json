@@ -1,0 +1,49 @@
+{
+  "id": "memory-codesight",
+  "name": "Memory Codesight",
+  "description": "Expose .codesight artifacts as an additive memory corpus supplement.",
+  "uiHints": {
+    "rootDir": {
+      "label": "Codesight Root",
+      "help": "Relative or absolute path to the codesight artifact root."
+    },
+    "limits.maxResults": {
+      "label": "Max Results",
+      "help": "Hard cap for codesight supplement search results."
+    },
+    "limits.maxSnippetChars": {
+      "label": "Max Snippet Chars",
+      "help": "Maximum snippet chars returned per codesight result."
+    },
+    "limits.maxFileBytes": {
+      "label": "Max File Bytes",
+      "help": "Skip artifact files larger than this size."
+    },
+    "limits.maxFilesPerQuery": {
+      "label": "Max Files Per Query",
+      "help": "Maximum number of artifact files considered per query."
+    },
+    "staleAfterHours": {
+      "label": "Stale After Hours",
+      "help": "Mark artifacts stale when older than this many hours."
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "rootDir": { "type": "string" },
+      "limits": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maxResults": { "type": "number", "minimum": 1 },
+          "maxSnippetChars": { "type": "number", "minimum": 64 },
+          "maxFileBytes": { "type": "number", "minimum": 1024 },
+          "maxFilesPerQuery": { "type": "number", "minimum": 1 }
+        }
+      },
+      "staleAfterHours": { "type": "number", "minimum": 1 }
+    }
+  }
+}

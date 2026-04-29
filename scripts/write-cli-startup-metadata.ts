@@ -38,6 +38,14 @@ const CORE_CHANNEL_ORDER = [
   "imessage",
 ] as const;
 
+function isBenignSpawnSyncError(result: {
+  error?: NodeJS.ErrnoException | null;
+  status: number | null;
+  signal: NodeJS.Signals | null;
+}) {
+  return result.error?.code === "EPERM" && result.status === 0 && result.signal === null;
+}
+
 type ExtensionChannelEntry = {
   id: string;
   order: number;
@@ -217,7 +225,7 @@ export async function renderBundledRootHelpText(
     env: renderContext.env,
     timeout: ROOT_HELP_RENDER_TIMEOUT_MS,
   });
-  if (result.error) {
+  if (result.error && !isBenignSpawnSyncError(result)) {
     throw result.error;
   }
   if (result.status !== 0) {
@@ -258,7 +266,7 @@ function renderSourceRootHelpText(
       timeout: ROOT_HELP_RENDER_TIMEOUT_MS,
     },
   );
-  if (result.error) {
+  if (result.error && !isBenignSpawnSyncError(result)) {
     throw result.error;
   }
   if (result.status !== 0) {
@@ -305,7 +313,7 @@ function renderSourceBrowserHelpText(
       timeout: BROWSER_HELP_RENDER_TIMEOUT_MS,
     },
   );
-  if (result.error) {
+  if (result.error && !isBenignSpawnSyncError(result)) {
     throw result.error;
   }
   if (result.status !== 0) {

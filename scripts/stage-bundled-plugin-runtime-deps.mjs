@@ -235,6 +235,14 @@ const defaultStagedRuntimeDepPruneRules = new Map([
 ]);
 const runtimeDepsStagingVersion = 7;
 const exactVersionSpecRe = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;
+const runtimeDepsDebugEnabled = process.env.OPENCLAW_RUNTIME_DEPS_DEBUG === "1";
+const runtimeDepsFastFingerprint = process.env.OPENCLAW_RUNTIME_DEPS_FAST_FINGERPRINT !== "0";
+
+function runtimeDepsDebug(message) {
+  if (runtimeDepsDebugEnabled) {
+    console.log(`[runtime-deps] ${message}`);
+  }
+}
 
 function resolveRuntimeDepPruneConfig(params = {}) {
   return {
@@ -284,7 +292,9 @@ function collectInstalledRuntimeDependencyRoots(
   dependencySpecs,
   directDependencyPackageRoot = null,
   optionalDependencyNames = new Set(),
+  options = {},
 ) {
+  const enforceDirectSpecs = options.enforceDirectSpecs ?? true;
   const packageCache = new Map();
   const directRoots = [];
   const allRoots = [];
@@ -302,7 +312,7 @@ function collectInstalledRuntimeDependencyRoots(
     const depRoot = resolveInstalledDependencyRoot({
       depName: current.depName,
       spec: current.spec,
-      enforceSpec: current.direct,
+      enforceSpec: current.direct ? enforceDirectSpecs : false,
       parentPackageRoot: current.parentPackageRoot,
       rootNodeModulesDir,
     });
@@ -447,6 +457,7 @@ function resolveInstalledDirectDependencyNames(
     const depRoot = resolveInstalledDependencyRoot({
       depName,
       spec,
+      enforceSpec: false,
       parentPackageRoot: directDependencyPackageRoot,
       rootNodeModulesDir,
     });
@@ -457,8 +468,13 @@ function resolveInstalledDirectDependencyNames(
       return null;
     }
     const installedVersion = readInstalledDependencyVersionFromRoot(depRoot);
-    if (installedVersion === null || !dependencyVersionSatisfied(spec, installedVersion)) {
+    if (installedVersion === null) {
       return null;
+    }
+    if (!dependencyVersionSatisfied(spec, installedVersion)) {
+      runtimeDepsDebug(
+        `direct dependency version mismatch for ${depName}: required ${spec}, installed ${installedVersion}; using installed root closure`,
+      );
     }
     directDependencyNames.push(depName);
   }
@@ -486,9 +502,12 @@ function appendDirectoryFingerprint(hash, rootDir, currentDir = rootDir) {
     if (!stats.isFile()) {
       continue;
     }
-    const stat = fs.statSync(fullPath);
-    hash.update(`file:${relativePath}:${stat.size}\n`);
-    hash.update(fs.readFileSync(fullPath));
+    // Runtime-deps fingerprinting runs during every build. Hashing full file
+    // contents across large dependency closures can dominate postbuild time
+    // (notably for heavy provider stacks). Use stable file metadata instead.
+    hash.update(
+      `file:${relativePath}:${stats.size}:${stats.mtimeMs.toFixed(3)}:${stats.mode}:${stats.ino}\n`,
+    );
   }
 }
 
@@ -518,6 +537,7 @@ function resolveInstalledRuntimeClosureFingerprint(params) {
     dependencySpecs,
     params.directDependencyPackageRoot,
     new Set(Object.keys(params.packageJson.optionalDependencies ?? {})),
+    { enforceDirectSpecs: false },
   );
   if (resolution === null) {
     return null;
@@ -1046,6 +1066,9 @@ function stageInstalledRootRuntimeDeps(params) {
   const optionalDependencyNames = new Set(Object.keys(packageJson.optionalDependencies ?? {}));
   const rootNodeModulesDir = path.join(repoRoot, "node_modules");
   if (Object.keys(dependencySpecs).length === 0 || !fs.existsSync(rootNodeModulesDir)) {
+    runtimeDepsDebug(
+      `${path.basename(pluginDir)}: root node_modules missing or no dependency specs`,
+    );
     return false;
   }
 
@@ -1056,6 +1079,9 @@ function stageInstalledRootRuntimeDeps(params) {
     optionalDependencyNames,
   );
   if (directDependencyNames === null) {
+    runtimeDepsDebug(
+      `${path.basename(pluginDir)}: could not resolve installed direct dependency names`,
+    );
     return false;
   }
   const resolution = collectInstalledRuntimeDependencyRoots(
@@ -1063,8 +1089,12 @@ function stageInstalledRootRuntimeDeps(params) {
     dependencySpecs,
     directDependencyPackageRoot,
     optionalDependencyNames,
+    { enforceDirectSpecs: false },
   );
   if (resolution === null) {
+    runtimeDepsDebug(
+      `${path.basename(pluginDir)}: could not resolve installed runtime dependency roots`,
+    );
     return false;
   }
   const rootsToCopy = selectRuntimeDependencyRootsToCopy(resolution);
@@ -1093,6 +1123,9 @@ function stageInstalledRootRuntimeDeps(params) {
       const sourcePath = record.realRoot;
       const targetPath = dependencyNodeModulesPath(stagedNodeModulesDir, record.name);
       if (targetPath === null) {
+        runtimeDepsDebug(
+          `${path.basename(pluginDir)}: invalid dependency target path for ${record.name}`,
+        );
         return false;
       }
       fs.mkdirSync(path.dirname(targetPath), { recursive: true });
@@ -1106,6 +1139,9 @@ function stageInstalledRootRuntimeDeps(params) {
           targetPath,
         })
       ) {
+        runtimeDepsDebug(
+          `${path.basename(pluginDir)}: copyMaterializedDependencyTree failed for ${record.name}`,
+        );
         return false;
       }
     }
@@ -1221,8 +1257,13 @@ export function stageBundledPluginRuntimeDeps(params = {}) {
     params.installPluginRuntimeDepsImpl ?? installPluginRuntimeDeps;
   const installAttempts = params.installAttempts ?? 3;
   const pruneConfig = resolveRuntimeDepPruneConfig(params);
+  const onlyPluginId = process.env.OPENCLAW_RUNTIME_DEPS_ONLY?.trim() || null;
   for (const pluginDir of listBundledPluginRuntimeDirs(repoRoot)) {
     const pluginId = path.basename(pluginDir);
+    if (onlyPluginId && pluginId !== onlyPluginId) {
+      continue;
+    }
+    runtimeDepsDebug(`plugin ${pluginId}: start`);
     const sourcePluginRoot = resolveInstalledWorkspacePluginRoot(repoRoot, pluginId);
     const directDependencyPackageRoot = fs.existsSync(path.join(sourcePluginRoot, "package.json"))
       ? sourcePluginRoot
@@ -1234,6 +1275,7 @@ export function stageBundledPluginRuntimeDeps(params = {}) {
     removePathIfExists(legacyStampPath);
     removeStaleRuntimeDepsTempDirs(pluginDir);
     if (!hasRuntimeDeps(packageJson) || !shouldStageRuntimeDeps(packageJson)) {
+      runtimeDepsDebug(`plugin ${pluginId}: no runtime deps staging required`);
       removePathIfExists(nodeModulesDir);
       removePathIfExists(stampPath);
       continue;
@@ -1242,18 +1284,22 @@ export function stageBundledPluginRuntimeDeps(params = {}) {
       repoRoot,
     });
     const stamp = readRuntimeDepsStamp(stampPath);
-    const rootInstalledRuntimeFingerprint = resolveInstalledRuntimeClosureFingerprint({
-      directDependencyPackageRoot,
-      packageJson,
-      rootNodeModulesDir: path.join(repoRoot, "node_modules"),
-    });
+    const rootInstalledRuntimeFingerprint = runtimeDepsFastFingerprint
+      ? null
+      : resolveInstalledRuntimeClosureFingerprint({
+          directDependencyPackageRoot,
+          packageJson,
+          rootNodeModulesDir: path.join(repoRoot, "node_modules"),
+        });
     const fingerprint = createRuntimeDepsFingerprint(packageJson, pruneConfig, {
       repoRoot,
       rootInstalledRuntimeFingerprint,
     });
     if (fs.existsSync(nodeModulesDir) && stamp?.fingerprint === fingerprint) {
+      runtimeDepsDebug(`plugin ${pluginId}: fingerprint hit`);
       continue;
     }
+    runtimeDepsDebug(`plugin ${pluginId}: staging from installed root closure`);
     if (
       stageInstalledRootRuntimeDeps({
         directDependencyPackageRoot,
@@ -1266,8 +1312,10 @@ export function stageBundledPluginRuntimeDeps(params = {}) {
         stampPath,
       })
     ) {
+      runtimeDepsDebug(`plugin ${pluginId}: staged from installed root closure`);
       continue;
     }
+    runtimeDepsDebug(`plugin ${pluginId}: falling back to explicit npm install`);
     try {
       installPluginRuntimeDepsWithRetries({
         attempts: installAttempts,
@@ -1284,6 +1332,7 @@ export function stageBundledPluginRuntimeDeps(params = {}) {
           stampPath,
         },
       });
+      runtimeDepsDebug(`plugin ${pluginId}: staged via explicit npm install`);
     } catch (error) {
       throw createRootRuntimeStagingError({ packageJson, pluginId, cause: error });
     }

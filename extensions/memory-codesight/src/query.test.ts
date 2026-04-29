@@ -77,6 +77,34 @@ describe("searchCodesightCorpus", () => {
 
     expect(results[0]?.provenanceLabel).toBe("codesight (stale)");
   });
+
+  it("serves last-known-good cache when artifact root becomes unreadable", async () => {
+    const workspace = await createWorkspace();
+    const codesightDir = path.join(workspace, ".codesight");
+    await fs.writeFile(
+      path.join(codesightDir, "CODESIGHT.md"),
+      "# Project Overview\n\nresilient cache check\n",
+      "utf8",
+    );
+    const config = resolveMemoryCodesightConfig({});
+    const appConfig = createAppConfig(workspace);
+
+    const first = await searchCodesightCorpus({
+      query: "resilient",
+      appConfig,
+      config,
+    });
+    expect(first).toHaveLength(1);
+
+    await fs.rename(codesightDir, `${codesightDir}.offline`);
+    const second = await searchCodesightCorpus({
+      query: "resilient",
+      appConfig,
+      config,
+    });
+    expect(second).toHaveLength(1);
+    expect(second[0]?.provenanceLabel).toBe("codesight (stale)");
+  });
 });
 
 describe("getCodesightCorpusEntry", () => {

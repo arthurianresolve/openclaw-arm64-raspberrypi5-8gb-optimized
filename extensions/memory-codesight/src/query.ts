@@ -33,6 +33,8 @@ type CachedArtifact = {
 type WorkspaceCache = Map<string, CachedArtifact>;
 
 const workspaceCaches = new Map<string, WorkspaceCache>();
+const workspaceFailureCounts = new Map<string, number>();
+const WORKSPACE_FAILURE_WARN_THRESHOLD = 3;
 
 function getWorkspaceCache(workspaceDir: string): WorkspaceCache {
   const existing = workspaceCaches.get(workspaceDir);
@@ -71,13 +73,20 @@ function resolveArtifactRoot(workspaceDir: string, config: ResolvedMemoryCodesig
     : path.join(workspaceDir, config.rootDir.replaceAll("/", path.sep));
 }
 
-async function listArtifactPaths(rootDir: string): Promise<string[]> {
+async function listArtifactPaths(rootDir: string): Promise<{ files: string[]; failed: boolean }> {
   const paths: string[] = [];
+  const rootEntries = await fs.readdir(rootDir, { withFileTypes: true }).catch(() => null);
+  if (!rootEntries) {
+    return { files: [], failed: true };
+  }
+  const hasMarkdownAtRoot = new Set(
+    rootEntries
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+      .map((entry) => entry.name),
+  );
   for (const fileName of INDEX_FILES) {
-    const absolute = path.join(rootDir, fileName);
-    const stat = await fs.stat(absolute).catch(() => null);
-    if (stat?.isFile()) {
-      paths.push(absolute);
+    if (hasMarkdownAtRoot.has(fileName)) {
+      paths.push(path.join(rootDir, fileName));
     }
   }
   const wikiDir = path.join(rootDir, WIKI_DIR);
@@ -87,7 +96,10 @@ async function listArtifactPaths(rootDir: string): Promise<string[]> {
       paths.push(path.join(wikiDir, entry.name));
     }
   }
-  return paths.toSorted((left, right) => left.localeCompare(right));
+  return {
+    files: paths.toSorted((left, right) => left.localeCompare(right)),
+    failed: false,
+  };
 }
 
 async function loadArtifact(params: {
@@ -129,8 +141,22 @@ async function loadArtifacts(params: {
   nowMs: number;
 }): Promise<ParsedArtifact[]> {
   const rootDir = resolveArtifactRoot(params.workspaceDir, params.config);
-  const files = await listArtifactPaths(rootDir);
+  const { files, failed } = await listArtifactPaths(rootDir);
   const cache = getWorkspaceCache(params.workspaceDir);
+  if (failed && cache.size > 0) {
+    const nextFailures = (workspaceFailureCounts.get(params.workspaceDir) ?? 0) + 1;
+    workspaceFailureCounts.set(params.workspaceDir, nextFailures);
+    if (nextFailures >= WORKSPACE_FAILURE_WARN_THRESHOLD) {
+      console.warn(
+        `[memory-codesight] artifact scan failed for ${params.workspaceDir}; serving last-known-good cache (${nextFailures} consecutive failures).`,
+      );
+    }
+    return Array.from(cache.values()).map((entry) => ({
+      ...entry.artifact,
+      stale: true,
+    }));
+  }
+  workspaceFailureCounts.set(params.workspaceDir, 0);
   const nextCache: WorkspaceCache = new Map();
   const artifacts: ParsedArtifact[] = [];
 
@@ -356,4 +382,5 @@ export async function getCodesightCorpusEntry(params: {
 
 export function _clearCodesightWorkspaceCacheForTests(): void {
   workspaceCaches.clear();
+  workspaceFailureCounts.clear();
 }

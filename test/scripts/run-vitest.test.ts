@@ -6,6 +6,7 @@ import {
   resolveVitestNodeArgs,
   resolveVitestNoOutputTimeoutMs,
   resolveVitestSpawnParams,
+  shouldSuppressVitestOutputLine,
   shouldSuppressVitestStderrLine,
 } from "../../scripts/run-vitest.mjs";
 
@@ -130,6 +131,7 @@ describe("scripts/run-vitest", () => {
         "\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m plugin `foo` was slow\n",
       ),
     ).toBe(true);
+    expect(shouldSuppressVitestOutputLine("[PLUGIN_TIMINGS] Warning: noisy line\n")).toBe(true);
     expect(shouldSuppressVitestStderrLine("real failure output\n")).toBe(false);
   });
 
@@ -142,7 +144,7 @@ describe("scripts/run-vitest", () => {
       const logSpy = vi.fn();
 
       const teardown = installVitestNoOutputWatchdog({
-        streams: [stdout],
+        monitoredStreams: [{ stream: stdout }],
         timeoutMs: 1000,
         forceKillAfterMs: 5000,
         log: logSpy,
@@ -184,7 +186,7 @@ describe("scripts/run-vitest", () => {
       const logSpy = vi.fn();
 
       installVitestNoOutputWatchdog({
-        streams: [stdout],
+        monitoredStreams: [{ stream: stdout }],
         timeoutMs: 1000,
         forceKillAfterMs: 0,
         label: "run --config test/vitest/vitest.secrets.config.ts",
@@ -196,6 +198,27 @@ describe("scripts/run-vitest", () => {
       expect(logSpy).toHaveBeenCalledWith(
         "[vitest] no output for 1000ms; terminating stalled Vitest process group (run --config test/vitest/vitest.secrets.config.ts).",
       );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("ignores suppressed output when determining watchdog activity", () => {
+    vi.useFakeTimers();
+    try {
+      const stdout = new EventEmitter();
+      const timeoutSpy = vi.fn();
+
+      installVitestNoOutputWatchdog({
+        monitoredStreams: [{ stream: stdout, shouldSuppressLine: shouldSuppressVitestOutputLine }],
+        timeoutMs: 1000,
+        forceKillAfterMs: 0,
+        onTimeout: timeoutSpy,
+      });
+
+      stdout.emit("data", "[PLUGIN_TIMINGS] Warning: still noisy\n");
+      vi.advanceTimersByTime(1000);
+      expect(timeoutSpy).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
     }

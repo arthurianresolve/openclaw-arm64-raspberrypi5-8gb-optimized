@@ -10,7 +10,7 @@ import {
 } from "./vitest-process-group.mjs";
 
 const TRUTHY_ENV_VALUES = new Set(["1", "true", "yes", "on"]);
-const SUPPRESSED_VITEST_STDERR_PATTERNS = ["[PLUGIN_TIMINGS] Warning:"];
+const SUPPRESSED_VITEST_OUTPUT_PATTERNS = ["[PLUGIN_TIMINGS] Warning:"];
 const require = createRequire(import.meta.url);
 
 function isTruthyEnvValue(value) {
@@ -78,8 +78,47 @@ function resolveExplicitVitestWorkerBudget(env) {
   return parsePositiveInt(env.OPENCLAW_VITEST_MAX_WORKERS ?? env.OPENCLAW_TEST_WORKERS);
 }
 
+export function shouldSuppressVitestOutputLine(line) {
+  return SUPPRESSED_VITEST_OUTPUT_PATTERNS.some((pattern) => line.includes(pattern));
+}
+
 export function shouldSuppressVitestStderrLine(line) {
-  return SUPPRESSED_VITEST_STDERR_PATTERNS.some((pattern) => line.includes(pattern));
+  return shouldSuppressVitestOutputLine(line);
+}
+
+function installVitestOutputActivityMonitor({ stream, shouldSuppressLine, onActivity }) {
+  if (!stream) {
+    return () => {};
+  }
+
+  let buffered = "";
+  const handleData = (chunk) => {
+    buffered += String(chunk);
+    while (true) {
+      const newlineIndex = buffered.indexOf("\n");
+      if (newlineIndex === -1) {
+        break;
+      }
+      const line = buffered.slice(0, newlineIndex + 1);
+      buffered = buffered.slice(newlineIndex + 1);
+      if (!shouldSuppressLine(line)) {
+        onActivity();
+      }
+    }
+  };
+
+  stream.on("data", handleData);
+  const handleEnd = () => {
+    if (buffered.length > 0 && !shouldSuppressLine(buffered)) {
+      onActivity();
+    }
+  };
+  stream.on("end", handleEnd);
+
+  return () => {
+    stream.off("data", handleData);
+    stream.off("end", handleEnd);
+  };
 }
 
 export function resolveDirectNodeVitestArgs(pnpmArgs) {
@@ -106,7 +145,7 @@ export function installVitestNoOutputWatchdog(params) {
   const setTimeoutFn = params.setTimeoutFn ?? setTimeout;
   const clearTimeoutFn = params.clearTimeoutFn ?? clearTimeout;
   const forceKillAfterMs = params.forceKillAfterMs ?? 5_000;
-  const streams = params.streams?.filter(Boolean) ?? [];
+  const monitoredStreams = params.monitoredStreams ?? [];
   const label = params.label?.trim();
   const suffix = label ? ` (${label})` : "";
 
@@ -161,13 +200,13 @@ export function installVitestNoOutputWatchdog(params) {
     resetSilenceTimer();
   };
 
-  const listeners = streams.map((stream) => {
-    const handler = () => {
-      handleActivity();
-    };
-    stream.on("data", handler);
-    return { stream, handler };
-  });
+  const teardownMonitors = monitoredStreams.map((streamConfig) =>
+    installVitestOutputActivityMonitor({
+      stream: streamConfig.stream,
+      shouldSuppressLine: streamConfig.shouldSuppressLine ?? (() => false),
+      onActivity: handleActivity,
+    }),
+  );
 
   resetSilenceTimer();
 
@@ -178,8 +217,8 @@ export function installVitestNoOutputWatchdog(params) {
     active = false;
     clearSilenceTimer();
     clearForceKillTimer();
-    for (const { stream, handler } of listeners) {
-      stream.off("data", handler);
+    for (const teardownMonitor of teardownMonitors) {
+      teardownMonitor();
     }
   };
 }
@@ -225,7 +264,16 @@ export function spawnWatchedVitestProcess({
   });
   const teardownChildCleanup = installVitestProcessGroupCleanup({ child });
   const teardownNoOutputWatchdog = installVitestNoOutputWatchdog({
-    streams: [child.stdout, child.stderr],
+    monitoredStreams: [
+      {
+        stream: child.stdout,
+        shouldSuppressLine: shouldSuppressVitestOutputLine,
+      },
+      {
+        stream: child.stderr,
+        shouldSuppressLine: shouldSuppressVitestOutputLine,
+      },
+    ],
     timeoutMs: resolveVitestNoOutputTimeoutMs(env),
     label,
     log: (message) => {
@@ -247,8 +295,8 @@ export function spawnWatchedVitestProcess({
       });
     },
   });
-  forwardVitestOutput(child.stdout, process.stdout);
-  forwardVitestOutput(child.stderr, process.stderr, shouldSuppressVitestStderrLine);
+  forwardVitestOutput(child.stdout, process.stdout, shouldSuppressVitestOutputLine);
+  forwardVitestOutput(child.stderr, process.stderr, shouldSuppressVitestOutputLine);
 
   return {
     child,

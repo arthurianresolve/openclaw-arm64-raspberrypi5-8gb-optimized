@@ -124,6 +124,7 @@ type WriteFileLike = (filePath: string, data: string, encoding: BufferEncoding) 
 type MkdirLike = (dirPath: string, options: { recursive: true }) => Promise<void>;
 type FetchTextResult = { ok: boolean; status: number; text: string };
 type FetchTextLike = (url: string) => Promise<FetchTextResult>;
+type DelayLike = (ms: number) => Promise<void>;
 
 const DEFAULT_MANIFEST_PATH = path.join(
   "qa",
@@ -131,6 +132,9 @@ const DEFAULT_MANIFEST_PATH = path.join(
   "system-prompts-and-models-of-ai-tools.manifest.json",
 );
 const DEFAULT_CACHE_ROOT = path.join("qa", ".cache", "external-corpora");
+const DEFAULT_FETCH_RETRY_LIMIT = 2;
+const DEFAULT_FETCH_RETRY_DELAY_MS = 1_000;
+const DEFAULT_FETCH_TIMEOUT_MS = 15_000;
 
 const SUSPICIOUS_PHRASES = [
   "system prompt",
@@ -287,6 +291,26 @@ function countMatches(text: string, pattern: RegExp) {
   return (text.match(pattern) ?? []).length;
 }
 
+function shouldRetryFetchError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("fetch failed") ||
+    message.includes("eai_again") ||
+    message.includes("enotfound") ||
+    message.includes("econnreset") ||
+    message.includes("econnrefused") ||
+    message.includes("etimedout") ||
+    message.includes("timeout")
+  );
+}
+
+function shouldRetryStatus(status: number) {
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
 export function analyzePromptText(text: string): PromptTextAnalysis {
   const adjustedChars = estimateStringChars(text);
   const headings = Array.from(text.matchAll(/^(#{1,6})\s+(.+)$/gm)).map((match) =>
@@ -417,12 +441,54 @@ export function buildOpenClawPromptCorpusSamples(repoRoot: string): PromptCorpus
 }
 
 async function defaultFetchText(url: string): Promise<FetchTextResult> {
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(DEFAULT_FETCH_TIMEOUT_MS),
+  });
   return {
     ok: response.ok,
     status: response.status,
     text: await response.text(),
   };
+}
+
+async function defaultDelay(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry(params: {
+  url: string;
+  fetchText: FetchTextLike;
+  retryLimit: number;
+  retryDelayMs: number;
+  delay: DelayLike;
+}) {
+  let lastStatus: number | undefined;
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= params.retryLimit; attempt += 1) {
+    try {
+      const result = await params.fetchText(params.url);
+      if (result.ok) {
+        return result;
+      }
+      lastStatus = result.status;
+      if (attempt >= params.retryLimit || !shouldRetryStatus(result.status)) {
+        return result;
+      }
+    } catch (error) {
+      lastError = error;
+      if (attempt >= params.retryLimit || !shouldRetryFetchError(error)) {
+        throw error;
+      }
+    }
+    await params.delay(params.retryDelayMs * (attempt + 1));
+  }
+  if (lastError) {
+    throw lastError;
+  }
+  if (lastStatus !== undefined) {
+    throw new Error(`Prompt corpus fetch failed (${lastStatus}) for ${params.url}`);
+  }
+  throw new Error(`Prompt corpus fetch exhausted retries for ${params.url}`);
 }
 
 export async function fetchExternalPromptCorpus(params: {
@@ -434,6 +500,9 @@ export async function fetchExternalPromptCorpus(params: {
   writeFile?: WriteFileLike;
   mkdir?: MkdirLike;
   fetchText?: FetchTextLike;
+  delay?: DelayLike;
+  retryLimit?: number;
+  retryDelayMs?: number;
 }) {
   const manifestPath = resolvePromptCorpusManifestPath(params.repoRoot, params.manifestPath);
   const manifest = await readExternalPromptCorpusManifest(manifestPath, {
@@ -448,6 +517,9 @@ export async function fetchExternalPromptCorpus(params: {
   const mkdir = params.mkdir ?? fs.mkdir;
   const readFile = params.readFile ?? fs.readFile;
   const fetchText = params.fetchText ?? defaultFetchText;
+  const delay = params.delay ?? defaultDelay;
+  const retryLimit = Math.max(0, params.retryLimit ?? DEFAULT_FETCH_RETRY_LIMIT);
+  const retryDelayMs = Math.max(0, params.retryDelayMs ?? DEFAULT_FETCH_RETRY_DELAY_MS);
   const cache = resolvePromptCorpusCachePaths({
     repoRoot: params.repoRoot,
     cacheRoot: params.cacheRoot,
@@ -473,7 +545,13 @@ export async function fetchExternalPromptCorpus(params: {
       });
       continue;
     }
-    const fetched = await fetchText(rawUrl);
+    const fetched = await fetchWithRetry({
+      url: rawUrl,
+      fetchText,
+      retryLimit,
+      retryDelayMs,
+      delay,
+    });
     if (!fetched.ok) {
       throw new Error(`Prompt corpus fetch failed (${fetched.status}) for ${rawUrl}`);
     }

@@ -108,6 +108,112 @@ describe("prompt corpus analysis", () => {
     );
   });
 
+  it("retries transient fetch errors before succeeding", async () => {
+    const repoRoot = await makeTempDir();
+    const manifestPath = path.join(repoRoot, "manifest.json");
+    await fs.writeFile(
+      manifestPath,
+      JSON.stringify(
+        {
+          id: "external-prompts",
+          owner: "x1xhlol",
+          repo: "system-prompts-and-models-of-ai-tools",
+          repositoryUrl: "https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools",
+          license: "GPL-3.0-only",
+          usage: "eval-only",
+          ref: { type: "commit", value: "abc123" },
+          files: [{ path: "README.md", kind: "metadata" }],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    let attempts = 0;
+    const delays: number[] = [];
+    const summary = await fetchExternalPromptCorpus({
+      repoRoot,
+      manifestPath,
+      retryLimit: 2,
+      retryDelayMs: 25,
+      delay: async (ms) => {
+        delays.push(ms);
+      },
+      fetchText: async () => {
+        attempts += 1;
+        if (attempts < 3) {
+          throw new Error("fetch failed: EAI_AGAIN raw.githubusercontent.com");
+        }
+        return {
+          ok: true,
+          status: 200,
+          text: "downloaded-after-retry",
+        };
+      },
+    });
+
+    expect(attempts).toBe(3);
+    expect(delays).toEqual([25, 50]);
+    expect(summary.files[0]?.status).toBe("downloaded");
+    expect(await fs.readFile(path.join(summary.cache.corpusDir, "README.md"), "utf8")).toBe(
+      "downloaded-after-retry",
+    );
+  });
+
+  it("retries transient HTTP statuses before succeeding", async () => {
+    const repoRoot = await makeTempDir();
+    const manifestPath = path.join(repoRoot, "manifest.json");
+    await fs.writeFile(
+      manifestPath,
+      JSON.stringify(
+        {
+          id: "external-prompts",
+          owner: "x1xhlol",
+          repo: "system-prompts-and-models-of-ai-tools",
+          repositoryUrl: "https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools",
+          license: "GPL-3.0-only",
+          usage: "eval-only",
+          ref: { type: "commit", value: "abc123" },
+          files: [{ path: "README.md", kind: "metadata" }],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    let attempts = 0;
+    const summary = await fetchExternalPromptCorpus({
+      repoRoot,
+      manifestPath,
+      retryLimit: 1,
+      retryDelayMs: 10,
+      delay: async () => undefined,
+      fetchText: async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          return {
+            ok: false,
+            status: 503,
+            text: "temporary failure",
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          text: "downloaded-after-503",
+        };
+      },
+    });
+
+    expect(attempts).toBe(2);
+    expect(summary.files[0]?.sha256).toBeDefined();
+    expect(await fs.readFile(path.join(summary.cache.corpusDir, "README.md"), "utf8")).toBe(
+      "downloaded-after-503",
+    );
+  });
+
   it("analyzes OpenClaw prompt samples alongside cached external files", async () => {
     const repoRoot = await makeTempDir();
     const manifestDir = path.join(repoRoot, "qa", "external-corpora");

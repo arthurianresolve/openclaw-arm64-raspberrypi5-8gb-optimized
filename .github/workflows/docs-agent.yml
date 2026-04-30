@@ -149,7 +149,7 @@ jobs:
 
       - name: Run Codex docs agent
         if: steps.gate.outputs.run_agent == 'true'
-        uses: openai/codex-action@v1
+        uses: openai/codex-action@v1.7
         env:
           DOCS_AGENT_BASE_SHA: ${{ steps.gate.outputs.review_base_sha }}
           DOCS_AGENT_HEAD_SHA: ${{ steps.gate.outputs.review_head_sha }}

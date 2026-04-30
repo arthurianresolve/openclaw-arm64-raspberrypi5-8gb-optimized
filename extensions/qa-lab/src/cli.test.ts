@@ -45,6 +45,8 @@ const {
   runQaCredentialsListCommand,
   runQaCredentialsRemoveCommand,
   runQaCoverageReportCommand,
+  runQaPromptCorpusAnalyzeCommand,
+  runQaPromptCorpusFetchCommand,
   runQaProviderServerCommand,
   runQaSuiteCommand,
   runQaTelegramCommand,
@@ -53,6 +55,8 @@ const {
   runQaCredentialsListCommand: vi.fn(),
   runQaCredentialsRemoveCommand: vi.fn(),
   runQaCoverageReportCommand: vi.fn(),
+  runQaPromptCorpusAnalyzeCommand: vi.fn(),
+  runQaPromptCorpusFetchCommand: vi.fn(),
   runQaProviderServerCommand: vi.fn(),
   runQaSuiteCommand: vi.fn(),
   runQaTelegramCommand: vi.fn(),
@@ -77,6 +81,8 @@ vi.mock("./cli.runtime.js", () => ({
   runQaCredentialsListCommand,
   runQaCredentialsRemoveCommand,
   runQaCoverageReportCommand,
+  runQaPromptCorpusAnalyzeCommand,
+  runQaPromptCorpusFetchCommand,
   runQaProviderServerCommand,
   runQaSuiteCommand,
 }));
@@ -92,6 +98,8 @@ describe("qa cli registration", () => {
     runQaCredentialsListCommand.mockReset();
     runQaCredentialsRemoveCommand.mockReset();
     runQaCoverageReportCommand.mockReset();
+    runQaPromptCorpusAnalyzeCommand.mockReset();
+    runQaPromptCorpusFetchCommand.mockReset();
     runQaProviderServerCommand.mockReset();
     runQaSuiteCommand.mockReset();
     runQaTelegramCommand.mockReset();
@@ -109,7 +117,13 @@ describe("qa cli registration", () => {
     const qa = program.commands.find((command) => command.name() === "qa");
     expect(qa).toBeDefined();
     expect(qa?.commands.map((command) => command.name())).toEqual(
-      expect.arrayContaining([TEST_QA_RUNNER.commandName, "telegram", "credentials", "coverage"]),
+      expect.arrayContaining([
+        TEST_QA_RUNNER.commandName,
+        "telegram",
+        "credentials",
+        "coverage",
+        "prompt-corpus",
+      ]),
     );
   });
 
@@ -129,6 +143,52 @@ describe("qa cli registration", () => {
     expect(runQaCoverageReportCommand).toHaveBeenCalledWith({
       repoRoot: "/tmp/openclaw-repo",
       output: ".artifacts/qa-coverage.md",
+      json: true,
+    });
+  });
+
+  it("routes prompt corpus fetch flags into the qa runtime command", async () => {
+    await program.parseAsync([
+      "node",
+      "openclaw",
+      "qa",
+      "prompt-corpus",
+      "fetch",
+      "--repo-root",
+      "/tmp/openclaw-repo",
+      "--manifest",
+      "qa/external-corpora/system-prompts.manifest.json",
+      "--cache-root",
+      "qa/.cache/external-corpora",
+      "--dry-run",
+      "--json",
+    ]);
+
+    expect(runQaPromptCorpusFetchCommand).toHaveBeenCalledWith({
+      repoRoot: "/tmp/openclaw-repo",
+      manifest: "qa/external-corpora/system-prompts.manifest.json",
+      cacheRoot: "qa/.cache/external-corpora",
+      dryRun: true,
+      json: true,
+    });
+  });
+
+  it("routes prompt corpus analyze flags into the qa runtime command", async () => {
+    await program.parseAsync([
+      "node",
+      "openclaw",
+      "qa",
+      "prompt-corpus",
+      "analyze",
+      "--repo-root",
+      "/tmp/openclaw-repo",
+      "--json",
+    ]);
+
+    expect(runQaPromptCorpusAnalyzeCommand).toHaveBeenCalledWith({
+      repoRoot: "/tmp/openclaw-repo",
+      manifest: undefined,
+      cacheRoot: undefined,
       json: true,
     });
   });

@@ -1143,15 +1143,15 @@ describe("update-cli", () => {
         mockPackageInstallStatus(createCaseDir("openclaw-update"));
         await updateCommand({ yes: true, tag: "main" });
       },
-      expectedSpec: "github:openclaw/openclaw#main",
+      expectedSpec: "github:arthurianresolve/excaliclaw#master",
     },
     {
       name: "explicit git package spec",
       run: async () => {
         mockPackageInstallStatus(createCaseDir("openclaw-update"));
-        await updateCommand({ yes: true, tag: "github:openclaw/openclaw#main" });
+        await updateCommand({ yes: true, tag: "github:arthurianresolve/excaliclaw#master" });
       },
-      expectedSpec: "github:openclaw/openclaw#main",
+      expectedSpec: "github:arthurianresolve/excaliclaw#master",
     },
     {
       name: "OPENCLAW_UPDATE_PACKAGE_SPEC override",

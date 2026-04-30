@@ -74,17 +74,17 @@ export async function updateWizardCommand(opts: UpdateWizardOptions = {}): Promi
       {
         value: "stable",
         label: "Stable",
-        hint: "Tagged releases (npm latest)",
+        hint: "Follow the fork update stream",
       },
       {
         value: "beta",
         label: "Beta",
-        hint: "Prereleases (npm beta)",
+        hint: "Same source, faster auto-check cadence",
       },
       {
         value: "dev",
         label: "Dev",
-        hint: "Git main",
+        hint: "Git master",
       },
     ],
     initialValue: "keep",
@@ -107,7 +107,7 @@ export async function updateWizardCommand(opts: UpdateWizardOptions = {}): Promi
         const empty = await isEmptyDir(gitDir);
         if (!empty) {
           defaultRuntime.error(
-            `OPENCLAW_GIT_DIR points at a non-git directory: ${gitDir}. Set OPENCLAW_GIT_DIR to an empty folder or an openclaw checkout.`,
+            `OPENCLAW_GIT_DIR points at a non-git directory: ${gitDir}. Set OPENCLAW_GIT_DIR to an empty folder or an excaliclaw checkout.`,
           );
           defaultRuntime.exit(1);
           return;

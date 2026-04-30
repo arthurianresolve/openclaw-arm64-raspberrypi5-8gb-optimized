@@ -33,8 +33,8 @@ describe("resolveUpdateAvailability", () => {
         root: "/tmp/repo",
         sha: null,
         tag: null,
-        branch: "main",
-        upstream: "origin/main",
+        branch: "master",
+        upstream: "origin/master",
         dirty: false,
         ahead: 0,
         behind: 3,
@@ -55,7 +55,7 @@ describe("resolveUpdateAvailability", () => {
     const update = buildUpdate({
       installKind: "package",
       packageManager: "pnpm",
-      registry: { latestVersion },
+      registry: { latestVersion, sourceLabel: "github arthurianresolve/excaliclaw#master" },
     });
     const availability = resolveUpdateAvailability(update);
     expect(availability.available).toBe(true);
@@ -73,14 +73,17 @@ describe("formatUpdateOneLiner", () => {
         root: "/tmp/repo",
         sha: "abc123456789",
         tag: null,
-        branch: "main",
-        upstream: "origin/main",
+        branch: "master",
+        upstream: "origin/master",
         dirty: true,
         ahead: 0,
         behind: 2,
         fetchOk: true,
       },
-      registry: { latestVersion: VERSION },
+      registry: {
+        latestVersion: VERSION,
+        sourceLabel: "github arthurianresolve/excaliclaw#master",
+      },
       deps: {
         manager: "pnpm",
         status: "ok",
@@ -90,7 +93,7 @@ describe("formatUpdateOneLiner", () => {
     });
 
     expect(formatUpdateOneLiner(update)).toBe(
-      `Update: git main · ↔ origin/main · dirty · behind 2 · npm latest ${VERSION} · deps ok`,
+      `Update: git master · ↔ origin/master · dirty · behind 2 · github arthurianresolve/excaliclaw#master ${VERSION} · deps ok`,
     );
   });
 
@@ -101,14 +104,17 @@ describe("formatUpdateOneLiner", () => {
         root: "/tmp/repo",
         sha: "abc123456789",
         tag: null,
-        branch: "main",
-        upstream: "origin/main",
+        branch: "master",
+        upstream: "origin/master",
         dirty: false,
         ahead: 0,
         behind: 0,
         fetchOk: true,
       },
-      registry: { latestVersion: VERSION },
+      registry: {
+        latestVersion: VERSION,
+        sourceLabel: "github arthurianresolve/excaliclaw#master",
+      },
       deps: {
         manager: "pnpm",
         status: "ok",
@@ -118,7 +124,7 @@ describe("formatUpdateOneLiner", () => {
     });
 
     expect(formatUpdateOneLiner(update)).toBe(
-      `Update: git main · ↔ origin/main · up to date · npm latest ${VERSION} · deps ok`,
+      `Update: git master · ↔ origin/master · up to date · github arthurianresolve/excaliclaw#master ${VERSION} · deps ok`,
     );
   });
 
@@ -126,7 +132,10 @@ describe("formatUpdateOneLiner", () => {
     const update = buildUpdate({
       installKind: "package",
       packageManager: "npm",
-      registry: { latestVersion: VERSION },
+      registry: {
+        latestVersion: VERSION,
+        sourceLabel: "github arthurianresolve/excaliclaw#master",
+      },
       deps: {
         manager: "npm",
         status: "ok",
@@ -136,7 +145,7 @@ describe("formatUpdateOneLiner", () => {
     });
 
     expect(formatUpdateOneLiner(update)).toBe(
-      `Update: npm · up to date · npm latest ${VERSION} · deps ok`,
+      `Update: npm · up to date · github arthurianresolve/excaliclaw#master ${VERSION} · deps ok`,
     );
   });
 
@@ -144,7 +153,11 @@ describe("formatUpdateOneLiner", () => {
     const update = buildUpdate({
       installKind: "package",
       packageManager: "npm",
-      registry: { latestVersion: null, error: "offline" },
+      registry: {
+        latestVersion: null,
+        sourceLabel: "github arthurianresolve/excaliclaw#master",
+        error: "offline",
+      },
       deps: {
         manager: "npm",
         status: "missing",
@@ -153,7 +166,9 @@ describe("formatUpdateOneLiner", () => {
       },
     });
 
-    expect(formatUpdateOneLiner(update)).toBe("Update: npm · npm latest unknown · deps missing");
+    expect(formatUpdateOneLiner(update)).toBe(
+      "Update: npm · github arthurianresolve/excaliclaw#master unknown · deps missing",
+    );
   });
 });
 
@@ -162,7 +177,10 @@ describe("formatUpdateAvailableHint", () => {
     const update = buildUpdate({
       installKind: "package",
       packageManager: "pnpm",
-      registry: { latestVersion: VERSION },
+      registry: {
+        latestVersion: VERSION,
+        sourceLabel: "github arthurianresolve/excaliclaw#master",
+      },
     });
 
     expect(formatUpdateAvailableHint(update)).toBeNull();
@@ -176,18 +194,18 @@ describe("formatUpdateAvailableHint", () => {
         root: "/tmp/repo",
         sha: null,
         tag: null,
-        branch: "main",
-        upstream: "origin/main",
+        branch: "master",
+        upstream: "origin/master",
         dirty: false,
         ahead: 0,
         behind: 2,
         fetchOk: true,
       },
-      registry: { latestVersion },
+      registry: { latestVersion, sourceLabel: "github arthurianresolve/excaliclaw#master" },
     });
 
     expect(formatUpdateAvailableHint(update)).toBe(
-      `Update available (git behind 2 · npm ${latestVersion}). Run: openclaw update`,
+      `Update available (git behind 2 · github arthurianresolve/excaliclaw#master ${latestVersion}). Run: openclaw update`,
     );
   });
 });

@@ -63,7 +63,9 @@ export function formatUpdateAvailableHint(update: UpdateCheckResult): string | n
     details.push(`git behind ${availability.gitBehind}`);
   }
   if (availability.hasRegistryUpdate && availability.latestVersion) {
-    details.push(`npm ${availability.latestVersion}`);
+    details.push(
+      `${update.registry?.sourceLabel ?? "update source"} ${availability.latestVersion}`,
+    );
   }
   const suffix = details.length > 0 ? ` (${details.join(" · ")})` : "";
   return `Update available${suffix}. Run: ${formatCliCommand("openclaw update")}`;
@@ -73,22 +75,23 @@ export function formatUpdateOneLiner(update: UpdateCheckResult): string {
   const parts: string[] = [];
 
   const appendRegistryUpdateSummary = () => {
+    const sourceLabel = update.registry?.sourceLabel ?? "update source";
     if (update.registry?.latestVersion) {
       const cmp = compareSemverStrings(VERSION, update.registry.latestVersion);
       if (cmp === 0) {
         if (update.installKind !== "git") {
           parts.push("up to date");
         }
-        parts.push(`npm latest ${update.registry.latestVersion}`);
+        parts.push(`${sourceLabel} ${update.registry.latestVersion}`);
       } else if (cmp != null && cmp < 0) {
-        parts.push(`npm update ${update.registry.latestVersion}`);
+        parts.push(`${sourceLabel} ${update.registry.latestVersion}`);
       } else {
-        parts.push(`npm latest ${update.registry.latestVersion} (local newer)`);
+        parts.push(`${sourceLabel} ${update.registry.latestVersion} (local newer)`);
       }
       return;
     }
     if (update.registry?.error) {
-      parts.push("npm latest unknown");
+      parts.push(`${sourceLabel} unknown`);
     }
   };
 

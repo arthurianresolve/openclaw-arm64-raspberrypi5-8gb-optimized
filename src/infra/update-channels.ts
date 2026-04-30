@@ -1,11 +1,12 @@
 import { normalizeOptionalLowercaseString } from "../shared/string-coerce.js";
+import { OPENCLAW_UPDATE_GITHUB_BRANCH } from "./update-source.js";
 
 export type UpdateChannel = "stable" | "beta" | "dev";
 export type UpdateChannelSource = "config" | "git-tag" | "git-branch" | "default";
 
 export const DEFAULT_PACKAGE_CHANNEL: UpdateChannel = "stable";
 export const DEFAULT_GIT_CHANNEL: UpdateChannel = "dev";
-export const DEV_BRANCH = "main";
+export const DEV_BRANCH = OPENCLAW_UPDATE_GITHUB_BRANCH;
 
 export function normalizeUpdateChannel(value?: string | null): UpdateChannel | null {
   const normalized = normalizeOptionalLowercaseString(value);

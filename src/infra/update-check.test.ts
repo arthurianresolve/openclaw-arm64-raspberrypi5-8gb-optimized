@@ -7,7 +7,7 @@ import {
   checkDepsStatus,
   checkUpdateStatus,
   compareSemverStrings,
-  fetchNpmLatestVersion,
+  fetchPackageUpdateSourceVersion,
   fetchNpmPackageTargetStatus,
   fetchNpmTagVersion,
   formatGitInstallLabel,
@@ -36,14 +36,27 @@ describe("compareSemverStrings", () => {
 
 describe("resolveNpmChannelTag", () => {
   let versionByTag: Record<string, string | null>;
+  let githubVersion: string | null;
 
   beforeEach(() => {
     versionByTag = {};
+    githubVersion = null;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
         const url =
           typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        if (
+          url.includes("raw.githubusercontent.com/arthurianresolve/excaliclaw/master/package.json")
+        ) {
+          return {
+            ok: githubVersion != null,
+            status: githubVersion != null ? 200 : 404,
+            json: async () => ({
+              version: githubVersion,
+            }),
+          } as Response;
+        }
         const tag = decodeURIComponent(url.split("/").pop() ?? "");
         const version = versionByTag[tag] ?? null;
         return {
@@ -62,43 +75,23 @@ describe("resolveNpmChannelTag", () => {
     vi.unstubAllGlobals();
   });
 
-  it("falls back to latest when beta is older", async () => {
-    versionByTag.beta = "1.0.0-beta.1";
-    versionByTag.latest = "1.0.1-1";
-
+  it("resolves package updates from the GitHub master branch", async () => {
+    githubVersion = "1.2.3";
     const resolved = await resolveNpmChannelTag({ channel: "beta", timeoutMs: 1000 });
-
-    expect(resolved).toEqual({ tag: "latest", version: "1.0.1-1" });
-  });
-
-  it("keeps beta when beta is not older", async () => {
-    versionByTag.beta = "1.0.2-beta.1";
-    versionByTag.latest = "1.0.1-1";
-
-    const resolved = await resolveNpmChannelTag({ channel: "beta", timeoutMs: 1000 });
-
-    expect(resolved).toEqual({ tag: "beta", version: "1.0.2-beta.1" });
-  });
-
-  it("falls back to latest when beta has same base as stable", async () => {
-    versionByTag.beta = "1.0.1-beta.2";
-    versionByTag.latest = "1.0.1";
-
-    const resolved = await resolveNpmChannelTag({ channel: "beta", timeoutMs: 1000 });
-
-    expect(resolved).toEqual({ tag: "latest", version: "1.0.1" });
+    expect(resolved).toEqual({ tag: "master", version: "1.2.3" });
   });
 
   it("keeps non-beta channels unchanged", async () => {
-    versionByTag.latest = "1.0.3";
+    githubVersion = "1.0.3";
 
     await expect(resolveNpmChannelTag({ channel: "stable", timeoutMs: 1000 })).resolves.toEqual({
-      tag: "latest",
+      tag: "master",
       version: "1.0.3",
     });
   });
 
-  it("exposes tag fetch helpers for success and http failures", async () => {
+  it("exposes source fetch helpers for success and npm http failures", async () => {
+    githubVersion = "1.0.4";
     versionByTag.latest = "1.0.4";
 
     await expect(
@@ -112,8 +105,9 @@ describe("resolveNpmChannelTag", () => {
       tag: "latest",
       version: "1.0.4",
     });
-    await expect(fetchNpmLatestVersion({ timeoutMs: 1000 })).resolves.toEqual({
+    await expect(fetchPackageUpdateSourceVersion({ timeoutMs: 1000 })).resolves.toEqual({
       latestVersion: "1.0.4",
+      sourceLabel: "github arthurianresolve/excaliclaw#master",
       error: undefined,
     });
     await expect(fetchNpmTagVersion({ tag: "beta", timeoutMs: 1000 })).resolves.toEqual({
@@ -135,15 +129,15 @@ describe("formatGitInstallLabel", () => {
           root: "/repo",
           sha: "1234567890abcdef",
           tag: null,
-          branch: "main",
-          upstream: "origin/main",
+          branch: "master",
+          upstream: "origin/master",
           dirty: false,
           ahead: 0,
           behind: 0,
           fetchOk: true,
         },
       }),
-    ).toBe("main · @ 12345678");
+    ).toBe("master · @ 12345678");
 
     expect(
       formatGitInstallLabel({

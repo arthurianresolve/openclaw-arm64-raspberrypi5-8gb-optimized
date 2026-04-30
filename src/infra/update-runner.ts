@@ -12,7 +12,6 @@ import { runGlobalPackageUpdateSteps } from "./package-update-steps.js";
 import { trimLogTail } from "./restart-sentinel.js";
 import { resolveStableNodePath } from "./stable-node-path.js";
 import {
-  channelToNpmTag,
   DEFAULT_PACKAGE_CHANNEL,
   DEV_BRANCH,
   isBetaTag,
@@ -35,6 +34,7 @@ import {
   resolveUpdateBuildManager,
   type UpdatePackageManagerFailureReason,
 } from "./update-package-manager.js";
+import { OPENCLAW_UPDATE_GITHUB_BRANCH } from "./update-source.js";
 
 export type UpdateStepResult = {
   name: string;
@@ -1413,7 +1413,7 @@ export async function runGatewayUpdate(opts: UpdateRunnerOptions = {}): Promise<
       packageName,
     });
     const channel = opts.channel ?? DEFAULT_PACKAGE_CHANNEL;
-    const tag = normalizeTag(opts.tag ?? channelToNpmTag(channel));
+    const tag = normalizeTag(opts.tag ?? OPENCLAW_UPDATE_GITHUB_BRANCH);
     const globalInstallEnv = await createGlobalInstallEnv();
     const spec = resolveGlobalInstallSpec({
       packageName,

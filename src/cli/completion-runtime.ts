@@ -63,15 +63,18 @@ export async function completionCacheExists(
   return pathExists(cachePath);
 }
 
-function formatCompletionSourceLine(
+export function formatCompletionSourceLine(
   shell: CompletionShell,
   _binName: string,
   cachePath: string,
 ): string {
   if (shell === "fish") {
-    return `source "${cachePath}"`;
+    return `if test -f "${cachePath}"; source "${cachePath}"; end`;
   }
-  return `source "${cachePath}"`;
+  if (shell === "powershell") {
+    return `if (Test-Path "${cachePath}") { . "${cachePath}" }`;
+  }
+  return `if [ -f "${cachePath}" ]; then source "${cachePath}"; fi`;
 }
 
 function isCompletionProfileHeader(line: string): boolean {

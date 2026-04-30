@@ -1,5 +1,10 @@
 import type { Command } from "commander";
-import { flowsCancelCommand, flowsListCommand, flowsShowCommand } from "../../commands/flows.js";
+import {
+  flowsAuditCommand,
+  flowsCancelCommand,
+  flowsListCommand,
+  flowsShowCommand,
+} from "../../commands/flows.js";
 import { healthCommand } from "../../commands/health.js";
 import { sessionsCleanupCommand } from "../../commands/sessions-cleanup.js";
 import { sessionsCommand } from "../../commands/sessions.js";
@@ -413,6 +418,23 @@ export function registerStatusHealthSessionsCommands(program: Command) {
     .action(async (lookup, opts) => {
       await runCommandWithRuntime(defaultRuntime, async () => {
         await flowsShowCommand(
+          {
+            lookup,
+            json: Boolean(opts.json),
+          },
+          defaultRuntime,
+        );
+      });
+    });
+
+  tasksFlowCmd
+    .command("audit")
+    .description("Show verification and repair audit details for one TaskFlow")
+    .argument("<lookup>", "Flow id or owner key")
+    .option("--json", "Output as JSON", false)
+    .action(async (lookup, opts) => {
+      await runCommandWithRuntime(defaultRuntime, async () => {
+        await flowsAuditCommand(
           {
             lookup,
             json: Boolean(opts.json),

@@ -9,6 +9,7 @@ import {
 } from "./task-flow-registry.paths.js";
 import type { TaskFlowRegistryStoreSnapshot } from "./task-flow-registry.store.types.js";
 import type { TaskFlowRecord, TaskFlowSyncMode, JsonValue } from "./task-flow-registry.types.js";
+import type { TaskFlowVerificationState } from "./task-flow-verification-state.js";
 
 type FlowRegistryRow = {
   flow_id: string;
@@ -24,6 +25,14 @@ type FlowRegistryRow = {
   current_step: string | null;
   blocked_task_id: string | null;
   blocked_summary: string | null;
+  verification_state_json: string | null;
+  verification_status: "passed" | "failed" | null;
+  verification_verified_at: number | bigint | null;
+  verification_repair_task_id: string | null;
+  verification_requires_repair: number | bigint | null;
+  verification_repair_attempt_count: number | bigint | null;
+  verification_repair_success_count: number | bigint | null;
+  verification_repair_failure_count: number | bigint | null;
   state_json: string | null;
   wait_json: string | null;
   cancel_requested_at: number | bigint | null;
@@ -85,6 +94,7 @@ function rowToFlowRecord(row: FlowRegistryRow): TaskFlowRecord {
   const endedAt = normalizeNumber(row.ended_at);
   const cancelRequestedAt = normalizeNumber(row.cancel_requested_at);
   const requesterOrigin = parseJsonValue<DeliveryContext>(row.requester_origin_json);
+  const verificationState = parseJsonValue<TaskFlowVerificationState>(row.verification_state_json);
   const stateJson = parseJsonValue<JsonValue>(row.state_json);
   const waitJson = parseJsonValue<JsonValue>(row.wait_json);
   return {
@@ -100,6 +110,7 @@ function rowToFlowRecord(row: FlowRegistryRow): TaskFlowRecord {
     ...(row.current_step ? { currentStep: row.current_step } : {}),
     ...(row.blocked_task_id ? { blockedTaskId: row.blocked_task_id } : {}),
     ...(row.blocked_summary ? { blockedSummary: row.blocked_summary } : {}),
+    ...(verificationState ? { verificationState } : {}),
     ...(stateJson !== undefined ? { stateJson } : {}),
     ...(waitJson !== undefined ? { waitJson } : {}),
     ...(cancelRequestedAt != null ? { cancelRequestedAt } : {}),
@@ -110,6 +121,7 @@ function rowToFlowRecord(row: FlowRegistryRow): TaskFlowRecord {
 }
 
 function bindFlowRecord(record: TaskFlowRecord) {
+  const verificationState = record.verificationState;
   return {
     flow_id: record.flowId,
     sync_mode: record.syncMode,
@@ -123,6 +135,14 @@ function bindFlowRecord(record: TaskFlowRecord) {
     current_step: record.currentStep ?? null,
     blocked_task_id: record.blockedTaskId ?? null,
     blocked_summary: record.blockedSummary ?? null,
+    verification_state_json: serializeJson(verificationState),
+    verification_status: verificationState?.status ?? null,
+    verification_verified_at: verificationState?.verifiedAt ?? null,
+    verification_repair_task_id: verificationState?.repairTaskId ?? null,
+    verification_requires_repair: record.currentStep?.trim() === "verification_repair" ? 1 : 0,
+    verification_repair_attempt_count: verificationState?.repairAttemptCount ?? 0,
+    verification_repair_success_count: verificationState?.repairSuccessCount ?? 0,
+    verification_repair_failure_count: verificationState?.repairFailureCount ?? 0,
     state_json: serializeJson(record.stateJson),
     wait_json: serializeJson(record.waitJson),
     cancel_requested_at: record.cancelRequestedAt ?? null,
@@ -149,6 +169,14 @@ function createStatements(db: DatabaseSync): FlowRegistryStatements {
         current_step,
         blocked_task_id,
         blocked_summary,
+        verification_state_json,
+        verification_status,
+        verification_verified_at,
+        verification_repair_task_id,
+        verification_requires_repair,
+        verification_repair_attempt_count,
+        verification_repair_success_count,
+        verification_repair_failure_count,
         state_json,
         wait_json,
         cancel_requested_at,
@@ -172,6 +200,14 @@ function createStatements(db: DatabaseSync): FlowRegistryStatements {
         current_step,
         blocked_task_id,
         blocked_summary,
+        verification_state_json,
+        verification_status,
+        verification_verified_at,
+        verification_repair_task_id,
+        verification_requires_repair,
+        verification_repair_attempt_count,
+        verification_repair_success_count,
+        verification_repair_failure_count,
         state_json,
         wait_json,
         cancel_requested_at,
@@ -191,6 +227,14 @@ function createStatements(db: DatabaseSync): FlowRegistryStatements {
         @current_step,
         @blocked_task_id,
         @blocked_summary,
+        @verification_state_json,
+        @verification_status,
+        @verification_verified_at,
+        @verification_repair_task_id,
+        @verification_requires_repair,
+        @verification_repair_attempt_count,
+        @verification_repair_success_count,
+        @verification_repair_failure_count,
         @state_json,
         @wait_json,
         @cancel_requested_at,
@@ -210,6 +254,14 @@ function createStatements(db: DatabaseSync): FlowRegistryStatements {
         current_step = excluded.current_step,
         blocked_task_id = excluded.blocked_task_id,
         blocked_summary = excluded.blocked_summary,
+        verification_state_json = excluded.verification_state_json,
+        verification_status = excluded.verification_status,
+        verification_verified_at = excluded.verification_verified_at,
+        verification_repair_task_id = excluded.verification_repair_task_id,
+        verification_requires_repair = excluded.verification_requires_repair,
+        verification_repair_attempt_count = excluded.verification_repair_attempt_count,
+        verification_repair_success_count = excluded.verification_repair_success_count,
+        verification_repair_failure_count = excluded.verification_repair_failure_count,
         state_json = excluded.state_json,
         wait_json = excluded.wait_json,
         cancel_requested_at = excluded.cancel_requested_at,
@@ -243,6 +295,14 @@ function ensureSchema(db: DatabaseSync) {
       current_step TEXT,
       blocked_task_id TEXT,
       blocked_summary TEXT,
+      verification_state_json TEXT,
+      verification_status TEXT,
+      verification_verified_at INTEGER,
+      verification_repair_task_id TEXT,
+      verification_requires_repair INTEGER NOT NULL DEFAULT 0,
+      verification_repair_attempt_count INTEGER NOT NULL DEFAULT 0,
+      verification_repair_success_count INTEGER NOT NULL DEFAULT 0,
+      verification_repair_failure_count INTEGER NOT NULL DEFAULT 0,
       state_json TEXT,
       wait_json TEXT,
       cancel_requested_at INTEGER,
@@ -304,6 +364,38 @@ function ensureSchema(db: DatabaseSync) {
   if (!hasFlowRunsColumn(db, "blocked_summary")) {
     db.exec(`ALTER TABLE flow_runs ADD COLUMN blocked_summary TEXT;`);
   }
+  if (!hasFlowRunsColumn(db, "verification_state_json")) {
+    db.exec(`ALTER TABLE flow_runs ADD COLUMN verification_state_json TEXT;`);
+  }
+  if (!hasFlowRunsColumn(db, "verification_status")) {
+    db.exec(`ALTER TABLE flow_runs ADD COLUMN verification_status TEXT;`);
+  }
+  if (!hasFlowRunsColumn(db, "verification_verified_at")) {
+    db.exec(`ALTER TABLE flow_runs ADD COLUMN verification_verified_at INTEGER;`);
+  }
+  if (!hasFlowRunsColumn(db, "verification_repair_task_id")) {
+    db.exec(`ALTER TABLE flow_runs ADD COLUMN verification_repair_task_id TEXT;`);
+  }
+  if (!hasFlowRunsColumn(db, "verification_requires_repair")) {
+    db.exec(
+      `ALTER TABLE flow_runs ADD COLUMN verification_requires_repair INTEGER NOT NULL DEFAULT 0;`,
+    );
+  }
+  if (!hasFlowRunsColumn(db, "verification_repair_attempt_count")) {
+    db.exec(
+      `ALTER TABLE flow_runs ADD COLUMN verification_repair_attempt_count INTEGER NOT NULL DEFAULT 0;`,
+    );
+  }
+  if (!hasFlowRunsColumn(db, "verification_repair_success_count")) {
+    db.exec(
+      `ALTER TABLE flow_runs ADD COLUMN verification_repair_success_count INTEGER NOT NULL DEFAULT 0;`,
+    );
+  }
+  if (!hasFlowRunsColumn(db, "verification_repair_failure_count")) {
+    db.exec(
+      `ALTER TABLE flow_runs ADD COLUMN verification_repair_failure_count INTEGER NOT NULL DEFAULT 0;`,
+    );
+  }
   if (!hasFlowRunsColumn(db, "state_json")) {
     db.exec(`ALTER TABLE flow_runs ADD COLUMN state_json TEXT;`);
   }
@@ -313,9 +405,28 @@ function ensureSchema(db: DatabaseSync) {
   if (!hasFlowRunsColumn(db, "cancel_requested_at")) {
     db.exec(`ALTER TABLE flow_runs ADD COLUMN cancel_requested_at INTEGER;`);
   }
+  db.exec(`
+    UPDATE flow_runs
+    SET verification_requires_repair = CASE
+      WHEN trim(COALESCE(current_step, '')) = 'verification_repair' THEN 1
+      ELSE 0
+    END
+  `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_flow_runs_status ON flow_runs(status);`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_flow_runs_owner_key ON flow_runs(owner_key);`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_flow_runs_updated_at ON flow_runs(updated_at);`);
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_flow_runs_owner_updated
+    ON flow_runs(owner_key, updated_at DESC)
+  `);
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_flow_runs_verification_requires_repair
+    ON flow_runs(verification_requires_repair, updated_at DESC)
+  `);
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_flow_runs_verification_status
+    ON flow_runs(verification_status, updated_at DESC)
+  `);
 }
 
 function ensureFlowRegistryPermissions(pathname: string) {

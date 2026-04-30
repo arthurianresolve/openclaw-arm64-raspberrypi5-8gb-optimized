@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   tasksCancelCommand: vi.fn(),
   flowsListCommand: vi.fn(),
   flowsShowCommand: vi.fn(),
+  flowsAuditCommand: vi.fn(),
   flowsCancelCommand: vi.fn(),
   setVerbose: vi.fn(),
   runtime: {
@@ -36,6 +37,7 @@ const tasksNotifyCommand = mocks.tasksNotifyCommand;
 const tasksCancelCommand = mocks.tasksCancelCommand;
 const flowsListCommand = mocks.flowsListCommand;
 const flowsShowCommand = mocks.flowsShowCommand;
+const flowsAuditCommand = mocks.flowsAuditCommand;
 const flowsCancelCommand = mocks.flowsCancelCommand;
 const setVerbose = mocks.setVerbose;
 const runtime = mocks.runtime;
@@ -68,6 +70,7 @@ vi.mock("../../commands/tasks.js", () => ({
 vi.mock("../../commands/flows.js", () => ({
   flowsListCommand: mocks.flowsListCommand,
   flowsShowCommand: mocks.flowsShowCommand,
+  flowsAuditCommand: mocks.flowsAuditCommand,
   flowsCancelCommand: mocks.flowsCancelCommand,
 }));
 
@@ -101,6 +104,7 @@ describe("registerStatusHealthSessionsCommands", () => {
     tasksCancelCommand.mockResolvedValue(undefined);
     flowsListCommand.mockResolvedValue(undefined);
     flowsShowCommand.mockResolvedValue(undefined);
+    flowsAuditCommand.mockResolvedValue(undefined);
     flowsCancelCommand.mockResolvedValue(undefined);
   });
 
@@ -359,5 +363,17 @@ describe("registerStatusHealthSessionsCommands", () => {
     registerStatusHealthSessionsCommands(program);
 
     expect(program.commands.find((command) => command.name() === "flows")).toBeUndefined();
+  });
+
+  it("runs task flow audit with forwarded options", async () => {
+    await runCli(["tasks", "flow", "audit", "agent:main:main", "--json"]);
+
+    expect(flowsAuditCommand).toHaveBeenCalledWith(
+      {
+        lookup: "agent:main:main",
+        json: true,
+      },
+      runtime,
+    );
   });
 });

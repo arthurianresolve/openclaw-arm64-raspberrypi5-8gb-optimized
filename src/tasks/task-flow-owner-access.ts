@@ -6,6 +6,19 @@ import {
 } from "./task-flow-registry.js";
 import type { TaskFlowRecord } from "./task-flow-registry.types.js";
 
+function isRepairPriorityFlow(flow: TaskFlowRecord): boolean {
+  return normalizeOptionalString(flow.currentStep) === "verification_repair";
+}
+
+function compareOwnerVisibleTaskFlows(left: TaskFlowRecord, right: TaskFlowRecord): number {
+  const leftRepairPriority = isRepairPriorityFlow(left);
+  const rightRepairPriority = isRepairPriorityFlow(right);
+  if (leftRepairPriority !== rightRepairPriority) {
+    return leftRepairPriority ? -1 : 1;
+  }
+  return right.createdAt - left.createdAt;
+}
+
 export function getTaskFlowByIdForOwner(params: {
   flowId: string;
   callerOwnerKey: string;
@@ -19,14 +32,18 @@ export function getTaskFlowByIdForOwner(params: {
 
 export function listTaskFlowsForOwner(params: { callerOwnerKey: string }): TaskFlowRecord[] {
   const ownerKey = normalizeOptionalString(params.callerOwnerKey);
-  return ownerKey ? listTaskFlowsForOwnerKey(ownerKey) : [];
+  return ownerKey ? listTaskFlowsForOwnerKey(ownerKey).toSorted(compareOwnerVisibleTaskFlows) : [];
 }
 
 export function findLatestTaskFlowForOwner(params: {
   callerOwnerKey: string;
 }): TaskFlowRecord | undefined {
   const ownerKey = normalizeOptionalString(params.callerOwnerKey);
-  return ownerKey ? findLatestTaskFlowForOwnerKey(ownerKey) : undefined;
+  if (!ownerKey) {
+    return undefined;
+  }
+  const prioritized = listTaskFlowsForOwner({ callerOwnerKey: ownerKey })[0];
+  return prioritized ?? findLatestTaskFlowForOwnerKey(ownerKey);
 }
 
 export function resolveTaskFlowForLookupTokenForOwner(params: {

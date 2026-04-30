@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "components": [
+    {
+      "id": "codex-runtime",
+      "label": "Codex runtime bridge",
+      "summary": "Owns the embedded Codex app-server bridge, context projection, and Codex-native thread handoff inside OpenClaw.",
+      "dossier": "components/codex-runtime.md",
+      "paths": ["extensions/codex/", "extensions/codex/src/app-server/"],
+      "keywords": [
+        "codex",
+        "app-server",
+        "thread",
+        "developer instructions",
+        "context projection",
+        "conversation binding"
+      ],
+      "docs": [
+        "docs/concepts/agent-runtimes.md",
+        "docs/concepts/context-engine.md",
+        "extensions/codex/src/app-server/context-engine-projection.ts"
+      ],
+      "tests": [
+        "extensions/codex/src/app-server/run-attempt.context-engine.test.ts",
+        "extensions/codex/src/app-server/context-engine-projection.test.ts",
+        "extensions/codex/src/app-server/compact.test.ts"
+      ],
+      "validation": ["pnpm test extensions/codex", "pnpm build"],
+      "invariants": [
+        "OpenClaw assembles context; Codex owns canonical thread state.",
+        "Codex prompt projection must treat assembled context as quoted reference, not fresh instructions.",
+        "Changes here must preserve Codex-native compaction and transcript mirror behavior."
+      ]
+    },
+    {
+      "id": "context-engine-core",
+      "label": "Context engine core",
+      "summary": "Defines the context-engine contract, slot selection, bootstrap and compaction lifecycles, and runtime delegation helpers.",
+      "dossier": "components/context-engine-core.md",
+      "paths": ["src/context-engine/", "docs/concepts/context-engine.md"],
+      "keywords": [
+        "context engine",
+        "assemble",
+        "compact",
+        "systemPromptAddition",
+        "subagent",
+        "compaction"
+      ],
+      "docs": [
+        "docs/concepts/context-engine.md",
+        "src/context-engine/types.ts",
+        "src/context-engine/delegate.ts"
+      ],
+      "tests": [
+        "src/context-engine/context-engine.test.ts",
+        "src/agents/subagent-spawn.context.test.ts",
+        "src/agents/pi-embedded-runner/context-engine-maintenance.test.ts"
+      ],
+      "validation": ["pnpm test src/context-engine/context-engine.test.ts", "pnpm build"],
+      "invariants": [
+        "The plugin slot contract is additive and fail-closed when a selected engine is invalid.",
+        "Non-legacy engines may inject systemPromptAddition but must still return ordered messages and token estimates.",
+        "Context-engine compaction must preserve runtime-owned transcript rotation semantics."
+      ]
+    },
+    {
+      "id": "embedded-runner",
+      "label": "Embedded PI runner",
+      "summary": "Owns the default OpenClaw model loop, prompt assembly, deferred maintenance, and tool execution lifecycle for non-native runtimes.",
+      "dossier": "components/embedded-runner.md",
+      "paths": ["src/agents/pi-embedded-runner/", "src/agents/harness/"],
+      "keywords": [
+        "embedded runner",
+        "pi runner",
+        "overflow compaction",
+        "maintenance",
+        "tool loop",
+        "attempt"
+      ],
+      "docs": [
+        "docs/concepts/agent-loop.md",
+        "docs/concepts/compaction.md",
+        "docs/concepts/session.md"
+      ],
+      "tests": [
+        "src/agents/pi-embedded-runner/run/attempt.test.ts",
+        "src/agents/pi-embedded-runner/run.overflow-compaction.test.ts",
+        "src/agents/pi-embedded-runner/context-engine-maintenance.test.ts"
+      ],
+      "validation": ["pnpm test src/agents/pi-embedded-runner/run/attempt.test.ts", "pnpm build"],
+      "invariants": [
+        "The runner owns prepared prompt assembly and generic tool orchestration for PI-mode turns.",
+        "Deferred context-engine maintenance must never silently corrupt transcript lineage.",
+        "Compaction and retries must preserve stable runtime context for the active run attempt."
+      ]
+    },
+    {
+      "id": "plugin-control-plane",
+      "label": "Plugin control plane",
+      "summary": "Owns plugin manifests, capability registration, slot activation, and runtime/plugin metadata boundaries.",
+      "dossier": "components/plugin-control-plane.md",
+      "paths": ["src/plugins/", "docs/plugins/", "extensions/"],
+      "keywords": [
+        "plugin",
+        "manifest",
+        "registerContextEngine",
+        "capability",
+        "activation",
+        "slot"
+      ],
+      "docs": [
+        "docs/plugins/architecture.md",
+        "docs/plugins/manifest.md",
+        "docs/plugins/sdk-entrypoints.md",
+        "extensions/AGENTS.md"
+      ],
+      "tests": [
+        "src/plugins/loader.test.ts",
+        "src/plugins/slots.test.ts",
+        "src/plugins/status.test.ts"
+      ],
+      "validation": ["pnpm test src/plugins/loader.test.ts", "pnpm build"],
+      "invariants": [
+        "Extension production code must stay on plugin-sdk seams and its own local package files.",
+        "Manifest metadata must remain cheap and accurate without executing plugin runtime code.",
+        "Context-engine ids are plugin-owned and must not collide with the reserved core legacy id."
+      ]
+    }
+  ]
+}

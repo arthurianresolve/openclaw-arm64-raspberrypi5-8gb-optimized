@@ -150,6 +150,10 @@ describe("lobster plugin tool", () => {
       flowControllerId: "tests/lobster",
       flowGoal: "Run Lobster workflow",
       flowStateJson: '{"lane":"email"}',
+      flowUnitContextJson:
+        '{"unitId":"lobster:flow-managed-run","objective":"Review managed Lobster run","ownedPaths":["extensions/lobster"],"relevantDocs":["docs/tools/lobster.md"],"invariants":["Keep task flow metadata explicit"],"validationCommands":["pnpm test -- lobster-tool"],"contextMode":"isolated-session","packetSource":"lobster"}',
+      flowVerificationJson:
+        '{"commands":["pnpm test -- lobster-tool"],"retryCount":2,"autoRepair":true,"failMode":"record_only"}',
       flowCurrentStep: "run_lobster",
       flowWaitingStep: "await_review",
     });
@@ -158,6 +162,22 @@ describe("lobster plugin tool", () => {
       controllerId: "tests/lobster",
       goal: "Run Lobster workflow",
       currentStep: "run_lobster",
+      unitContextPacket: {
+        unitId: "lobster:flow-managed-run",
+        objective: "Review managed Lobster run",
+        ownedPaths: ["extensions/lobster"],
+        relevantDocs: ["docs/tools/lobster.md"],
+        invariants: ["Keep task flow metadata explicit"],
+        validationCommands: ["pnpm test -- lobster-tool"],
+        contextMode: "isolated-session",
+        packetSource: "lobster",
+      },
+      unitVerificationPolicy: {
+        commands: ["pnpm test -- lobster-tool"],
+        retryCount: 2,
+        autoRepair: true,
+        failMode: "record_only",
+      },
       stateJson: { lane: "email" },
     });
     expect(taskFlow.setWaiting).toHaveBeenCalledWith({

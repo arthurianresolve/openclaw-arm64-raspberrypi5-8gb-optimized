@@ -36,6 +36,12 @@ type ManagedFlowRunParams = {
   goal: string;
   currentStep?: string;
   waitingStep?: string;
+  unitContextPacket?: NonNullable<
+    Parameters<BoundTaskFlow["createManaged"]>[0]["unitContextPacket"]
+  >;
+  unitVerificationPolicy?: NonNullable<
+    Parameters<BoundTaskFlow["createManaged"]>[0]["unitVerificationPolicy"]
+  >;
   stateJson?: JsonLike;
 };
 
@@ -98,12 +104,46 @@ function parseOptionalFlowStateJson(value: unknown): JsonLike | undefined {
   }
 }
 
+function parseOptionalFlowUnitContextJson(
+  value: unknown,
+): ManagedFlowRunParams["unitContextPacket"] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "string") {
+    throw new Error("flowUnitContextJson must be a JSON string");
+  }
+  try {
+    return JSON.parse(value) as ManagedFlowRunParams["unitContextPacket"];
+  } catch {
+    throw new Error("flowUnitContextJson must be valid JSON");
+  }
+}
+
+function parseOptionalFlowVerificationJson(
+  value: unknown,
+): ManagedFlowRunParams["unitVerificationPolicy"] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "string") {
+    throw new Error("flowVerificationJson must be a JSON string");
+  }
+  try {
+    return JSON.parse(value) as ManagedFlowRunParams["unitVerificationPolicy"];
+  } catch {
+    throw new Error("flowVerificationJson must be valid JSON");
+  }
+}
+
 function parseRunFlowParams(params: Record<string, unknown>): ManagedFlowRunParams | null {
   const controllerId = readOptionalTrimmedString(params.flowControllerId, "flowControllerId");
   const goal = readOptionalTrimmedString(params.flowGoal, "flowGoal");
   const currentStep = readOptionalTrimmedString(params.flowCurrentStep, "flowCurrentStep");
   const waitingStep = readOptionalTrimmedString(params.flowWaitingStep, "flowWaitingStep");
   const stateJson = parseOptionalFlowStateJson(params.flowStateJson);
+  const unitContextPacket = parseOptionalFlowUnitContextJson(params.flowUnitContextJson);
+  const unitVerificationPolicy = parseOptionalFlowVerificationJson(params.flowVerificationJson);
   const resumeFlowId = readOptionalTrimmedString(params.flowId, "flowId");
   const resumeRevision = readOptionalNumber(params.flowExpectedRevision, "flowExpectedRevision");
 
@@ -112,6 +152,8 @@ function parseRunFlowParams(params: Record<string, unknown>): ManagedFlowRunPara
     goal !== undefined ||
     currentStep !== undefined ||
     waitingStep !== undefined ||
+    unitContextPacket !== undefined ||
+    unitVerificationPolicy !== undefined ||
     stateJson !== undefined;
 
   if (!hasRunFields) {
@@ -131,6 +173,8 @@ function parseRunFlowParams(params: Record<string, unknown>): ManagedFlowRunPara
     goal,
     ...(currentStep ? { currentStep } : {}),
     ...(waitingStep ? { waitingStep } : {}),
+    ...(unitContextPacket ? { unitContextPacket } : {}),
+    ...(unitVerificationPolicy ? { unitVerificationPolicy } : {}),
     ...(stateJson !== undefined ? { stateJson } : {}),
   };
 }
@@ -235,6 +279,8 @@ export function createLobsterTool(api: OpenClawPluginApi, options?: LobsterToolO
       flowControllerId: Type.Optional(Type.String()),
       flowGoal: Type.Optional(Type.String()),
       flowStateJson: Type.Optional(Type.String()),
+      flowUnitContextJson: Type.Optional(Type.String()),
+      flowVerificationJson: Type.Optional(Type.String()),
       flowId: Type.Optional(Type.String()),
       flowExpectedRevision: Type.Optional(Type.Number()),
       flowCurrentStep: Type.Optional(Type.String()),
@@ -281,6 +327,12 @@ export function createLobsterTool(api: OpenClawPluginApi, options?: LobsterToolO
               runnerParams,
               controllerId: flowParams.controllerId,
               goal: flowParams.goal,
+              ...(flowParams.unitContextPacket
+                ? { unitContextPacket: flowParams.unitContextPacket }
+                : {}),
+              ...(flowParams.unitVerificationPolicy
+                ? { unitVerificationPolicy: flowParams.unitVerificationPolicy }
+                : {}),
               ...(flowParams.stateJson !== undefined ? { stateJson: flowParams.stateJson } : {}),
               ...(flowParams.currentStep ? { currentStep: flowParams.currentStep } : {}),
               ...(flowParams.waitingStep ? { waitingStep: flowParams.waitingStep } : {}),

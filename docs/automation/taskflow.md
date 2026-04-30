@@ -133,15 +133,45 @@ openclaw tasks flow list
 # Show details for a specific flow
 openclaw tasks flow show <lookup>
 
+# Show verification and repair history for one flow
+openclaw tasks flow audit <lookup>
+
 # Cancel a running flow and its active tasks
 openclaw tasks flow cancel <lookup>
 ```
 
-| Command                           | Description                                   |
-| --------------------------------- | --------------------------------------------- |
-| `openclaw tasks flow list`        | Shows tracked flows with status and sync mode |
-| `openclaw tasks flow show <id>`   | Inspect one flow by flow id or lookup key     |
-| `openclaw tasks flow cancel <id>` | Cancel a running flow and its active tasks    |
+| Command                           | Description                                                    |
+| --------------------------------- | -------------------------------------------------------------- |
+| `openclaw tasks flow list`        | Shows tracked flows with status and sync mode                  |
+| `openclaw tasks flow show <id>`   | Inspect one flow by flow id or lookup key                      |
+| `openclaw tasks flow audit <id>`  | Inspect verification state, repair history, and repair linkage |
+| `openclaw tasks flow cancel <id>` | Cancel a running flow and its active tasks                     |
+
+## Unit execution and verification
+
+Managed Task Flows can now carry two machine-facing execution contracts:
+
+- `UnitContextPacket`: bounded scope for one unit of work
+- `UnitVerificationPolicy`: commands, retry budget, auto-repair toggle, and fail mode
+
+When a managed child task inherits a verification policy, Task Flow appends explicit verification instructions to the child task text and runs the declared commands after a successful terminal result.
+
+## Verification repair loop
+
+The current repair loop is intentionally bounded:
+
+1. a unit task succeeds
+2. Task Flow runs its verification commands
+3. if verification fails and `autoRepair` plus retry budget are enabled, Task Flow records structured verification state and queues one repair task
+4. while the flow is in `currentStep: "verification_repair"`, generic child work is suppressed
+5. if the repair task passes verification, Task Flow restores the pre-repair step and normal dispatch can resume
+6. if verification still fails and no repair budget remains, the flow is either `blocked` or records the failure only, depending on `failMode`
+
+Repair state is durable. Flow views expose repair priority, verification history, remaining repair budget, and repair task linkage.
+
+## Maintenance
+
+`openclaw tasks maintenance --apply` now rewrites legacy Task Flow rows that still persisted verification payloads under `stateJson.verification` into the typed `verificationState` storage field. This is a storage cleanup only; it does not change logical flow state.
 
 ## How flows relate to tasks
 

@@ -1,4 +1,6 @@
 import type { DeliveryContext } from "../utils/delivery-context.types.js";
+import type { UnitContextPacket } from "./unit-context-packet.js";
+import type { UnitVerificationPolicy } from "./unit-verification-policy.js";
 
 export type TaskRuntime = "subagent" | "acp" | "cli" | "cron";
 
@@ -77,6 +79,8 @@ export type TaskRecord = {
   progressSummary?: string;
   terminalSummary?: string;
   terminalOutcome?: TaskTerminalOutcome;
+  unitContextPacket?: UnitContextPacket;
+  unitVerificationPolicy?: UnitVerificationPolicy;
 };
 
 export type TaskRegistrySnapshot = {

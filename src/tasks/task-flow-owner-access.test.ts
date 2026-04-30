@@ -96,4 +96,39 @@ describe("task flow owner access", () => {
       }),
     ).toEqual([]);
   });
+
+  it("prioritizes verification repair flows ahead of newer generic flows", () => {
+    const generic = createManagedTaskFlow({
+      ownerKey: "agent:main:main",
+      controllerId: "tests/owner-access",
+      goal: "Generic latest flow",
+      createdAt: 200,
+      updatedAt: 200,
+    });
+    const repair = createManagedTaskFlow({
+      ownerKey: "agent:main:main",
+      controllerId: "tests/owner-access",
+      goal: "Repair verification",
+      currentStep: "verification_repair",
+      createdAt: 100,
+      updatedAt: 100,
+    });
+
+    expect(
+      listTaskFlowsForOwner({
+        callerOwnerKey: "agent:main:main",
+      }).map((flow) => flow.flowId),
+    ).toEqual([repair.flowId, generic.flowId]);
+    expect(
+      findLatestTaskFlowForOwner({
+        callerOwnerKey: "agent:main:main",
+      })?.flowId,
+    ).toBe(repair.flowId);
+    expect(
+      resolveTaskFlowForLookupTokenForOwner({
+        token: "agent:main:main",
+        callerOwnerKey: "agent:main:main",
+      })?.flowId,
+    ).toBe(repair.flowId);
+  });
 });

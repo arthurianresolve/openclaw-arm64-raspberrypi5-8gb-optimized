@@ -56,7 +56,14 @@ describe("task-flow-registry", () => {
         controllerId: "tests/managed-controller",
         goal: "Investigate flaky test",
         currentStep: "spawn_task",
-        stateJson: { phase: "spawn" },
+        stateJson: {
+          phase: "spawn",
+          verification: {
+            status: "failed",
+            summary: "legacy verification payload",
+            commands: [],
+          },
+        },
       });
 
       expect(created).toMatchObject({
@@ -67,6 +74,11 @@ describe("task-flow-registry", () => {
         status: "queued",
         currentStep: "spawn_task",
         stateJson: { phase: "spawn" },
+        verificationState: {
+          status: "failed",
+          summary: "legacy verification payload",
+          commands: [],
+        },
       });
 
       const waiting = setFlowWaiting({

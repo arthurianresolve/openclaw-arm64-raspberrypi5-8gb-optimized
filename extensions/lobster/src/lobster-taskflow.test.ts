@@ -74,10 +74,32 @@ describe("runManagedLobsterFlow", () => {
       controllerId: "tests/lobster",
       goal: "Run Lobster workflow",
       currentStep: "run_lobster",
+      unitContextPacket: {
+        unitId: "lobster:tests/lobster",
+        objective: "Run Lobster workflow",
+        ownedPaths: [],
+        relevantDocs: [],
+        invariants: [],
+        validationCommands: [],
+        contextMode: "isolated-session",
+        packetSource: "lobster",
+      },
     });
     expect(taskFlow.finish).toHaveBeenCalledWith({
       flowId: "flow-1",
       expectedRevision: 1,
+      currentStep: "lobster_complete",
+      unitContextPacket: {
+        unitId: "lobster:tests/lobster@lobster_complete",
+        objective: "Run Lobster workflow (lobster_complete)",
+        ownedPaths: [],
+        relevantDocs: [],
+        invariants: [],
+        validationCommands: [],
+        contextMode: "isolated-session",
+        packetSource: "lobster",
+      },
+      unitVerificationPolicy: undefined,
     });
   });
 
@@ -103,11 +125,74 @@ describe("runManagedLobsterFlow", () => {
       flowId: "flow-1",
       expectedRevision: 1,
       currentStep: "await_lobster_approval",
+      unitContextPacket: {
+        unitId: "lobster:tests/lobster@await_lobster_approval",
+        objective: "Run Lobster workflow (await_lobster_approval)",
+        ownedPaths: [],
+        relevantDocs: [],
+        invariants: [],
+        validationCommands: [],
+        contextMode: "isolated-session",
+        packetSource: "lobster",
+      },
+      unitVerificationPolicy: undefined,
       waitJson: {
         kind: "lobster_approval",
         prompt: "Approve this?",
         items: [{ id: "item-1", createdAt: createdAt.toISOString(), count: "2" }],
         resumeToken: "resume-1",
+      },
+    });
+  });
+
+  it("passes explicit flow packet and verification policy into managed runs", async () => {
+    const taskFlow = createFakeTaskFlow();
+    const runner = createRunner({
+      ok: true,
+      status: "ok",
+      output: [],
+      requiresApproval: null,
+    });
+
+    await runManagedLobsterFlow({
+      ...createRunFlowParams(taskFlow, runner),
+      unitContextPacket: {
+        unitId: "lobster:review",
+        objective: "Review workflow output",
+        ownedPaths: ["extensions/lobster"],
+        relevantDocs: ["docs/tools/lobster.md"],
+        invariants: ["Keep managed flow state deterministic"],
+        validationCommands: ["pnpm test -- lobster-taskflow"],
+        contextMode: "isolated-session",
+        packetSource: "lobster",
+      },
+      unitVerificationPolicy: {
+        commands: ["pnpm test -- lobster-taskflow"],
+        retryCount: 1,
+        autoRepair: false,
+        failMode: "stop",
+      },
+    });
+
+    expect(taskFlow.createManaged).toHaveBeenCalledWith({
+      controllerId: "tests/lobster",
+      goal: "Run Lobster workflow",
+      currentStep: "run_lobster",
+      unitContextPacket: {
+        unitId: "lobster:review",
+        objective: "Review workflow output",
+        ownedPaths: ["extensions/lobster"],
+        relevantDocs: ["docs/tools/lobster.md"],
+        invariants: ["Keep managed flow state deterministic"],
+        validationCommands: ["pnpm test -- lobster-taskflow"],
+        contextMode: "isolated-session",
+        packetSource: "lobster",
+      },
+      unitVerificationPolicy: {
+        commands: ["pnpm test -- lobster-taskflow"],
+        retryCount: 1,
+        autoRepair: false,
+        failMode: "stop",
       },
     });
   });
@@ -129,6 +214,18 @@ describe("runManagedLobsterFlow", () => {
     expect(taskFlow.fail).toHaveBeenCalledWith({
       flowId: "flow-1",
       expectedRevision: 1,
+      currentStep: "lobster_failed",
+      unitContextPacket: {
+        unitId: "lobster:tests/lobster@lobster_failed",
+        objective: "Run Lobster workflow (lobster_failed)",
+        ownedPaths: [],
+        relevantDocs: [],
+        invariants: [],
+        validationCommands: [],
+        contextMode: "isolated-session",
+        packetSource: "lobster",
+      },
+      unitVerificationPolicy: undefined,
     });
   });
 
@@ -145,6 +242,18 @@ describe("runManagedLobsterFlow", () => {
     expect(taskFlow.fail).toHaveBeenCalledWith({
       flowId: "flow-1",
       expectedRevision: 1,
+      currentStep: "lobster_failed",
+      unitContextPacket: {
+        unitId: "lobster:tests/lobster@lobster_failed",
+        objective: "Run Lobster workflow (lobster_failed)",
+        ownedPaths: [],
+        relevantDocs: [],
+        invariants: [],
+        validationCommands: [],
+        contextMode: "isolated-session",
+        packetSource: "lobster",
+      },
+      unitVerificationPolicy: undefined,
     });
   });
 });
@@ -167,10 +276,33 @@ describe("resumeManagedLobsterFlow", () => {
       expectedRevision: 4,
       status: "running",
       currentStep: "resume_lobster",
+      unitContextPacket: {
+        unitId: "lobster:tests/lobster@resume_lobster",
+        objective: "Run Lobster workflow (resume_lobster)",
+        ownedPaths: [],
+        relevantDocs: [],
+        invariants: [],
+        validationCommands: [],
+        contextMode: "isolated-session",
+        packetSource: "lobster",
+      },
+      unitVerificationPolicy: undefined,
     });
     expect(taskFlow.finish).toHaveBeenCalledWith({
       flowId: "flow-1",
       expectedRevision: 5,
+      currentStep: "lobster_complete",
+      unitContextPacket: {
+        unitId: "lobster:tests/lobster@lobster_complete",
+        objective: "Run Lobster workflow (lobster_complete)",
+        ownedPaths: [],
+        relevantDocs: [],
+        invariants: [],
+        validationCommands: [],
+        contextMode: "isolated-session",
+        packetSource: "lobster",
+      },
+      unitVerificationPolicy: undefined,
     });
   });
 
@@ -216,6 +348,17 @@ describe("resumeManagedLobsterFlow", () => {
       flowId: "flow-1",
       expectedRevision: 5,
       currentStep: "await_lobster_approval",
+      unitContextPacket: {
+        unitId: "lobster:tests/lobster@await_lobster_approval",
+        objective: "Run Lobster workflow (await_lobster_approval)",
+        ownedPaths: [],
+        relevantDocs: [],
+        invariants: [],
+        validationCommands: [],
+        contextMode: "isolated-session",
+        packetSource: "lobster",
+      },
+      unitVerificationPolicy: undefined,
       waitJson: {
         kind: "lobster_approval",
         prompt: "Approve this too?",

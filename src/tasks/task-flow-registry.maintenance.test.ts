@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { withTempDir } from "../test-helpers/temp-dir.js";
 import { createRunningTaskRun } from "./task-executor.js";
 import {
@@ -12,6 +12,8 @@ import {
   previewTaskFlowRegistryMaintenance,
   runTaskFlowRegistryMaintenance,
 } from "./task-flow-registry.maintenance.js";
+import { configureTaskFlowRegistryRuntime } from "./task-flow-registry.store.js";
+import type { TaskFlowRecord } from "./task-flow-registry.types.js";
 import {
   resetTaskRegistryDeliveryRuntimeForTests,
   resetTaskRegistryForTests,
@@ -64,11 +66,13 @@ describe("task-flow-registry maintenance", () => {
       expect(previewTaskFlowRegistryMaintenance()).toEqual({
         reconciled: 1,
         pruned: 0,
+        backfilled: 0,
       });
 
       expect(await runTaskFlowRegistryMaintenance()).toEqual({
         reconciled: 1,
         pruned: 0,
+        backfilled: 0,
       });
       expect(getTaskFlowById(flow.flowId)).toMatchObject({
         flowId: flow.flowId,
@@ -94,11 +98,13 @@ describe("task-flow-registry maintenance", () => {
       expect(previewTaskFlowRegistryMaintenance()).toEqual({
         reconciled: 0,
         pruned: 1,
+        backfilled: 0,
       });
 
       expect(await runTaskFlowRegistryMaintenance()).toEqual({
         reconciled: 0,
         pruned: 1,
+        backfilled: 0,
       });
       expect(getTaskFlowById(oldFlow.flowId)).toBeUndefined();
     });
@@ -145,11 +151,13 @@ describe("task-flow-registry maintenance", () => {
       expect(previewTaskFlowRegistryMaintenance()).toEqual({
         reconciled: 0,
         pruned: 0,
+        backfilled: 0,
       });
 
       expect(await runTaskFlowRegistryMaintenance()).toEqual({
         reconciled: 0,
         pruned: 0,
+        backfilled: 0,
       });
       expect(getTaskFlowById(flow.flowId)).toMatchObject({
         flowId: flow.flowId,
@@ -198,15 +206,73 @@ describe("task-flow-registry maintenance", () => {
       expect(previewTaskFlowRegistryMaintenance()).toEqual({
         reconciled: 0,
         pruned: 25,
+        backfilled: 0,
       });
 
       expect(await runTaskFlowRegistryMaintenance()).toEqual({
         reconciled: 0,
         pruned: 25,
+        backfilled: 0,
       });
 
       const remainingFlowIds = new Set(listTaskFlowRecords().map((flow) => flow.flowId));
       expect(remainingFlowIds).toEqual(new Set([fresh.flowId, running.flowId]));
+    });
+  });
+
+  it("backfills legacy verification payloads from the persisted flow store", async () => {
+    const legacyFlow: TaskFlowRecord = {
+      flowId: "flow-legacy-maintenance",
+      syncMode: "managed",
+      ownerKey: "agent:main:main",
+      controllerId: "tests/task-flow-maintenance",
+      revision: 2,
+      status: "running",
+      notifyPolicy: "done_only",
+      goal: "Legacy verification flow",
+      stateJson: {
+        lane: "triage",
+        verification: {
+          status: "failed",
+          summary: "Legacy verification payload",
+          commands: [],
+        },
+      },
+      createdAt: 10,
+      updatedAt: 10,
+    };
+    const saveSnapshot = vi.fn();
+    configureTaskFlowRegistryRuntime({
+      store: {
+        loadSnapshot: () => ({
+          flows: new Map([[legacyFlow.flowId, legacyFlow]]),
+        }),
+        saveSnapshot,
+      },
+    });
+
+    expect(previewTaskFlowRegistryMaintenance()).toEqual({
+      reconciled: 0,
+      pruned: 0,
+      backfilled: 1,
+    });
+
+    expect(await runTaskFlowRegistryMaintenance()).toEqual({
+      reconciled: 0,
+      pruned: 0,
+      backfilled: 1,
+    });
+    const savedSnapshot = saveSnapshot.mock.calls.at(-1)?.[0] as {
+      flows: ReadonlyMap<string, TaskFlowRecord>;
+    };
+    expect(savedSnapshot.flows.get(legacyFlow.flowId)).toMatchObject({
+      flowId: legacyFlow.flowId,
+      stateJson: { lane: "triage" },
+      verificationState: {
+        status: "failed",
+        summary: "Legacy verification payload",
+        commands: [],
+      },
     });
   });
 });

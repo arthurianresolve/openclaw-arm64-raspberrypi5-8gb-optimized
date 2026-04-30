@@ -5,6 +5,7 @@ import type { OpenClawPluginToolContext } from "../tool-types.js";
 import type { PluginRuntimeTaskFlow } from "./runtime-taskflow.types.js";
 import type {
   TaskFlowDetail,
+  TaskFlowMetrics,
   TaskFlowView,
   TaskRunAggregateSummary,
   TaskRunCancelResult,
@@ -13,6 +14,7 @@ import type {
 } from "./task-domain-types.js";
 export type {
   TaskFlowDetail,
+  TaskFlowMetrics,
   TaskFlowView,
   TaskRunAggregateSummary,
   TaskRunCancelResult,
@@ -49,6 +51,7 @@ export type BoundTaskFlowsRuntime = {
   findLatest: () => TaskFlowDetail | undefined;
   resolve: (token: string) => TaskFlowDetail | undefined;
   getTaskSummary: (flowId: string) => TaskRunAggregateSummary | undefined;
+  summarize: () => TaskFlowMetrics;
 };
 
 export type PluginRuntimeTaskFlows = {

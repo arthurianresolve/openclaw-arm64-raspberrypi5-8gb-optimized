@@ -1,11 +1,13 @@
 import type {
   TaskFlowDetail,
+  TaskFlowVerification,
   TaskFlowView,
   TaskRunAggregateSummary,
   TaskRunDetail,
   TaskRunView,
 } from "../plugins/runtime/task-domain-types.js";
 import type { TaskFlowRecord } from "./task-flow-registry.types.js";
+import { cloneTaskFlowVerificationState } from "./task-flow-verification-state.js";
 import { summarizeTaskRecords } from "./task-registry.summary.js";
 import type { TaskRecord, TaskRegistrySummary } from "./task-registry.types.js";
 
@@ -55,6 +57,10 @@ export function mapTaskRunDetail(task: TaskRecord): TaskRunDetail {
 }
 
 export function mapTaskFlowView(flow: TaskFlowRecord): TaskFlowView {
+  const verification: TaskFlowVerification | undefined = cloneTaskFlowVerificationState(
+    flow.verificationState,
+  );
+  const requiresRepair = flow.currentStep === "verification_repair";
   return {
     id: flow.flowId,
     ownerKey: flow.ownerKey,
@@ -63,6 +69,9 @@ export function mapTaskFlowView(flow: TaskFlowRecord): TaskFlowView {
     notifyPolicy: flow.notifyPolicy,
     goal: flow.goal,
     ...(flow.currentStep ? { currentStep: flow.currentStep } : {}),
+    priority: requiresRepair ? "repair" : "normal",
+    ...(requiresRepair ? { requiresRepair: true } : {}),
+    ...(verification ? { verification } : {}),
     ...(flow.cancelRequestedAt !== undefined ? { cancelRequestedAt: flow.cancelRequestedAt } : {}),
     createdAt: flow.createdAt,
     updatedAt: flow.updatedAt,

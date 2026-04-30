@@ -1,5 +1,6 @@
 import { statSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { requireNodeSqlite } from "../infra/node-sqlite.js";
 import { withTempDir } from "../test-helpers/temp-dir.js";
 import {
   createManagedTaskFlow,
@@ -29,6 +30,11 @@ function createStoredFlow(): TaskFlowRecord {
     blockedTaskId: "task-restored",
     blockedSummary: "Writable session required.",
     stateJson: { lane: "triage", done: 3 },
+    verificationState: {
+      status: "failed",
+      summary: "Persisted verification state",
+      commands: [],
+    },
     waitJson: { kind: "task", taskId: "task-restored" },
     cancelRequestedAt: 115,
     createdAt: 100,
@@ -79,6 +85,11 @@ describe("task-flow-registry store runtime", () => {
       controllerId: "tests/restored-controller",
       revision: 4,
       stateJson: { lane: "triage", done: 3 },
+      verificationState: {
+        status: "failed",
+        summary: "Persisted verification state",
+        commands: [],
+      },
       waitJson: { kind: "task", taskId: "task-restored" },
       cancelRequestedAt: 115,
     });
@@ -148,6 +159,47 @@ describe("task-flow-registry store runtime", () => {
     });
   });
 
+  it("migrates legacy stateJson.verification from configured stores into verificationState", () => {
+    const storedFlow: TaskFlowRecord = {
+      flowId: "flow-legacy-verification",
+      syncMode: "managed",
+      ownerKey: "agent:main:main",
+      controllerId: "tests/restored-controller",
+      revision: 1,
+      status: "running",
+      notifyPolicy: "done_only",
+      goal: "Legacy verification flow",
+      stateJson: {
+        lane: "triage",
+        verification: {
+          status: "failed",
+          summary: "Legacy verification payload",
+          commands: [],
+        },
+      },
+      createdAt: 100,
+      updatedAt: 100,
+    };
+    configureTaskFlowRegistryRuntime({
+      store: {
+        loadSnapshot: () => ({
+          flows: new Map([[storedFlow.flowId, storedFlow]]),
+        }),
+        saveSnapshot: () => {},
+      },
+    });
+
+    expect(getTaskFlowById(storedFlow.flowId)).toMatchObject({
+      flowId: storedFlow.flowId,
+      stateJson: { lane: "triage" },
+      verificationState: {
+        status: "failed",
+        summary: "Legacy verification payload",
+        commands: [],
+      },
+    });
+  });
+
   it("round-trips explicit json null through sqlite", async () => {
     await withFlowRegistryTempDir(async (root) => {
       process.env.OPENCLAW_STATE_DIR = root;
@@ -167,6 +219,62 @@ describe("task-flow-registry store runtime", () => {
         flowId: created.flowId,
         stateJson: null,
         waitJson: null,
+      });
+    });
+  });
+
+  it("persists indexed verification summary columns alongside verification_state_json", async () => {
+    await withFlowRegistryTempDir(async (root) => {
+      process.env.OPENCLAW_STATE_DIR = root;
+      resetTaskFlowRegistryForTests();
+
+      const created = createManagedTaskFlow({
+        ownerKey: "agent:main:main",
+        controllerId: "tests/verification-indexes",
+        goal: "Persist verification indexes",
+        status: "running",
+        currentStep: "verification_repair",
+        verificationState: {
+          status: "failed",
+          summary: "Verification failed.",
+          commands: [],
+          verifiedAt: 222,
+          repairTaskId: "task-repair",
+          repairAttemptCount: 2,
+          repairSuccessCount: 1,
+          repairFailureCount: 1,
+        },
+      });
+
+      const sqlitePath = resolveTaskFlowRegistrySqlitePath(process.env);
+      const { DatabaseSync } = requireNodeSqlite();
+      const db = new DatabaseSync(sqlitePath);
+      const row = db
+        .prepare(
+          `
+            SELECT
+              verification_status,
+              verification_verified_at,
+              verification_repair_task_id,
+              verification_requires_repair,
+              verification_repair_attempt_count,
+              verification_repair_success_count,
+              verification_repair_failure_count
+            FROM flow_runs
+            WHERE flow_id = ?
+          `,
+        )
+        .get(created.flowId) as Record<string, unknown>;
+      db.close();
+
+      expect(row).toEqual({
+        verification_status: "failed",
+        verification_verified_at: 222,
+        verification_repair_task_id: "task-repair",
+        verification_requires_repair: 1,
+        verification_repair_attempt_count: 2,
+        verification_repair_success_count: 1,
+        verification_repair_failure_count: 1,
       });
     });
   });

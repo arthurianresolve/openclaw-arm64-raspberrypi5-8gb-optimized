@@ -974,7 +974,7 @@ export async function spawnSubagentDirect(
     ? "lightweight"
     : undefined;
 
-  const childTaskMessage = buildSubagentInitialUserMessage({
+  let childTaskMessage = buildSubagentInitialUserMessage({
     childDepth,
     maxSpawnDepth,
     persistentSession: spawnMode === "session",
@@ -1036,6 +1036,21 @@ export async function spawnSubagentDirect(
     };
   }
   const contextEnginePreparation = contextEnginePrepareResult.preparation;
+  const contextEngineSystemPromptAddition =
+    normalizeOptionalString(contextEnginePreparation?.systemPromptAddition) ?? undefined;
+  const contextEngineInitialUserMessageAddition =
+    normalizeOptionalString(contextEnginePreparation?.initialUserMessageAddition) ?? undefined;
+  if (contextEngineSystemPromptAddition) {
+    childSystemPrompt = `${childSystemPrompt}\n\n${contextEngineSystemPromptAddition}`;
+  }
+  if (contextEngineInitialUserMessageAddition) {
+    childTaskMessage = buildSubagentInitialUserMessage({
+      childDepth,
+      maxSpawnDepth,
+      persistentSession: spawnMode === "session",
+      initialUserMessageAddition: contextEngineInitialUserMessageAddition,
+    });
+  }
 
   const childIdem = crypto.randomUUID();
   let childRunId: string = childIdem;

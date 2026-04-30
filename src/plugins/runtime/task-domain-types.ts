@@ -1,5 +1,10 @@
 import type { JsonValue } from "../../tasks/task-flow-registry.types.js";
 import type {
+  TaskFlowVerificationCommand,
+  TaskFlowVerificationHistoryEntry,
+  TaskFlowVerificationState,
+} from "../../tasks/task-flow-verification-state.js";
+import type {
   TaskDeliveryStatus,
   TaskNotifyPolicy,
   TaskRuntime,
@@ -57,6 +62,25 @@ export type TaskRunCancelResult = {
   task?: TaskRunDetail;
 };
 
+export type TaskFlowVerification = TaskFlowVerificationState;
+
+export type TaskFlowMetrics = {
+  total: number;
+  active: number;
+  blocked: number;
+  waiting: number;
+  terminal: number;
+  cancelRequested: number;
+  repairPriority: number;
+  verificationTracked: number;
+  verificationPassed: number;
+  verificationFailed: number;
+  repairAttempts: number;
+  repairSuccesses: number;
+  repairFailures: number;
+  repairSuccessRate: number | null;
+};
+
 export type TaskFlowView = {
   id: string;
   ownerKey: string;
@@ -65,6 +89,9 @@ export type TaskFlowView = {
   notifyPolicy: TaskNotifyPolicy;
   goal: string;
   currentStep?: string;
+  priority: "repair" | "normal";
+  requiresRepair?: boolean;
+  verification?: TaskFlowVerification;
   cancelRequestedAt?: number;
   createdAt: number;
   updatedAt: number;

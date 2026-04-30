@@ -10,6 +10,8 @@ export function buildSubagentInitialUserMessage(params: {
   maxSpawnDepth: number;
   /** When true, this subagent uses a persistent session for follow-up messages. */
   persistentSession: boolean;
+  /** Optional bounded handoff text injected by the active context engine. */
+  initialUserMessageAddition?: string;
 }): string {
   const lines = [
     `[Subagent Context] You are running as a subagent (depth ${params.childDepth}/${params.maxSpawnDepth}). Results auto-announce to your requester; do not busy-poll for status.`,
@@ -18,6 +20,9 @@ export function buildSubagentInitialUserMessage(params: {
     lines.push(
       "[Subagent Context] This subagent session is persistent and remains available for thread follow-up messages.",
     );
+  }
+  if (params.initialUserMessageAddition?.trim()) {
+    lines.push(`[Subagent Handoff]\n${params.initialUserMessageAddition.trim()}`);
   }
   lines.push(
     "Begin. Your assigned task is in the system prompt under **Your Role**; execute it to completion.",

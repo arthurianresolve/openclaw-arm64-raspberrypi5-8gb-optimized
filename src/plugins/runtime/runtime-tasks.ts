@@ -13,6 +13,7 @@ import {
   findLatestTaskFlowForOwner,
   resolveTaskFlowForLookupTokenForOwner,
 } from "../../tasks/task-flow-owner-access.js";
+import { summarizeTaskFlows } from "../../tasks/task-flow-summary.js";
 import {
   findLatestTaskForRelatedSessionKeyForOwner,
   getTaskByIdForOwner,
@@ -172,6 +173,12 @@ function createBoundTaskFlowsRuntime(params: {
       });
       return flow ? mapTaskRunAggregateSummary(getFlowTaskSummary(flow.flowId)) : undefined;
     },
+    summarize: () =>
+      summarizeTaskFlows(
+        listTaskFlowsForOwner({
+          callerOwnerKey: ownerKey,
+        }),
+      ),
   };
 }
 

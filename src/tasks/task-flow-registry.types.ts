@@ -1,5 +1,8 @@
 import type { DeliveryContext } from "../utils/delivery-context.types.js";
+import type { TaskFlowVerificationState } from "./task-flow-verification-state.js";
 import type { TaskNotifyPolicy } from "./task-registry.types.js";
+import type { UnitContextPacket } from "./unit-context-packet.js";
+import type { UnitVerificationPolicy } from "./unit-verification-policy.js";
 
 export type JsonValue =
   | null
@@ -34,6 +37,9 @@ export type TaskFlowRecord = {
   currentStep?: string;
   blockedTaskId?: string;
   blockedSummary?: string;
+  unitContextPacket?: UnitContextPacket;
+  unitVerificationPolicy?: UnitVerificationPolicy;
+  verificationState?: TaskFlowVerificationState;
   stateJson?: JsonValue;
   waitJson?: JsonValue;
   cancelRequestedAt?: number;

@@ -70,12 +70,13 @@ function renderFetchSummary(summary: Awaited<ReturnType<typeof fetchExternalProm
     `Prompt corpus manifest: ${summary.manifest.id}`,
     `Source: ${summary.manifest.repositoryUrl} @ ${summary.manifest.ref.type}:${summary.manifest.ref.value}`,
     `Cache dir: ${summary.cache.corpusDir}`,
+    `Counts: downloaded=${summary.counts.downloaded} cached=${summary.counts.cached} dry-run=${summary.counts.dryRun} failed=${summary.counts.failed}`,
   ];
   for (const warning of summary.warnings) {
     lines.push(`Warning: ${warning}`);
   }
   for (const file of summary.files) {
-    lines.push(`${file.status.padEnd(10)} ${file.path}`);
+    lines.push(`${file.status.padEnd(10)} ${file.path}${file.error ? ` :: ${file.error}` : ""}`);
   }
   return `${lines.join("\n")}\n`;
 }

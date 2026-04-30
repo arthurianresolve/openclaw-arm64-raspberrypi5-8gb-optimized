@@ -106,6 +106,12 @@ describe("prompt corpus analysis", () => {
     expect(await fs.readFile(path.join(summary.cache.corpusDir, "index.json"), "utf8")).toContain(
       '"manifestId": "external-prompts"',
     );
+    expect(summary.counts).toEqual({
+      downloaded: 1,
+      cached: 0,
+      dryRun: 0,
+      failed: 0,
+    });
   });
 
   it("retries transient fetch errors before succeeding", async () => {
@@ -156,6 +162,7 @@ describe("prompt corpus analysis", () => {
     expect(attempts).toBe(3);
     expect(delays).toEqual([25, 50]);
     expect(summary.files[0]?.status).toBe("downloaded");
+    expect(summary.counts.failed).toBe(0);
     expect(await fs.readFile(path.join(summary.cache.corpusDir, "README.md"), "utf8")).toBe(
       "downloaded-after-retry",
     );
@@ -209,8 +216,81 @@ describe("prompt corpus analysis", () => {
 
     expect(attempts).toBe(2);
     expect(summary.files[0]?.sha256).toBeDefined();
+    expect(summary.counts.downloaded).toBe(1);
     expect(await fs.readFile(path.join(summary.cache.corpusDir, "README.md"), "utf8")).toBe(
       "downloaded-after-503",
+    );
+  });
+
+  it("records per-file failures without aborting the whole fetch", async () => {
+    const repoRoot = await makeTempDir();
+    const manifestPath = path.join(repoRoot, "manifest.json");
+    await fs.writeFile(
+      manifestPath,
+      JSON.stringify(
+        {
+          id: "external-prompts",
+          owner: "x1xhlol",
+          repo: "system-prompts-and-models-of-ai-tools",
+          repositoryUrl: "https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools",
+          license: "GPL-3.0-only",
+          usage: "eval-only",
+          ref: { type: "commit", value: "abc123" },
+          files: [
+            { path: "README.md", kind: "metadata" },
+            { path: "missing.txt", kind: "vendor-system-prompt" },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const summary = await fetchExternalPromptCorpus({
+      repoRoot,
+      manifestPath,
+      retryLimit: 0,
+      fetchText: async (url) => {
+        if (url.endsWith("/missing.txt")) {
+          return {
+            ok: false,
+            status: 404,
+            text: "not found",
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          text: "downloaded-ok",
+        };
+      },
+    });
+
+    expect(summary.counts).toEqual({
+      downloaded: 1,
+      cached: 0,
+      dryRun: 0,
+      failed: 1,
+    });
+    expect(summary.files).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "README.md",
+          status: "downloaded",
+        }),
+        expect.objectContaining({
+          path: "missing.txt",
+          status: "failed",
+          error: expect.stringContaining("404"),
+        }),
+      ]),
+    );
+    expect(summary.warnings).toEqual(
+      expect.arrayContaining([expect.stringContaining("Fetch failed for missing.txt")]),
+    );
+    expect(await fs.readFile(path.join(summary.cache.corpusDir, "README.md"), "utf8")).toBe(
+      "downloaded-ok",
     );
   });
 

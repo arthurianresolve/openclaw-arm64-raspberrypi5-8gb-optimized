@@ -99,9 +99,10 @@ export type ExternalPromptCorpusFetchEntry = {
   label?: string;
   rawUrl: string;
   cachePath: string;
-  status: "downloaded" | "cached" | "dry-run";
+  status: "downloaded" | "cached" | "dry-run" | "failed";
   sha256?: string;
   chars?: number;
+  error?: string;
 };
 
 export type ExternalPromptCorpusFetchSummary = {
@@ -117,6 +118,12 @@ export type ExternalPromptCorpusFetchSummary = {
   };
   warnings: string[];
   files: ExternalPromptCorpusFetchEntry[];
+  counts: {
+    downloaded: number;
+    cached: number;
+    dryRun: number;
+    failed: number;
+  };
 };
 
 type ReadFileLike = (filePath: string, encoding: BufferEncoding) => Promise<string>;
@@ -291,6 +298,13 @@ function countMatches(text: string, pattern: RegExp) {
   return (text.match(pattern) ?? []).length;
 }
 
+function formatFetchErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
 function shouldRetryFetchError(error: unknown) {
   if (!(error instanceof Error)) {
     return false;
@@ -441,8 +455,9 @@ export function buildOpenClawPromptCorpusSamples(repoRoot: string): PromptCorpus
 }
 
 async function defaultFetchText(url: string): Promise<FetchTextResult> {
+  const timeoutMs = readPromptCorpusFetchTimeoutMsFromEnv();
   const response = await fetch(url, {
-    signal: AbortSignal.timeout(DEFAULT_FETCH_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   return {
     ok: response.ok,
@@ -453,6 +468,40 @@ async function defaultFetchText(url: string): Promise<FetchTextResult> {
 
 async function defaultDelay(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function readNonNegativeIntegerEnv(name: string, fallback: number) {
+  const raw = process.env[name]?.trim();
+  if (!raw) {
+    return fallback;
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return fallback;
+  }
+  return Math.floor(parsed);
+}
+
+function readPromptCorpusFetchRetryLimitFromEnv() {
+  return readNonNegativeIntegerEnv(
+    "OPENCLAW_QA_PROMPT_CORPUS_FETCH_RETRIES",
+    DEFAULT_FETCH_RETRY_LIMIT,
+  );
+}
+
+function readPromptCorpusFetchRetryDelayMsFromEnv() {
+  return readNonNegativeIntegerEnv(
+    "OPENCLAW_QA_PROMPT_CORPUS_FETCH_RETRY_DELAY_MS",
+    DEFAULT_FETCH_RETRY_DELAY_MS,
+  );
+}
+
+function readPromptCorpusFetchTimeoutMsFromEnv() {
+  const timeoutMs = readNonNegativeIntegerEnv(
+    "OPENCLAW_QA_PROMPT_CORPUS_FETCH_TIMEOUT_MS",
+    DEFAULT_FETCH_TIMEOUT_MS,
+  );
+  return Math.max(1, timeoutMs);
 }
 
 async function fetchWithRetry(params: {
@@ -518,8 +567,11 @@ export async function fetchExternalPromptCorpus(params: {
   const readFile = params.readFile ?? fs.readFile;
   const fetchText = params.fetchText ?? defaultFetchText;
   const delay = params.delay ?? defaultDelay;
-  const retryLimit = Math.max(0, params.retryLimit ?? DEFAULT_FETCH_RETRY_LIMIT);
-  const retryDelayMs = Math.max(0, params.retryDelayMs ?? DEFAULT_FETCH_RETRY_DELAY_MS);
+  const retryLimit = Math.max(0, params.retryLimit ?? readPromptCorpusFetchRetryLimitFromEnv());
+  const retryDelayMs = Math.max(
+    0,
+    params.retryDelayMs ?? readPromptCorpusFetchRetryDelayMsFromEnv(),
+  );
   const cache = resolvePromptCorpusCachePaths({
     repoRoot: params.repoRoot,
     cacheRoot: params.cacheRoot,
@@ -545,41 +597,61 @@ export async function fetchExternalPromptCorpus(params: {
       });
       continue;
     }
-    const fetched = await fetchWithRetry({
-      url: rawUrl,
-      fetchText,
-      retryLimit,
-      retryDelayMs,
-      delay,
-    });
-    if (!fetched.ok) {
-      throw new Error(`Prompt corpus fetch failed (${fetched.status}) for ${rawUrl}`);
-    }
-    const contentHash = sha256(fetched.text);
-    let status: ExternalPromptCorpusFetchEntry["status"] = "downloaded";
     try {
-      const existing = await readFile(cachePath, "utf8");
-      if (sha256(existing) === contentHash) {
-        status = "cached";
+      const fetched = await fetchWithRetry({
+        url: rawUrl,
+        fetchText,
+        retryLimit,
+        retryDelayMs,
+        delay,
+      });
+      if (!fetched.ok) {
+        throw new Error(`Prompt corpus fetch failed (${fetched.status}) for ${rawUrl}`);
       }
-    } catch {
-      // Missing cache is expected on first fetch.
+      const contentHash = sha256(fetched.text);
+      let status: ExternalPromptCorpusFetchEntry["status"] = "downloaded";
+      try {
+        const existing = await readFile(cachePath, "utf8");
+        if (sha256(existing) === contentHash) {
+          status = "cached";
+        }
+      } catch {
+        // Missing cache is expected on first fetch.
+      }
+      if (status !== "cached") {
+        await mkdir(path.dirname(cachePath), { recursive: true });
+        await writeFile(cachePath, fetched.text, "utf8");
+      }
+      entries.push({
+        path: file.path,
+        kind: file.kind,
+        label: file.label,
+        rawUrl,
+        cachePath,
+        status,
+        sha256: contentHash,
+        chars: fetched.text.length,
+      });
+    } catch (error) {
+      warnings.push(`Fetch failed for ${file.path}: ${formatFetchErrorMessage(error)}`);
+      entries.push({
+        path: file.path,
+        kind: file.kind,
+        label: file.label,
+        rawUrl,
+        cachePath,
+        status: "failed",
+        error: formatFetchErrorMessage(error),
+      });
     }
-    if (status !== "cached") {
-      await mkdir(path.dirname(cachePath), { recursive: true });
-      await writeFile(cachePath, fetched.text, "utf8");
-    }
-    entries.push({
-      path: file.path,
-      kind: file.kind,
-      label: file.label,
-      rawUrl,
-      cachePath,
-      status,
-      sha256: contentHash,
-      chars: fetched.text.length,
-    });
   }
+
+  const counts = {
+    downloaded: entries.filter((entry) => entry.status === "downloaded").length,
+    cached: entries.filter((entry) => entry.status === "cached").length,
+    dryRun: entries.filter((entry) => entry.status === "dry-run").length,
+    failed: entries.filter((entry) => entry.status === "failed").length,
+  };
 
   if (params.dryRun !== true) {
     await mkdir(cache.corpusDir, { recursive: true });
@@ -596,6 +668,8 @@ export async function fetchExternalPromptCorpus(params: {
           repositoryUrl: manifest.repositoryUrl,
           ref: manifest.ref,
           files: entries,
+          counts,
+          warnings,
         },
         null,
         2,
@@ -614,6 +688,7 @@ export async function fetchExternalPromptCorpus(params: {
     cache,
     warnings,
     files: entries,
+    counts,
   } satisfies ExternalPromptCorpusFetchSummary;
 }
 

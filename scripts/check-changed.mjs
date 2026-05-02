@@ -4,6 +4,7 @@ import {
   listChangedPathsFromGit,
   listStagedChangedPaths,
   normalizeChangedPath,
+  resolveDefaultChangedBase,
 } from "./changed-lanes.mjs";
 import { booleanFlag, parseFlagArgs, stringFlag } from "./lib/arg-utils.mjs";
 import { printTimingSummary } from "./lib/check-timing-summary.mjs";
@@ -73,7 +74,12 @@ export function createChangedCheckPlan(result, options = {}) {
       "--",
       ...(options.staged
         ? ["--staged"]
-        : ["--base", options.base ?? "origin/main", "--head", options.head ?? "HEAD"]),
+        : [
+            "--base",
+            options.base ?? resolveDefaultChangedBase(),
+            "--head",
+            options.head ?? "HEAD",
+          ]),
     ]);
     add("iOS version sync", ["ios:version:check"]);
     add("config schema baseline", ["config:schema:check"]);
@@ -244,7 +250,7 @@ function printSummary(timings, options) {
 
 function parseArgs(argv) {
   const args = {
-    base: "origin/main",
+    base: null,
     head: "HEAD",
     staged: false,
     dryRun: false,
@@ -280,20 +286,22 @@ function isDirectRun() {
 
 if (isDirectRun()) {
   const args = parseArgs(process.argv.slice(2));
+  const base = args.base ?? resolveDefaultChangedBase();
   const paths =
     args.paths.length > 0
       ? args.paths
       : args.staged
         ? listStagedChangedPaths()
-        : listChangedPathsFromGit({ base: args.base, head: args.head });
+        : listChangedPathsFromGit({ base, head: args.head });
   const result = detectChangedLanesForPaths({
     paths,
-    base: args.base,
+    base,
     head: args.head,
     staged: args.staged,
   });
   process.exitCode = await runChangedCheck(result, {
     ...args,
+    base,
     explicitPaths: args.paths.length > 0,
   });
 }

@@ -3,6 +3,8 @@ import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { booleanFlag, parseFlagArgs, stringFlag } from "./lib/arg-utils.mjs";
 
 const GIT_OUTPUT_MAX_BUFFER = 64 * 1024 * 1024;
+const DEFAULT_CHANGED_BASE = "origin/main";
+const DEFAULT_CHANGED_BASE_FALLBACKS = [DEFAULT_CHANGED_BASE, "origin/master"];
 
 const DOCS_PATH_RE = /^(?:docs\/|README\.md$|AGENTS\.md$|.*\.mdx?$)/u;
 const APP_PATH_RE = /^(?:apps\/|Swabble\/|appcast\.xml$)/u;
@@ -225,9 +227,9 @@ export function detectChangedLanesForPaths(params) {
  * @returns {string[]}
  */
 export function listChangedPathsFromGit(params) {
-  const base = params.base;
-  const head = params.head ?? "HEAD";
   const cwd = params.cwd ?? process.cwd();
+  const base = params.base || resolveDefaultChangedBase(cwd);
+  const head = params.head ?? "HEAD";
   if (!base) {
     return [];
   }
@@ -263,6 +265,25 @@ function runGitLsFiles(extraArgs, cwd = process.cwd()) {
     maxBuffer: GIT_OUTPUT_MAX_BUFFER,
   });
   return output.split("\n").map(normalizeChangedPath).filter(Boolean);
+}
+
+export function resolveDefaultChangedBase(cwd = process.cwd()) {
+  return (
+    DEFAULT_CHANGED_BASE_FALLBACKS.find((candidate) => gitCommitExists(candidate, cwd)) ??
+    DEFAULT_CHANGED_BASE
+  );
+}
+
+function gitCommitExists(ref, cwd = process.cwd()) {
+  try {
+    execFileSync("git", ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], {
+      cwd,
+      stdio: "ignore",
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function listStagedChangedPaths() {
@@ -411,7 +432,7 @@ function toSnakeCase(value) {
 
 function parseArgs(argv) {
   const args = {
-    base: "origin/main",
+    base: null,
     head: "HEAD",
     staged: false,
     json: false,
@@ -472,15 +493,16 @@ function printHuman(result) {
 
 if (isDirectRun()) {
   const args = parseArgs(process.argv.slice(2));
+  const base = args.base ?? resolveDefaultChangedBase();
   const paths =
     args.paths.length > 0
       ? args.paths
       : args.staged
         ? listStagedChangedPaths()
-        : listChangedPathsFromGit({ base: args.base, head: args.head });
+        : listChangedPathsFromGit({ base, head: args.head });
   const result = detectChangedLanesForPaths({
     paths,
-    base: args.base,
+    base,
     head: args.head,
     staged: args.staged,
   });

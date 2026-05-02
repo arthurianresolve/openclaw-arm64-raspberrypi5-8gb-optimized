@@ -27,6 +27,7 @@ Updated: 2026-05-03
   - `OPENCLAW_TSGO_HEAVY_CHECK_LOCK_HELD=1 pnpm tsgo:test:root`
 - For `test/scripts/*`, use the tooling Vitest config with an explicit JSON include file if routing misses the file.
 - Docs-only architecture changes use `git diff --check` plus `pnpm check:docs`; `docs:check-i18n-glossary` may skip when no merge base exists.
+- `pnpm changed:lanes --json` and `pnpm check:changed` default to `origin/main`, but fall back to `origin/master` when `origin/main` is unavailable locally.
 
 ## Harness
 

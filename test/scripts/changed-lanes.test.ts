@@ -83,6 +83,42 @@ describe("scripts/changed-lanes", () => {
     });
   });
 
+  it("falls back to origin/master when origin/main is unavailable", () => {
+    const dir = makeTempRepoRoot(tempDirs, "openclaw-changed-lanes-master-");
+    git(dir, ["init", "-q", "--initial-branch=master"]);
+    writeFileSync(path.join(dir, "README.md"), "initial\n", "utf8");
+    git(dir, ["add", "README.md"]);
+    git(dir, [
+      "-c",
+      "user.email=test@example.com",
+      "-c",
+      "user.name=Test User",
+      "commit",
+      "-q",
+      "-m",
+      "initial",
+    ]);
+    git(dir, ["update-ref", "refs/remotes/origin/master", "HEAD"]);
+
+    mkdirSync(path.join(dir, "scripts"), { recursive: true });
+    writeFileSync(path.join(dir, "scripts", "master-only-check.mjs"), "export {};\n", "utf8");
+
+    const output = execFileSync(
+      process.execPath,
+      [path.join(repoRoot, "scripts", "changed-lanes.mjs"), "--json"],
+      {
+        cwd: dir,
+        encoding: "utf8",
+        env: createNestedGitEnv(),
+      },
+    );
+
+    expect(JSON.parse(output)).toMatchObject({
+      paths: ["scripts/master-only-check.mjs"],
+      lanes: { tooling: true },
+    });
+  });
+
   it("ignores the explicit path separator", () => {
     const result = detectChangedLanes(["--", "scripts/test-live-acp-bind-docker.sh"]);
 

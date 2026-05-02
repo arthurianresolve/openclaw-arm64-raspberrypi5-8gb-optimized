@@ -9,6 +9,10 @@ Updated: 2026-05-02
 - Preserve helper seams. Avoid hard-coded owner/plugin exceptions when a generic helper works.
 - Rebuild only derived data. Session skill hydration should restore missing `resolvedSkills` and leave persisted fields alone.
 - Make trust explicit. Fallback or synthesized events should be `trusted: false`.
+- Keep public docs generic OpenClaw-facing. Fork-local or machine-local facts belong in memory, skills, or handoff notes, not Mintlify docs.
+- Treat external agentic repos as design influences unless they have a local owner path, validation artifact, and rollback or pivot trigger.
+- For risky runtime, prompt, command, harness, context, or tool-contract changes, require an agentic change record with failure evidence, root cause, targeted fix, changed invariant, risk surface, validation artifact, and pivot trigger.
+- Use agentic pattern catalogs as review vocabulary only. Adopt PEV, dry-run, meta-controller, memory, ensemble, and attribution ideas when they map to OpenClaw owner paths; reject Python/LangChain/LangGraph/Jupyter/Nebius/Tavily/Neo4j/FAISS/notebook-code dependencies by default.
 
 ## Validation
 
@@ -19,6 +23,7 @@ Updated: 2026-05-02
   - `OPENCLAW_TSGO_HEAVY_CHECK_LOCK_HELD=1 pnpm tsgo:test:src`
   - `OPENCLAW_TSGO_HEAVY_CHECK_LOCK_HELD=1 pnpm tsgo:test:root`
 - For `test/scripts/*`, use the tooling Vitest config with an explicit JSON include file if routing misses the file.
+- Docs-only architecture changes use `git diff --check` plus `pnpm check:docs`; `docs:check-i18n-glossary` may skip when no merge base exists.
 
 ## Harness
 
@@ -31,6 +36,7 @@ Updated: 2026-05-02
 
 - `git push` may need `gh auth setup-git` even when `gh auth status` already passes.
 - Canonical remote: `origin/master`.
+- Canonical GitHub repo: `arthurianresolve/excaliclaw`; upstream comparison source: `openclaw/openclaw`.
 - Keep upstream-port commits grouped by behavior.
 
 ## Session Facts
@@ -40,3 +46,5 @@ Updated: 2026-05-02
 - PTY output is sanitized and carriage-return progress updates are rendered logically.
 - The key upstream ports were session skill hydration, restart-lock recovery, `SecretRef` auth-rotation detection, plugin audit debris filtering, and fallback trust marking.
 - A stale heavy-check lock once hit an `EPERM` liveness edge; the helper now reclaims it and logs the reclaim.
+- Added `docs/concepts/agentic-architecture.md` and docs nav entry. The page captures orchestration, context, harnesses, advanced feature engineering, command and prompt adoption, debugging, validation, upstream/downstream port review, external references considered, and agentic pattern applicability.
+- External references reviewed this session: `china-qijizhifeng/agentic-harness-engineering` for change attribution and pivot rules; `FareedKhan-dev/all-agentic-architectures` for pattern taxonomy. Both are design influences, not implementation dependencies.

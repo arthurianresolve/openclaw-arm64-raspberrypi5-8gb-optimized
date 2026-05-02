@@ -1,0 +1,68 @@
+---
+name: excaliclaw-maintainer
+description: Maintain arthurianresolve/excaliclaw with selective upstream ports, strict TypeScript proof, and sequential validation on constrained hardware.
+---
+
+# Excaliclaw Maintainer
+
+Use this skill for `arthurianresolve/excaliclaw`.
+
+## Read First
+
+- [`AGENTS.md`](/home/george/excaliclaw/AGENTS.md)
+- [`MEMORY.md`](/home/george/excaliclaw/MEMORY.md)
+- [`docs/reference/test.md`](/home/george/excaliclaw/docs/reference/test.md)
+- [`docs/reference/AGENTS.default.md`](/home/george/excaliclaw/docs/reference/AGENTS.default.md)
+
+## Default Behavior
+
+- Prefer selective upstream ports over blind syncs.
+- Keep TypeScript strict. Preserve helper seams. Avoid one-off special cases.
+- Make trust explicit. If an event is synthesized or fallback-only, mark it `trusted: false`.
+- Rebuild only derived data. For session skills, restore missing `resolvedSkills` without mutating persisted fields.
+- Keep audit and security helpers generic. Filter by structure, not plugin name, when possible.
+- Keep public docs generic OpenClaw-facing. Put fork-local, machine-local, and session-local facts in memory, skill guidance, or handoff notes.
+- For agentic architecture work, use `docs/concepts/agentic-architecture.md` as the durable map.
+
+## Validation
+
+- On the Raspberry Pi host, run heavy checks sequentially.
+- Do not launch multiple independent `pnpm test` or `tsgo` jobs in parallel in the same worktree.
+- Use these compile checks first:
+  - `OPENCLAW_TSGO_HEAVY_CHECK_LOCK_HELD=1 pnpm tsgo:core`
+  - `OPENCLAW_TSGO_HEAVY_CHECK_LOCK_HELD=1 pnpm tsgo:test:src`
+  - `OPENCLAW_TSGO_HEAVY_CHECK_LOCK_HELD=1 pnpm tsgo:test:root`
+- For `test/scripts/*`, use the tooling Vitest config plus an explicit JSON include file when default routing misses the file.
+- Prove the touched surface first. Broaden only when the changed contract requires it.
+- Docs-only architecture changes use `git diff --check` plus `pnpm check:docs`.
+
+## Harness Notes
+
+- Local heavy-check locks live under `.git/openclaw-local-checks/`.
+- If a lock owner PID is dead, reclaim the lock instead of waiting.
+- Prefer a visible reclamation log when the helper self-heals a stale lock.
+- Keep `scripts/run-vitest.mjs` and `scripts/test-projects.mjs` aligned for `close` completion, PTY fallback, and no-output watchdog behavior.
+
+## Agentic Architecture Notes
+
+- Require an agentic change record for risky runtime, prompt, command, harness, context, or tool-contract changes.
+- Change records should include failure evidence, root cause, targeted fix, component level, owner path, changed invariant, predicted impact, risk surface, validation artifact, and rollback or pivot trigger.
+- External agentic repos are design influences unless they map to an OpenClaw owner path and validation artifact.
+- Adopt process ideas from agentic harness references: change attribution, component pivot rules, PEV, dry-run, meta-controller vocabulary, memory/reasoning vocabulary, and evidence ladders.
+- Reject implementation dependencies from those references by default: Python harness code, LangChain, LangGraph, Jupyter, Nebius, Tavily, Neo4j, FAISS, E2B, NexAU, tmux, high-concurrency loops, and autonomous policy mutation.
+
+## Git / Push
+
+- If `git push` fails while `gh auth status` is healthy, run `gh auth setup-git` and retry.
+- Push to `origin/master`.
+- GitHub repo is `arthurianresolve/excaliclaw`; upstream comparison source is `openclaw/openclaw`.
+- Keep upstream-port commits grouped by behavior.
+
+## Current Memory
+
+- Prompt-corpus cache integrity and fetch-control fixes were already ported.
+- Vitest direct runs use PTY fallback when useful and wait for `close`.
+- PTY output is sanitized and carriage-return progress updates are rendered logically.
+- The key upstream ports here were session skill hydration, restart-lock recovery, `SecretRef` auth-rotation detection, plugin audit debris filtering, and fallback trust marking.
+- A stale heavy-check lock once stalled on `EPERM`; the helper now reclaims it and logs the reclaim.
+- `docs/concepts/agentic-architecture.md` now captures orchestration, context, harnesses, advanced feature engineering, command and prompt adoption, debugging, validation, upstream/downstream port review, external references considered, and agentic pattern applicability.

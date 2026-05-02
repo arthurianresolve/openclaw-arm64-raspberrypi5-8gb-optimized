@@ -26,6 +26,7 @@ Use this skill for `arthurianresolve/excaliclaw`.
 - Treat third-party GitHub Actions as trust-boundary dependencies. Review them for behavior changes, not just version bumps.
 - Use clean-room process ideas from `warpdotdev/warp` only when they fit OpenClaw ownership and validation. Do not import Warp code, command-signature bundles, UI code, or verbatim skill text.
 - For substantial or ambiguous changes, consider `$excaliclaw-spec-driven-implementation`. Use `$excaliclaw-product-spec` for behavior and `$excaliclaw-tech-spec` for implementation plans.
+- For risky agent runtime, prompt, tool, sandbox, approval, memory, subagent, MCP, or autonomous workflow changes, use `$excaliclaw-agent-harness-review`.
 
 ## Validation
 
@@ -73,3 +74,4 @@ Use this skill for `arthurianresolve/excaliclaw`.
 - Workflow-action review lessons from 2026-05-03: `openai/codex-action` bumps may tighten bot eligibility and should be treated as behavior changes; `pnpm/action-setup` bumps are usually inert when the workflow passes an explicit `version` or the repo pins `packageManager`.
 - Dependabot PR maintenance lesson: if a `pull_request_target` job fails on a merged or rebased Dependabot PR, update the base branch workflow file on `master` and then rebase the PR head so GitHub reevaluates the real policy.
 - Warp review lesson: the useful integration path is clean-room spec workflow guidance, not direct terminal/UI/code integration.
+- Blake guide-set review lesson: adopt clean-room review vocabulary only. Keep media prompt guidance provider-neutral, enforce iOS agent boundaries locally, and defer retrieval runtime changes until benchmarked.

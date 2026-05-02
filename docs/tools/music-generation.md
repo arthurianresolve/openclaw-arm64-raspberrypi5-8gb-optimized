@@ -88,6 +88,26 @@ Generate a cinematic piano track with soft strings and no vocals.
 Generate an energetic chiptune loop about launching a rocket at sunrise.
 ```
 
+## Prompt guidance
+
+Music requests work best when the agent separates musical character from
+structure and provider controls:
+
+- describe genre, mood, tempo feel, instrumentation, vocal style, and mix
+  texture in `prompt`
+- use `lyrics` when the words matter and `instrumental=true` when vocals would
+  be a failure
+- express arrangement in plain language or lyrics sections when supported,
+  such as verse, chorus, bridge, intro, outro, or loopable stem
+- set `durationSeconds` only when the provider supports duration hints, then
+  check `details.normalization` for the applied value
+- budget for iteration; the first result should usually establish direction,
+  not be treated as a final master
+
+Do not paste provider-specific metatag systems from external music tools unless
+the chosen OpenClaw provider documents and supports that syntax. Unsupported
+optional hints are ignored with a visible warning.
+
 ## Supported providers
 
 | Provider | Default model          | Reference inputs | Supported controls                                        | Auth                                   |

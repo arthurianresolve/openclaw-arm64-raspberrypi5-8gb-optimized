@@ -2,7 +2,29 @@ export function runCli(argv: string[]): Promise<void>;
 export function shouldStartCrestodianForBareRoot(argv: string[]): boolean;
 export function clearConfigCache(): void;
 
-export type OpenClawConfig = any;
+export type OpenClawConfig = {
+  agents?: {
+    defaults?: {
+      workspace?: string;
+      model?: unknown;
+    };
+    list?: Array<{
+      id?: string;
+      workspace?: string;
+      model?: string;
+    }>;
+  };
+  gateway?: {
+    port?: number;
+    auth?: {
+      token?: unknown;
+    };
+  };
+  plugins?: {
+    allow?: string[];
+  };
+  [key: string]: unknown;
+};
 
 export type RuntimeEnv = {
   log: (...args: unknown[]) => void;
@@ -102,9 +124,7 @@ export function applyFinalEffectiveToolPolicy(params: {
   warn: (message: string) => void;
 }): MaterializedMcpTool[];
 
-export function getPluginToolMeta(
-  tool: MaterializedMcpTool,
-): { pluginId?: string } | undefined;
+export function getPluginToolMeta(tool: MaterializedMcpTool): { pluginId?: string } | undefined;
 
 export function queueRuntimeContextForNextTurn(...args: unknown[]): Promise<void>;
 export function resolveRuntimeContextPromptParts(params: {

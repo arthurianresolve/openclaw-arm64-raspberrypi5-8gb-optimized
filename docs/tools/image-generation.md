@@ -83,6 +83,25 @@ provider does not support them. Bundled transparent-background support is
 OpenAI-specific; other providers may still preserve PNG alpha if their
 backend emits it.
 
+## Prompt guidance
+
+For reliable cross-provider results, describe the image in the same order the
+agent should preserve it:
+
+- lead with the subject and required visible details
+- add setting, lighting, materials, mood, and composition
+- put geometry in tool parameters (`aspectRatio`, `size`, or `resolution`)
+  instead of burying it in prose
+- use reference images for identity, product, or style continuity when the
+  selected provider supports edit mode
+- request one or a small batch first, inspect the result, then iterate with a
+  narrower prompt or reference image
+
+Avoid provider-specific flags from external image tools unless OpenClaw exposes
+an equivalent `image_generate` parameter. If a requested hint is unsupported,
+OpenClaw reports the drop or remap in the tool result so the agent can explain
+what actually happened.
+
 ## Supported providers
 
 | Provider   | Default model                           | Edit support                       | Auth                                                  |

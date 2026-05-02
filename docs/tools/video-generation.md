@@ -80,6 +80,26 @@ larger renders. When a provider also returns a hosted output URL, OpenClaw
 can deliver that URL instead of failing the task if local persistence
 rejects an oversized file.
 
+## Prompt guidance
+
+Video prompts should describe motion, camera, subject continuity, and ending
+state, then leave provider-normalized controls in tool parameters:
+
+- start with the subject and action, then add scene, lighting, camera motion,
+  pacing, and final frame
+- use `image`, `images`, `video`, or `videos` for continuity when the selected
+  provider supports the needed mode
+- put `durationSeconds`, `aspectRatio`, `resolution`, `audio`, and `watermark`
+  in parameters instead of only in prose
+- keep each request narrow enough for one clip; ask for a sequence as multiple
+  clips rather than a single overloaded generation
+- treat generation as asynchronous in chat and use task status instead of
+  starting duplicate jobs
+
+Provider-specific prompt tricks from external video or image tools are not
+portable unless they map to an OpenClaw parameter or the provider page says the
+model accepts them.
+
 ### Task lifecycle
 
 | State       | Meaning                                                                                          |

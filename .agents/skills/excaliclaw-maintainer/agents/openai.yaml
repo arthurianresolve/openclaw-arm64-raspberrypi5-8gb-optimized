@@ -1,7 +1,7 @@
 interface:
   display_name: "Excaliclaw Maintainer"
-  short_description: "Maintain excaliclaw ports, tests, docs, and spec workflows"
-  default_prompt: "Use $excaliclaw-maintainer to evaluate, spec when warranted, patch, validate, and hand off an arthurianresolve/excaliclaw change."
+  short_description: "Maintain excaliclaw ports, tests, docs, specs, and harness reviews"
+  default_prompt: "Use $excaliclaw-maintainer to evaluate, spec or harness-review when warranted, patch, validate, and hand off an arthurianresolve/excaliclaw change."
 
 policy:
   allow_implicit_invocation: true

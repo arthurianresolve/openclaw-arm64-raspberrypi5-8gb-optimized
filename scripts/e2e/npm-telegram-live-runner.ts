@@ -6,7 +6,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { runTelegramQaLive } from "../../extensions/qa-lab/src/live-transports/telegram/telegram-live.runtime.ts";
 import type { QaProviderModeInput } from "../../extensions/qa-lab/src/run-config.js";
-import { formatErrorMessage } from "../../src/infra/errors.ts";
+import { formatErrorMessage } from "./dist-modules.mjs";
 
 function parseBoolean(value: string | undefined) {
   const normalized = value?.trim().toLowerCase();

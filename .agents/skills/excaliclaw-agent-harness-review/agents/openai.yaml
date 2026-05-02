@@ -1,0 +1,7 @@
+interface:
+  display_name: "Excaliclaw Agent Harness Review"
+  short_description: "Review risky Excaliclaw agent harness changes"
+  default_prompt: "Use $excaliclaw-agent-harness-review to review this agent harness change across trust boundaries, owner paths, validation, and rollback."
+
+policy:
+  allow_implicit_invocation: true

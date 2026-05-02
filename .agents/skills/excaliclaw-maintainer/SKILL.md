@@ -23,6 +23,9 @@ Use this skill for `arthurianresolve/excaliclaw`.
 - Keep audit and security helpers generic. Filter by structure, not plugin name, when possible.
 - Keep public docs generic OpenClaw-facing. Put fork-local, machine-local, and session-local facts in memory, skill guidance, or handoff notes.
 - For agentic architecture work, use `docs/concepts/agentic-architecture.md` as the durable map.
+- Treat third-party GitHub Actions as trust-boundary dependencies. Review them for behavior changes, not just version bumps.
+- Use clean-room process ideas from `warpdotdev/warp` only when they fit OpenClaw ownership and validation. Do not import Warp code, command-signature bundles, UI code, or verbatim skill text.
+- For substantial or ambiguous changes, consider `$excaliclaw-spec-driven-implementation`. Use `$excaliclaw-product-spec` for behavior and `$excaliclaw-tech-spec` for implementation plans.
 
 ## Validation
 
@@ -50,6 +53,7 @@ Use this skill for `arthurianresolve/excaliclaw`.
 - External agentic repos are design influences unless they map to an OpenClaw owner path and validation artifact.
 - Adopt process ideas from agentic harness references: change attribution, component pivot rules, PEV, dry-run, meta-controller vocabulary, memory/reasoning vocabulary, and evidence ladders.
 - Reject implementation dependencies from those references by default: Python harness code, LangChain, LangGraph, Jupyter, Nebius, Tavily, Neo4j, FAISS, E2B, NexAU, tmux, high-concurrency loops, and autonomous policy mutation.
+- Repo-local spec skills complement the agentic change record. `PRODUCT.md` owns behavior, `TECH.md` owns implementation and validation, and the change record owns risky agentic invariant attribution.
 
 ## Git / Push
 
@@ -66,3 +70,6 @@ Use this skill for `arthurianresolve/excaliclaw`.
 - The key upstream ports here were session skill hydration, restart-lock recovery, `SecretRef` auth-rotation detection, plugin audit debris filtering, and fallback trust marking.
 - A stale heavy-check lock once stalled on `EPERM`; the helper now reclaims it and logs the reclaim.
 - `docs/concepts/agentic-architecture.md` now captures orchestration, context, harnesses, advanced feature engineering, command and prompt adoption, debugging, validation, upstream/downstream port review, external references considered, and agentic pattern applicability.
+- Workflow-action review lessons from 2026-05-03: `openai/codex-action` bumps may tighten bot eligibility and should be treated as behavior changes; `pnpm/action-setup` bumps are usually inert when the workflow passes an explicit `version` or the repo pins `packageManager`.
+- Dependabot PR maintenance lesson: if a `pull_request_target` job fails on a merged or rebased Dependabot PR, update the base branch workflow file on `master` and then rebase the PR head so GitHub reevaluates the real policy.
+- Warp review lesson: the useful integration path is clean-room spec workflow guidance, not direct terminal/UI/code integration.

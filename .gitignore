@@ -104,6 +104,12 @@ USER.md
 !.agents/skills/blacksmith-testbox/**
 !.agents/skills/excaliclaw-maintainer/
 !.agents/skills/excaliclaw-maintainer/**
+!.agents/skills/excaliclaw-product-spec/
+!.agents/skills/excaliclaw-product-spec/**
+!.agents/skills/excaliclaw-spec-driven-implementation/
+!.agents/skills/excaliclaw-spec-driven-implementation/**
+!.agents/skills/excaliclaw-tech-spec/
+!.agents/skills/excaliclaw-tech-spec/**
 !.agents/skills/openclaw-ghsa-maintainer/
 !.agents/skills/openclaw-ghsa-maintainer/**
 !.agents/skills/openclaw-parallels-smoke/

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Excaliclaw Spec Workflow"
+  short_description: "Use PRODUCT.md and TECH.md specs for substantial excaliclaw work"
+  default_prompt: "Use $excaliclaw-spec-driven-implementation to decide whether this work needs specs, keep them current, implement against them, and validate the result."
+
+policy:
+  allow_implicit_invocation: true

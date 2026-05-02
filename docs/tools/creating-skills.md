@@ -11,6 +11,13 @@ containing a `SKILL.md` file with YAML frontmatter and markdown instructions.
 
 For how skills are loaded and prioritized, see [Skills](/tools/skills).
 
+Skills can also encode reviewed maintainer workflows, not only end-user tool
+procedures. Repo-local skills under `.agents/skills` are appropriate for
+repeatable contribution flows such as writing product specs, drafting technical
+plans, debugging CI, or validating release evidence. Keep those workflows
+specific to the repository, grounded in existing docs, and free of private
+machine details.
+
 ## Create your first skill
 
 <Steps>
@@ -96,6 +103,9 @@ The YAML frontmatter supports these fields:
 - **Be concise** — instruct the model on _what_ to do, not how to be an AI
 - **Safety first** — if your skill uses `exec`, ensure prompts don't allow arbitrary command injection from untrusted input
 - **Test locally** — use `openclaw agent --message "..."` to test before sharing
+- **Use repo-local skills for maintainer process** — place contribution
+  workflows in `.agents/skills` when they should travel with the repository
+  instead of a single user's local profile
 - **Use ClawHub** — browse and contribute skills at [ClawHub](https://clawhub.ai)
 
 ## Where skills live

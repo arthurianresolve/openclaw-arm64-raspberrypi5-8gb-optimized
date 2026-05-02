@@ -1,0 +1,7 @@
+interface:
+  display_name: "Excaliclaw Product Spec"
+  short_description: "Draft PRODUCT.md behavior specs for substantial excaliclaw changes"
+  default_prompt: "Use $excaliclaw-product-spec to draft a concise PRODUCT.md behavior spec for a substantial OpenClaw/excaliclaw change."
+
+policy:
+  allow_implicit_invocation: true

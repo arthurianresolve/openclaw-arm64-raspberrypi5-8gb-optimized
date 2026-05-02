@@ -98,14 +98,15 @@ These references informed the architecture and validation policy. They are not
 vendored dependencies and should not be ported directly unless a later review
 identifies a concrete owner path and validation target.
 
-| Reference                                       | Role in this document                                        | Adopt                                                                                     | Do not adopt                                                                                           |
-| ----------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `openclaw/openclaw`                             | Primary upstream architecture and behavior source            | selective runtime, context, prompt, security, and harness fixes                           | blind syncs over local divergence                                                                      |
-| `arthurianresolve/excaliclaw`                   | Downstream receiving repo and local maintainer policy        | sequential validation, strict TypeScript proof, durable maintainer memory                 | public docs that expose local machine or branch state                                                  |
-| `china-qijizhifeng/agentic-harness-engineering` | Research reference for agentic harness evaluation loops      | change records, attribution artifacts, component pivot rules, trace distillation ideas    | Python, NexAU, E2B, tmux harness code, high-concurrency loops, pass-rate-only optimization             |
-| `FareedKhan-dev/all-agentic-architectures`      | Educational pattern catalog for agentic architecture choices | pattern taxonomy, PEV, dry-run, meta-controller, memory, ensemble, and evaluation framing | LangChain, LangGraph, Jupyter, Nebius, Tavily, Neo4j, FAISS, notebook code, autonomous policy mutation |
-| OpenAI Codex and GPT-5 docs                     | Model and runtime behavior plus prompt-upgrade reference     | model-family-aware prompt review and strict agentic execution expectations                | undocumented assumptions about model availability, pricing, or provider behavior                       |
-| OpenClaw QA and trajectory docs                 | Existing validation and debugging surfaces                   | QA summaries, trajectory bundles, parity reports as evidence artifacts                    | treating smoke coverage as proof of runtime invariants                                                 |
+| Reference                                       | Role in this document                                        | Adopt                                                                                                                                         | Do not adopt                                                                                               |
+| ----------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `openclaw/openclaw`                             | Primary upstream architecture and behavior source            | selective runtime, context, prompt, security, and harness fixes                                                                               | blind syncs over local divergence                                                                          |
+| `arthurianresolve/excaliclaw`                   | Downstream receiving repo and local maintainer policy        | sequential validation, strict TypeScript proof, durable maintainer memory                                                                     | public docs that expose local machine or branch state                                                      |
+| `china-qijizhifeng/agentic-harness-engineering` | Research reference for agentic harness evaluation loops      | change records, attribution artifacts, component pivot rules, trace distillation ideas                                                        | Python, NexAU, E2B, tmux harness code, high-concurrency loops, pass-rate-only optimization                 |
+| `FareedKhan-dev/all-agentic-architectures`      | Educational pattern catalog for agentic architecture choices | pattern taxonomy, PEV, dry-run, meta-controller, memory, ensemble, and evaluation framing                                                     | LangChain, LangGraph, Jupyter, Nebius, Tavily, Neo4j, FAISS, notebook code, autonomous policy mutation     |
+| `warpdotdev/warp`                               | Public repository reference for agent-assisted spec workflow | clean-room spec-first workflow ideas: product behavior specs, technical implementation specs, and keeping specs current during implementation | Rust terminal code, UI code, AGPL-covered implementation, command-signature bundle, or verbatim skill text |
+| OpenAI Codex and GPT-5 docs                     | Model and runtime behavior plus prompt-upgrade reference     | model-family-aware prompt review and strict agentic execution expectations                                                                    | undocumented assumptions about model availability, pricing, or provider behavior                           |
+| OpenClaw QA and trajectory docs                 | Existing validation and debugging surfaces                   | QA summaries, trajectory bundles, parity reports as evidence artifacts                                                                        | treating smoke coverage as proof of runtime invariants                                                     |
 
 When using an external reference, record whether it is a source of truth, a
 design influence, or a rejected implementation dependency. Design influences
@@ -543,6 +544,32 @@ Use the fields this way:
 Keep the record out of changelogs unless the user-facing behavior changed.
 For docs-only architecture updates, the record can be in the handoff summary
 instead of the docs page itself.
+
+### Spec-first workflow
+
+For substantial or ambiguous changes, a checked-in spec can make agent work and
+review more reliable than a one-off plan. Use the repo-local spec skills as a
+clean-room workflow:
+
+- `$excaliclaw-product-spec` writes `specs/<id>/PRODUCT.md` with numbered,
+  testable behavior invariants from the consumer's perspective.
+- `$excaliclaw-tech-spec` writes `specs/<id>/TECH.md` with current-code
+  context, proposed implementation, validation, and risks.
+- `$excaliclaw-spec-driven-implementation` decides whether specs are warranted,
+  keeps them current during implementation, and maps validation back to the
+  product invariants.
+
+Specs are useful when work spans multiple subsystems, carries product or
+architecture ambiguity, changes risky runtime behavior, or needs review by
+multiple agents. They are usually unnecessary for small bug fixes,
+straightforward refactors, narrow dependency updates, or docs corrections where
+the existing docs already define the intended behavior.
+
+Specs complement the agentic change record rather than replacing it. Use
+`PRODUCT.md` for behavior, `TECH.md` for implementation and validation, and the
+agentic change record for risky runtime, prompt, command, harness, context, or
+tool-contract changes. For large agentic work, include the change record inside
+`TECH.md`; for a small risky fix, the change record alone is enough.
 
 ### Component pivot rule
 

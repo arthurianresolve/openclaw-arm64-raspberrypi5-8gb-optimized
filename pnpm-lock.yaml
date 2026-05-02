@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@anthropic-ai/sdk': 0.91.0
+  '@anthropic-ai/sdk': 0.91.1
   hono: 4.12.14
   '@hono/node-server': 1.19.14
   axios: 1.15.0
@@ -253,8 +253,8 @@ importers:
   extensions/amazon-bedrock-mantle:
     dependencies:
       '@anthropic-ai/sdk':
-        specifier: 0.91.0
-        version: 0.91.0(zod@4.3.6)
+        specifier: 0.91.1
+        version: 0.91.1(zod@4.3.6)
       '@aws/bedrock-token-generator':
         specifier: ^1.1.0
         version: 1.1.0
@@ -841,6 +841,15 @@ importers:
         specifier: workspace:*
         version: link:../../packages/plugin-sdk
 
+  extensions/memory-codesight:
+    devDependencies:
+      '@openclaw/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../packages/plugin-sdk
+      openclaw:
+        specifier: workspace:*
+        version: link:../..
+
   extensions/memory-core:
     dependencies:
       chokidar:
@@ -1017,6 +1026,15 @@ importers:
       '@openclaw/plugin-sdk':
         specifier: workspace:*
         version: link:../../packages/plugin-sdk
+
+  extensions/odylith-grounding:
+    devDependencies:
+      '@openclaw/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../packages/plugin-sdk
+      openclaw:
+        specifier: workspace:*
+        version: link:../..
 
   extensions/ollama:
     dependencies:
@@ -1642,8 +1660,8 @@ packages:
     peerDependencies:
       zod: ^4.0.0
 
-  '@anthropic-ai/sdk@0.91.0':
-    resolution: {integrity: sha512-hybd/DOI3ujG4gZyqqcWnSekYxkdjr1JbZYqP2Lb4AmcsU6HCTHSrTOgqedPSsQAruBVucHNAoD1vTQnpPzedw==}
+  '@anthropic-ai/sdk@0.91.1':
+    resolution: {integrity: sha512-LAmu761tSN9r66ixvmciswUj/ZC+1Q4iAfpedTfSVLeswRwnY3n2Nb6Tsk+cLPP28aLOPWeMgIuTuCcMC6W/iw==}
     hasBin: true
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
@@ -7654,7 +7672,7 @@ snapshots:
 
   '@anthropic-ai/claude-agent-sdk@0.2.119(zod@4.3.6)':
     dependencies:
-      '@anthropic-ai/sdk': 0.91.0(zod@4.3.6)
+      '@anthropic-ai/sdk': 0.91.1(zod@4.3.6)
       '@modelcontextprotocol/sdk': 1.29.0(zod@4.3.6)
       zod: 4.3.6
     optionalDependencies:
@@ -7670,7 +7688,7 @@ snapshots:
       - '@cfworker/json-schema'
       - supports-color
 
-  '@anthropic-ai/sdk@0.91.0(zod@4.3.6)':
+  '@anthropic-ai/sdk@0.91.1(zod@4.3.6)':
     dependencies:
       json-schema-to-ts: 3.1.1
     optionalDependencies:
@@ -7678,7 +7696,7 @@ snapshots:
 
   '@anthropic-ai/vertex-sdk@0.16.0(zod@4.3.6)':
     dependencies:
-      '@anthropic-ai/sdk': 0.91.0(zod@4.3.6)
+      '@anthropic-ai/sdk': 0.91.1(zod@4.3.6)
       google-auth-library: 9.15.1
     transitivePeerDependencies:
       - encoding
@@ -9407,7 +9425,7 @@ snapshots:
 
   '@mariozechner/pi-ai@0.70.2(@modelcontextprotocol/sdk@1.29.0(zod@4.3.6))(ws@8.20.0)(zod@4.3.6)':
     dependencies:
-      '@anthropic-ai/sdk': 0.91.0(zod@4.3.6)
+      '@anthropic-ai/sdk': 0.91.1(zod@4.3.6)
       '@aws-sdk/client-bedrock-runtime': 3.1036.0
       '@google/genai': 1.50.1(@modelcontextprotocol/sdk@1.29.0(zod@4.3.6))
       '@mistralai/mistralai': 2.2.1

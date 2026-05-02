@@ -4,11 +4,13 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { runCli, shouldStartCrestodianForBareRoot } from "../../dist/cli/run-main.js";
-import { clearConfigCache } from "../../dist/config/config.js";
-import type { OpenClawConfig } from "../../dist/config/types.openclaw.js";
-import { runCrestodian } from "../../dist/crestodian/crestodian.js";
-import type { RuntimeEnv } from "../../dist/runtime.js";
+import {
+  clearConfigCache,
+  runCli,
+  runCrestodian,
+  shouldStartCrestodianForBareRoot,
+} from "./dist-modules.mjs";
+import type { OpenClawConfig, RuntimeEnv } from "./dist-modules.mjs";
 
 type CrestodianFirstRunCommand = {
   id: string;

@@ -473,8 +473,9 @@ function resolveInstalledDirectDependencyNames(
     }
     if (!dependencyVersionSatisfied(spec, installedVersion)) {
       runtimeDepsDebug(
-        `direct dependency version mismatch for ${depName}: required ${spec}, installed ${installedVersion}; using installed root closure`,
+        `direct dependency version mismatch for ${depName}; using installed root closure`,
       );
+      return null;
     }
     directDependencyNames.push(depName);
   }

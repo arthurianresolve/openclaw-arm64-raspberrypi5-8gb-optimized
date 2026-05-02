@@ -380,7 +380,7 @@ function isProcessAlive(pid) {
   try {
     process.kill(pid, 0);
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

@@ -28,7 +28,7 @@ function toStringEnv(env = process.env) {
   const result = {};
   for (const [key, value] of Object.entries(env)) {
     if (value !== undefined) {
-      result[key] = String(value);
+      result[key] = value;
     }
   }
   return result;
@@ -54,7 +54,7 @@ export function resolveVitestNoOutputTimeoutMs(env = process.env) {
 export function shouldUseVitestPty(
   env = process.env,
   platform = process.platform,
-  stdioIsTty = process.stdout.isTTY === true && process.stderr.isTTY === true,
+  stdioIsTty = process.stdout.isTTY && process.stderr.isTTY,
 ) {
   const explicit = env.OPENCLAW_VITEST_PTY?.trim().toLowerCase();
   if (explicit) {

@@ -35,8 +35,15 @@ const shards = [
   },
 ];
 
-const results = await Promise.all(shards.map((shard) => runShard(shard)));
-process.exitCode = results.find((status) => status !== 0) ?? 0;
+let exitCode = 0;
+for (const shard of shards) {
+  const status = await runShard(shard);
+  if (status !== 0) {
+    exitCode = status;
+    break;
+  }
+}
+process.exitCode = exitCode;
 
 async function runShard(shard) {
   console.error(`[oxlint:${shard.name}] starting`);

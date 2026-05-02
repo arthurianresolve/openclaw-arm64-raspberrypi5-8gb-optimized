@@ -124,7 +124,7 @@ function main() {
 
   for (const filePath of paths) {
     if (!RELEASE_METADATA_PATHS.has(filePath)) {
-      fail(`${filePath}: not a release metadata path; run the normal changed gate`);
+      fail(`${String(filePath)}: not a release metadata path; run the normal changed gate`);
     }
   }
 
@@ -141,7 +141,7 @@ function main() {
     }
     const { before, after } = readBeforeAfter(args, filePath);
     if (normalizeVersionText(before) !== normalizeVersionText(after)) {
-      fail(`${filePath}: changed outside recognized version/build literals`);
+      fail(`${String(filePath)}: changed outside recognized version/build literals`);
     }
   }
 

@@ -14,28 +14,30 @@ const DEFAULT_MAX_CANDIDATE_COMPONENTS = 2;
 const DEFAULT_DOSSIER_CHAR_BUDGET = 1400;
 
 export const odylithGroundingConfigSchema = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    repoRoot: { type: "string" },
-    governanceRoot: { type: "string" },
-    historyWindowMessages: {
-      type: "integer",
-      minimum: 1,
-      maximum: 40,
-      default: DEFAULT_HISTORY_WINDOW_MESSAGES,
-    },
-    maxCandidateComponents: {
-      type: "integer",
-      minimum: 1,
-      maximum: 6,
-      default: DEFAULT_MAX_CANDIDATE_COMPONENTS,
-    },
-    dossierCharBudget: {
-      type: "integer",
-      minimum: 400,
-      maximum: 4000,
-      default: DEFAULT_DOSSIER_CHAR_BUDGET,
+  jsonSchema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      repoRoot: { type: "string" },
+      governanceRoot: { type: "string" },
+      historyWindowMessages: {
+        type: "integer",
+        minimum: 1,
+        maximum: 40,
+        default: DEFAULT_HISTORY_WINDOW_MESSAGES,
+      },
+      maxCandidateComponents: {
+        type: "integer",
+        minimum: 1,
+        maximum: 6,
+        default: DEFAULT_MAX_CANDIDATE_COMPONENTS,
+      },
+      dossierCharBudget: {
+        type: "integer",
+        minimum: 400,
+        maximum: 4000,
+        default: DEFAULT_DOSSIER_CHAR_BUDGET,
+      },
     },
   },
 } satisfies OpenClawPluginConfigSchema;

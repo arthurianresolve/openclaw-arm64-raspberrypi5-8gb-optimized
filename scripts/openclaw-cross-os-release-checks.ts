@@ -44,6 +44,9 @@ type RunnerMatrixParams = {
   varMacosRunner?: string;
 };
 
+// This script intentionally uses a heterogeneous bag of lane state and inputs.
+// Keep the alias loose so the maintenance code stays readable.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyRecord = Record<string, any>;
 type ProviderMeta = (typeof providerConfig)[keyof typeof providerConfig];
 type CommandResult = {
@@ -638,7 +641,7 @@ function readProvidedCandidate(params: AnyRecord): BuildInfo {
 
 async function runFreshLane(params: AnyRecord): Promise<SummaryResult> {
   const lane = createLaneState("fresh");
-  const cleanup: Array<() => Promise<unknown> | unknown> = [];
+  const cleanup: Array<() => Promise<void> | void> = [];
   try {
     const env = buildLaneEnv(lane, params.providerConfig, params.providerSecretValue);
     logLanePhase(lane, "install-candidate");
@@ -736,7 +739,7 @@ async function runUpgradeLane(params: AnyRecord): Promise<SummaryResult> {
     throw new Error("Missing candidate package URL for upgrade mode.");
   }
   const lane = createLaneState("upgrade");
-  const cleanup: Array<() => Promise<unknown> | unknown> = [];
+  const cleanup: Array<() => Promise<void> | void> = [];
   try {
     const env = buildLaneEnv(lane, params.providerConfig, params.providerSecretValue);
     logLanePhase(lane, "install-baseline");
@@ -865,7 +868,7 @@ async function runUpgradeLane(params: AnyRecord): Promise<SummaryResult> {
 
 async function runInstallerFreshSuite(params: AnyRecord): Promise<SummaryResult> {
   const lane = createLaneState("installer-fresh");
-  const cleanup: Array<() => Promise<unknown> | unknown> = [];
+  const cleanup: Array<() => Promise<void> | void> = [];
   const usesManagedGateway = shouldUseManagedGatewayService();
   const useManagedGatewayAfterInstall = shouldUseManagedGatewayForInstallerRuntime();
   const manualGateway: GatewayHolder = { current: null };
@@ -1026,7 +1029,7 @@ async function runInstallerFreshSuite(params: AnyRecord): Promise<SummaryResult>
 
 async function runDevUpdateSuite(params: AnyRecord): Promise<SummaryResult> {
   const lane = createLaneState("dev-update");
-  const cleanup: Array<() => Promise<unknown> | unknown> = [];
+  const cleanup: Array<() => Promise<void> | void> = [];
   const installTarget = await resolveInstallerTargetVersion({
     baselineSpec: params.baselineSpec,
     logsDir: params.logsDir,
@@ -1366,7 +1369,7 @@ export function packageHasScript(packageRoot: string, scriptName: string) {
 }
 
 function parseMarkerLine(output: string, marker: string) {
-  return `${output}`
+  return output
     .split(/\r?\n/gu)
     .find((line) => line.startsWith(marker))
     ?.slice(marker.length)
@@ -1386,7 +1389,7 @@ export function normalizeWindowsCommandShimPath(commandPath: string | undefined)
 
 export function resolveInstalledPrefixDirFromCliPath(cliPath: string, platform = process.platform) {
   const resolvedCliPath =
-    platform === "win32" ? normalizeWindowsInstalledCliPath(cliPath) : String(cliPath ?? "");
+    platform === "win32" ? normalizeWindowsInstalledCliPath(cliPath) : (cliPath ?? "");
   if (!resolvedCliPath?.trim()) {
     throw new Error("Missing installed CLI path.");
   }
@@ -2837,7 +2840,7 @@ async function waitForChildExit(child: ChildProcess, timeoutMs: number) {
   });
 }
 
-async function runCleanup(cleanupFns: Array<() => Promise<unknown> | unknown>) {
+async function runCleanup(cleanupFns: Array<() => Promise<void> | void>) {
   for (const cleanupFn of cleanupFns.toReversed()) {
     try {
       await cleanupFn();
@@ -3056,7 +3059,7 @@ async function runCommand(
 async function startStaticFileServer(params: { filePath: string; logPath: string }) {
   mkdirSync(dirname(params.logPath), { recursive: true });
   const logStream = createWriteStream(params.logPath, { flags: "a" });
-  const fileName = String(params.filePath.split(/[/\\]/u).at(-1) ?? "artifact");
+  const fileName = params.filePath.split(/[/\\]/u).at(-1) ?? "artifact";
   const fileBytes = readFileSync(params.filePath);
   const server = createServer((request, response) => {
     logStream.write(`${new Date().toISOString()} ${request.method} ${request.url}\n`);

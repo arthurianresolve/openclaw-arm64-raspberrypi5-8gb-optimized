@@ -264,7 +264,6 @@ async function buildPacketFromCandidates(params: {
         : selectedMatches.flatMap((match) => match.component.paths),
   });
   const dossierExcerpt = await loadDossierExcerpt({
-    repoRoot: params.repoRoot,
     governanceRoot: params.config.governanceRoot,
     component: topMatch.component,
     maxChars: params.config.dossierCharBudget,
@@ -530,7 +529,7 @@ function extractMessageText(message: AgentMessage): string {
       if (!part || typeof part !== "object" || !("type" in part)) {
         return [];
       }
-      const record = part as Record<string, unknown>;
+      const record = part as unknown as Record<string, unknown>;
       return record.type === "text" && typeof record.text === "string" ? [record.text] : [];
     })
     .join("\n");

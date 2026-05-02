@@ -631,6 +631,10 @@ Gradle output directories so Docker live runs do not spend minutes copying
 machine-specific artifacts.
 They also set `OPENCLAW_SKIP_CHANNELS=1` so gateway live probes do not start
 real Telegram/Discord/etc. channel workers inside the container.
+The source-side Docker E2E drivers that need to exercise packaged CLI/runtime
+artifacts keep their own source files typechecked and load the built modules
+through a tiny adapter layer at runtime, so the smoke still validates the
+tarball without hiding declarations inside ignored build output.
 `test:docker:live-models` still runs `pnpm test:live`, so pass through
 `OPENCLAW_LIVE_GATEWAY_*` as well when you need to narrow or exclude gateway
 live coverage from that Docker lane.

@@ -245,6 +245,10 @@ and guarantees durable lifecycle semantics.
 - If a new feature changes retries, compaction, or transcript writes, treat it
   as orchestration work, not as a tool or prompt tweak.
 - Prefer explicit event and state transitions over inferred completion.
+- When a source-owned smoke harness must exercise a packaged artifact, keep the
+  harness in source and route the built imports through a narrow adapter
+  module. That preserves tarball coverage while keeping the harness itself
+  typechecked and reviewable.
 
 ## Context And Prompt Architecture
 

@@ -6,14 +6,14 @@ import fs from "node:fs/promises";
 import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
-import { materializeBundleMcpToolsForRun } from "../../dist/agents/pi-bundle-mcp-materialize.js";
 import {
+  applyFinalEffectiveToolPolicy,
   disposeAllSessionMcpRuntimes,
   getOrCreateSessionMcpRuntime,
-} from "../../dist/agents/pi-bundle-mcp-runtime.js";
-import { applyFinalEffectiveToolPolicy } from "../../dist/agents/pi-embedded-runner/effective-tool-policy.js";
-import type { OpenClawConfig } from "../../dist/config/types.openclaw.js";
-import { getPluginToolMeta } from "../../dist/plugins/tools.js";
+  getPluginToolMeta,
+  materializeBundleMcpToolsForRun,
+} from "./dist-modules.mjs";
+import type { OpenClawConfig } from "./dist-modules.mjs";
 
 const require = createRequire(import.meta.url);
 

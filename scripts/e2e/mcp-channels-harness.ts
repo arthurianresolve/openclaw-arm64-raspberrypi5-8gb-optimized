@@ -9,10 +9,12 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { WebSocket } from "ws";
 import { z } from "zod";
-import { PROTOCOL_VERSION } from "../../dist/gateway/protocol/index.js";
-import { formatErrorMessage } from "../../dist/infra/errors.js";
-import { rawDataToString } from "../../dist/infra/ws.js";
-import { readStringValue } from "../../dist/shared/string-coerce.js";
+import {
+  PROTOCOL_VERSION,
+  formatErrorMessage,
+  rawDataToString,
+  readStringValue,
+} from "./dist-modules.mjs";
 
 export const ClaudeChannelNotificationSchema = z.object({
   method: z.literal("notifications/claude/channel"),

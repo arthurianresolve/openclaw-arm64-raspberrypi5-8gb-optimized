@@ -738,7 +738,7 @@ jobs:
   label-issues:
     permissions:
       issues: write
-    if: ${{ github.event_name == 'issues' && github.event.issue.user.login != 'dependabot[bot]' }}
+    if: github.event_name == 'issues'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/create-github-app-token@v3

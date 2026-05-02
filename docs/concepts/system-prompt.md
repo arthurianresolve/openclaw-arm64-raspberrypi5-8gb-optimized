@@ -96,6 +96,20 @@ OpenClaw can render smaller system prompts for sub-agents. The runtime sets a
 When `promptMode=minimal`, extra injected prompts are labeled **Subagent
 Context** instead of **Group Chat Context**.
 
+## Delegated profiles
+
+In addition to `promptMode`, the runtime can derive a small delegated profile
+for tool-limited minimal runs. These profiles are internal prompt-contribution
+presets, not user-facing modes:
+
+- `explore`: favors read-first investigation and broad search before conclusions.
+- `plan`: favors concise execution sequencing, dependencies, and checkpoints.
+- `verify`: favors the smallest evidence-gathering step and explicit pass/fail output.
+
+Profiles are OpenClaw-owned guidance layered into the system prompt before the
+cache boundary. They are meant to reduce prompt cost and tool ambiguity without
+changing normal `full` runs.
+
 ## Workspace bootstrap injection
 
 Bootstrap files are trimmed and appended under **Project Context** so the model sees identity and profile context without needing explicit reads:

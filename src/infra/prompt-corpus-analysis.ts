@@ -1,543 +1,350 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { buildSubagentSystemPrompt } from "../agents/subagent-system-prompt.js";
-import { buildAgentSystemPrompt } from "../agents/system-prompt.js";
-import { estimateStringChars, estimateTokensFromChars } from "../utils/cjk-chars.js";
+import { normalizeStructuredPromptSection } from "../agents/prompt-cache-stability.js";
+import { SYSTEM_PROMPT_CACHE_BOUNDARY } from "../agents/system-prompt-cache-boundary.js";
 
-export type ExternalPromptCorpusRef = {
-  type: "branch" | "commit";
-  value: string;
+export type PromptCorpusRepeatedBlock = {
+  text: string;
+  count: number;
 };
 
-export type ExternalPromptCorpusFile = {
+export type PromptCorpusSectionCount = {
+  heading: string;
+  count: number;
+};
+
+export type PromptCorpusAnalysis = {
+  chars: number;
+  estimatedTokens: number;
+  lineCount: number;
+  sectionCount: number;
+  sectionHistogram: PromptCorpusSectionCount[];
+  repeatedBlocks: PromptCorpusRepeatedBlock[];
+  cacheBoundaryIndex: number | null;
+  stablePrefixChars: number;
+  volatileSuffixChars: number;
+};
+
+export type PromptCorpusComparison = {
+  charsDelta: number;
+  estimatedTokensDelta: number;
+  lineCountDelta: number;
+  sectionCountDelta: number;
+  stablePrefixCharsDelta: number;
+  volatileSuffixCharsDelta: number;
+};
+
+export type PromptCorpusManifestFile = {
   path: string;
-  kind: string;
-  label?: string;
-  notes?: string;
+  reason?: string;
 };
 
-export type ExternalPromptCorpusManifest = {
+export type PromptCorpusManifest = {
   id: string;
-  owner: string;
+  repo: string;
+  license?: string;
+  usage: string;
+  pinnedCommit: string;
+  files: PromptCorpusManifestFile[];
+};
+
+export type PromptCorpusResolvedManifest = {
+  id: string;
   repo: string;
   repositoryUrl: string;
-  license: string;
-  usage: "eval-only";
-  description?: string;
-  ref: ExternalPromptCorpusRef;
-  files: ExternalPromptCorpusFile[];
-  pinRequiredInCi?: boolean;
-};
-
-export type PromptTextSuspiciousPhrase = {
-  phrase: string;
-  count: number;
-};
-
-export type PromptTextAnalysis = {
-  chars: number;
-  adjustedChars: number;
-  estimatedTokens: number;
-  lines: number;
-  headingCount: number;
-  duplicateHeadingCount: number;
-  xmlTagCount: number;
-  jsonSchemaHintCount: number;
-  longestLineChars: number;
-  sha256: string;
-  suspiciousPhrases: PromptTextSuspiciousPhrase[];
-};
-
-export type PromptCorpusSample = {
-  id: string;
-  label: string;
-  source: "openclaw" | "external";
-  path?: string;
-  rawUrl?: string;
-  cachePath?: string;
-  kind?: string;
-  analysis?: PromptTextAnalysis;
-  status: "analyzed" | "missing";
-};
-
-export type PromptCorpusAggregate = {
-  count: number;
-  totalChars: number;
-  totalEstimatedTokens: number;
-  maxChars: number;
-  maxEstimatedTokens: number;
-  avgChars: number;
-  avgEstimatedTokens: number;
-};
-
-export type PromptCorpusAnalysisSummary = {
-  manifest: {
-    id: string;
-    repositoryUrl: string;
-    license: string;
-    usage: "eval-only";
-    ref: ExternalPromptCorpusRef;
-    fileCount: number;
+  ref: {
+    type: "commit";
+    value: string;
   };
+  license?: string;
+  usage: string;
+  files: PromptCorpusManifestFile[];
+};
+
+export type PromptCorpusFetchSummary = {
+  manifest: PromptCorpusResolvedManifest;
   cache: {
-    cacheRoot: string;
     corpusDir: string;
   };
-  warnings: string[];
-  localSamples: PromptCorpusSample[];
-  externalSamples: PromptCorpusSample[];
-  aggregates: {
-    openclaw: PromptCorpusAggregate;
-    external: PromptCorpusAggregate;
-  };
-};
-
-export type ExternalPromptCorpusFetchEntry = {
-  path: string;
-  kind: string;
-  label?: string;
-  rawUrl: string;
-  cachePath: string;
-  status: "downloaded" | "cached" | "dry-run" | "failed";
-  sha256?: string;
-  chars?: number;
-  error?: string;
-};
-
-export type ExternalPromptCorpusFetchSummary = {
-  manifest: {
-    id: string;
-    repositoryUrl: string;
-    ref: ExternalPromptCorpusRef;
-    fileCount: number;
-  };
-  cache: {
-    cacheRoot: string;
-    corpusDir: string;
-  };
-  warnings: string[];
-  files: ExternalPromptCorpusFetchEntry[];
   counts: {
     downloaded: number;
     cached: number;
     dryRun: number;
     failed: number;
   };
+  warnings: string[];
+  files: Array<{
+    path: string;
+    status: "downloaded" | "cached" | "planned" | "failed";
+    error?: string;
+    sha256?: string;
+    bytes?: number;
+  }>;
 };
 
-type ReadFileLike = (filePath: string, encoding: BufferEncoding) => Promise<string>;
-type WriteFileLike = (filePath: string, data: string, encoding: BufferEncoding) => Promise<void>;
-type MkdirLike = (dirPath: string, options: { recursive: true }) => Promise<void>;
-type FetchTextResult = { ok: boolean; status: number; text: string };
-type FetchTextLike = (url: string) => Promise<FetchTextResult>;
-type DelayLike = (ms: number) => Promise<void>;
+export type PromptCorpusAnalysisSample = {
+  path: string;
+  status: "analyzed" | "missing";
+  analysis?: PromptCorpusAnalysis;
+  error?: string;
+};
 
-const DEFAULT_MANIFEST_PATH = path.join(
-  "qa",
-  "external-corpora",
-  "system-prompts-and-models-of-ai-tools.manifest.json",
-);
-const DEFAULT_CACHE_ROOT = path.join("qa", ".cache", "external-corpora");
-const DEFAULT_FETCH_RETRY_LIMIT = 2;
-const DEFAULT_FETCH_RETRY_DELAY_MS = 1_000;
-const DEFAULT_FETCH_TIMEOUT_MS = 15_000;
+export type PromptCorpusAnalyzeSummary = {
+  manifest: PromptCorpusResolvedManifest;
+  cache: {
+    corpusDir: string;
+  };
+  warnings: string[];
+  openclawSamples: PromptCorpusAnalysisSample[];
+  externalSamples: PromptCorpusAnalysisSample[];
+  aggregates: {
+    openclaw: {
+      count: number;
+      maxEstimatedTokens: number;
+    };
+    external: {
+      count: number;
+      maxEstimatedTokens: number;
+    };
+  };
+};
 
-const SUSPICIOUS_PHRASES = [
-  "system prompt",
-  "hidden instructions",
-  "internal tools",
-  "do not reveal",
-  "ignore previous",
-  "developer message",
-] as const;
+const HEADING_RE = /^#{1,6}\s+(.+)$/gm;
 
-function sha256(text: string) {
-  return createHash("sha256").update(text, "utf8").digest("hex");
+function estimatePromptTokens(chars: number): number {
+  return Math.max(1, Math.ceil(chars / 4));
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function normalizeBlock(block: string): string {
+  return normalizeStructuredPromptSection(block).replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function countHeadings(text: string): PromptCorpusSectionCount[] {
+  const counts = new Map<string, number>();
+  for (const match of text.matchAll(HEADING_RE)) {
+    const heading = normalizeStructuredPromptSection(match[1] ?? "");
+    if (!heading) {
+      continue;
+    }
+    counts.set(heading, (counts.get(heading) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([heading, count]) => ({ heading, count }))
+    .sort((left, right) => right.count - left.count || left.heading.localeCompare(right.heading));
+}
+
+function countRepeatedBlocks(text: string): PromptCorpusRepeatedBlock[] {
+  const counts = new Map<string, { text: string; count: number }>();
+  for (const block of text.split(/\n\s*\n+/g)) {
+    const normalized = normalizeBlock(block);
+    if (!normalized) {
+      continue;
+    }
+    const existing = counts.get(normalized);
+    if (existing) {
+      existing.count += 1;
+      continue;
+    }
+    counts.set(normalized, { text: normalizeStructuredPromptSection(block), count: 1 });
+  }
+  return [...counts.values()]
+    .filter((entry) => entry.count > 1)
+    .sort((left, right) => right.count - left.count || right.text.length - left.text.length);
+}
+
+function isValidSha(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9a-f]{40}$/i.test(value);
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function readRequiredString(input: Record<string, unknown>, key: string) {
-  const value = input[key];
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`Prompt corpus manifest field "${key}" must be a non-empty string.`);
-  }
-  return value.trim();
+function normalizeRepoPath(repoPath: string): string {
+  return repoPath.split("/").filter(Boolean).join("/");
 }
 
-function readOptionalString(input: Record<string, unknown>, key: string) {
-  const value = input[key];
-  if (value === undefined) {
-    return undefined;
+function sanitizeRelativePath(filePath: string): string {
+  const normalized = path.posix.normalize(filePath);
+  if (!normalized || normalized.startsWith("..") || path.posix.isAbsolute(normalized)) {
+    throw new Error(`Invalid manifest path: ${filePath}`);
   }
-  if (typeof value !== "string") {
-    throw new Error(`Prompt corpus manifest field "${key}" must be a string when present.`);
-  }
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
+  return normalized;
 }
 
-function normalizeRef(input: unknown): ExternalPromptCorpusRef {
-  if (!isRecord(input)) {
-    throw new Error('Prompt corpus manifest field "ref" must be an object.');
-  }
-  const type = readRequiredString(input, "type");
-  if (type !== "branch" && type !== "commit") {
-    throw new Error('Prompt corpus manifest field "ref.type" must be "branch" or "commit".');
-  }
-  return {
-    type,
-    value: readRequiredString(input, "value"),
-  };
+function encodeRepoPath(filePath: string): string {
+  return filePath.split("/").map(encodeURIComponent).join("/");
 }
 
-function normalizeFiles(input: unknown): ExternalPromptCorpusFile[] {
-  if (!Array.isArray(input) || input.length === 0) {
-    throw new Error('Prompt corpus manifest field "files" must be a non-empty array.');
-  }
-  return input.map((entry, index) => {
-    if (!isRecord(entry)) {
-      throw new Error(`Prompt corpus manifest file entry #${index + 1} must be an object.`);
+function sha256(text: string): string {
+  return createHash("sha256").update(text).digest("hex");
+}
+
+async function readTextIfExists(filePath: string): Promise<string | undefined> {
+  try {
+    return await fs.readFile(filePath, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return undefined;
     }
-    return {
-      path: readRequiredString(entry, "path"),
-      kind: readRequiredString(entry, "kind"),
-      label: readOptionalString(entry, "label"),
-      notes: readOptionalString(entry, "notes"),
-    };
-  });
-}
-
-export function parseExternalPromptCorpusManifest(input: unknown): ExternalPromptCorpusManifest {
-  if (!isRecord(input)) {
-    throw new Error("Prompt corpus manifest must be a JSON object.");
+    throw error;
   }
-  const usage = readRequiredString(input, "usage");
-  if (usage !== "eval-only") {
-    throw new Error('Prompt corpus manifest field "usage" must be "eval-only".');
+}
+
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
   }
-  const pinRequiredInCi = input.pinRequiredInCi;
-  if (pinRequiredInCi !== undefined && typeof pinRequiredInCi !== "boolean") {
-    throw new Error('Prompt corpus manifest field "pinRequiredInCi" must be a boolean.');
-  }
-  return {
-    id: readRequiredString(input, "id"),
-    owner: readRequiredString(input, "owner"),
-    repo: readRequiredString(input, "repo"),
-    repositoryUrl: readRequiredString(input, "repositoryUrl"),
-    license: readRequiredString(input, "license"),
-    usage,
-    description: readOptionalString(input, "description"),
-    ref: normalizeRef(input.ref),
-    files: normalizeFiles(input.files),
-    pinRequiredInCi,
-  };
 }
 
-export async function readExternalPromptCorpusManifest(
-  manifestPath: string,
-  deps?: { readFile?: ReadFileLike },
-) {
-  const readFile = deps?.readFile ?? fs.readFile;
-  const payload = await readFile(manifestPath, "utf8");
-  return parseExternalPromptCorpusManifest(JSON.parse(payload) as unknown);
+async function ensureDir(dirPath: string): Promise<void> {
+  await fs.mkdir(dirPath, { recursive: true });
 }
 
-function encodePathForRawUrl(filePath: string) {
-  return filePath
-    .split("/")
-    .filter(Boolean)
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
+async function readJson(filePath: string): Promise<unknown> {
+  const text = await fs.readFile(filePath, "utf8");
+  return JSON.parse(text);
 }
 
-function sanitizeRefForDir(ref: string) {
-  return ref.replace(/[^a-zA-Z0-9._-]+/g, "_");
-}
-
-export function resolvePromptCorpusManifestPath(repoRoot: string, manifestPath?: string) {
+function resolveManifestPath(repoRoot: string, manifestPath?: string): string {
   if (!manifestPath) {
-    return path.join(repoRoot, DEFAULT_MANIFEST_PATH);
+    return path.resolve(
+      repoRoot,
+      "qa/external-corpora/piebald-claude-code-system-prompts.manifest.json",
+    );
   }
   return path.isAbsolute(manifestPath) ? manifestPath : path.resolve(repoRoot, manifestPath);
 }
 
-export function resolvePromptCorpusCachePaths(params: {
-  repoRoot: string;
-  cacheRoot?: string;
-  manifest: ExternalPromptCorpusManifest;
-}) {
-  const cacheRoot = params.cacheRoot
-    ? path.isAbsolute(params.cacheRoot)
-      ? params.cacheRoot
-      : path.resolve(params.repoRoot, params.cacheRoot)
-    : path.join(params.repoRoot, DEFAULT_CACHE_ROOT);
-  const corpusDir = path.join(
-    cacheRoot,
-    params.manifest.id,
-    `${params.manifest.ref.type}-${sanitizeRefForDir(params.manifest.ref.value)}`,
-  );
-  return { cacheRoot, corpusDir };
-}
-
-export function buildExternalPromptCorpusRawUrl(
-  manifest: ExternalPromptCorpusManifest,
-  filePath: string,
-) {
-  return `https://raw.githubusercontent.com/${encodeURIComponent(
-    manifest.owner,
-  )}/${encodeURIComponent(manifest.repo)}/${encodeURIComponent(
-    manifest.ref.value,
-  )}/${encodePathForRawUrl(filePath)}`;
-}
-
-function countMatches(text: string, pattern: RegExp) {
-  return (text.match(pattern) ?? []).length;
-}
-
-function formatFetchErrorMessage(error: unknown) {
-  if (error instanceof Error) {
-    return error.message;
+function resolveCacheRoot(repoRoot: string, cacheRoot?: string): string {
+  if (!cacheRoot) {
+    return path.resolve(repoRoot, "qa/.cache/external-corpora");
   }
-  return String(error);
+  return path.isAbsolute(cacheRoot) ? cacheRoot : path.resolve(repoRoot, cacheRoot);
 }
 
-function shouldRetryFetchError(error: unknown) {
-  if (!(error instanceof Error)) {
-    return false;
+function normalizeManifest(raw: unknown): PromptCorpusManifest {
+  if (!isObject(raw)) {
+    throw new Error("Manifest must be an object");
   }
-  const message = error.message.toLowerCase();
-  return (
-    message.includes("fetch failed") ||
-    message.includes("eai_again") ||
-    message.includes("enotfound") ||
-    message.includes("econnreset") ||
-    message.includes("econnrefused") ||
-    message.includes("etimedout") ||
-    message.includes("timeout")
-  );
-}
-
-function shouldRetryStatus(status: number) {
-  return status === 408 || status === 425 || status === 429 || status >= 500;
-}
-
-export function analyzePromptText(text: string): PromptTextAnalysis {
-  const adjustedChars = estimateStringChars(text);
-  const headings = Array.from(text.matchAll(/^(#{1,6})\s+(.+)$/gm)).map((match) =>
-    match[2]?.trim().toLowerCase(),
-  );
-  const headingCounts = new Map<string, number>();
-  for (const heading of headings) {
-    if (!heading) {
-      continue;
+  const id = typeof raw.id === "string" ? raw.id.trim() : "";
+  const repo = typeof raw.repo === "string" ? raw.repo.trim() : "";
+  const license = typeof raw.license === "string" ? raw.license.trim() : undefined;
+  const usage = typeof raw.usage === "string" ? raw.usage.trim() : "";
+  const pinnedCommit = typeof raw.pinnedCommit === "string" ? raw.pinnedCommit.trim() : "";
+  if (!id) {
+    throw new Error("Manifest id is required");
+  }
+  if (!repo) {
+    throw new Error("Manifest repo is required");
+  }
+  if (usage !== "eval-only") {
+    throw new Error("Manifest usage must be eval-only");
+  }
+  if (!isValidSha(pinnedCommit)) {
+    throw new Error("Manifest pinnedCommit must be a full 40-character commit SHA");
+  }
+  if (!Array.isArray(raw.files) || raw.files.length === 0) {
+    throw new Error("Manifest must include at least one allowlisted file");
+  }
+  const files = raw.files.map((entry) => {
+    if (!isObject(entry)) {
+      throw new Error("Manifest file entry must be an object");
     }
-    headingCounts.set(heading, (headingCounts.get(heading) ?? 0) + 1);
-  }
-  const duplicateHeadingCount = Array.from(headingCounts.values()).filter(
-    (count) => count > 1,
-  ).length;
-  const suspiciousPhrases = SUSPICIOUS_PHRASES.map((phrase) => ({
-    phrase,
-    count: countMatches(text, new RegExp(phrase.replaceAll(" ", "\\s+"), "gi")),
-  })).filter((entry) => entry.count > 0);
-  const lines = text.length === 0 ? 0 : text.split(/\r?\n/u).length;
-  const longestLineChars = Math.max(0, ...text.split(/\r?\n/u).map((line) => line.length));
-  return {
-    chars: text.length,
-    adjustedChars,
-    estimatedTokens: estimateTokensFromChars(adjustedChars),
-    lines,
-    headingCount: headings.length,
-    duplicateHeadingCount,
-    xmlTagCount: countMatches(text, /<([a-z][\w-]*)\b[^>]*>/giu),
-    jsonSchemaHintCount: countMatches(text, /"properties"|"required"|"type"\s*:\s*"object"/giu),
-    longestLineChars,
-    sha256: sha256(text),
-    suspiciousPhrases,
-  };
-}
-
-function buildAggregate(samples: PromptCorpusSample[]): PromptCorpusAggregate {
-  const analyses = samples
-    .map((sample) => sample.analysis)
-    .filter((analysis): analysis is PromptTextAnalysis => analysis !== undefined);
-  if (analyses.length === 0) {
-    return {
-      count: 0,
-      totalChars: 0,
-      totalEstimatedTokens: 0,
-      maxChars: 0,
-      maxEstimatedTokens: 0,
-      avgChars: 0,
-      avgEstimatedTokens: 0,
+    const filePath = typeof entry.path === "string" ? entry.path.trim() : "";
+    if (!filePath) {
+      throw new Error("Manifest file entry path is required");
+    }
+    const normalized: PromptCorpusManifestFile = {
+      path: sanitizeRelativePath(filePath),
     };
-  }
-  const totalChars = analyses.reduce((sum, analysis) => sum + analysis.chars, 0);
-  const totalEstimatedTokens = analyses.reduce(
-    (sum, analysis) => sum + analysis.estimatedTokens,
-    0,
-  );
-  return {
-    count: analyses.length,
-    totalChars,
-    totalEstimatedTokens,
-    maxChars: Math.max(...analyses.map((analysis) => analysis.chars)),
-    maxEstimatedTokens: Math.max(...analyses.map((analysis) => analysis.estimatedTokens)),
-    avgChars: Math.round(totalChars / analyses.length),
-    avgEstimatedTokens: Math.round(totalEstimatedTokens / analyses.length),
-  };
-}
-
-export function buildOpenClawPromptCorpusSamples(repoRoot: string): PromptCorpusSample[] {
-  const skillsPrompt = [
-    "<available_skills>",
-    "  <skill>",
-    "    <name>prompt-budget</name>",
-    "    <description>Inspect prompt growth and section duplication.</description>",
-    "  </skill>",
-    "</available_skills>",
-  ].join("\n");
-  const fullPrompt = buildAgentSystemPrompt({
-    workspaceDir: repoRoot,
-    promptMode: "full",
-    toolNames: ["read", "exec", "message", "web_search", "sessions_spawn"],
-    skillsPrompt,
-    docsPath: path.join(repoRoot, "docs"),
-    sourcePath: repoRoot,
-    runtimeInfo: {
-      os: process.platform,
-      arch: process.arch,
-      shell: process.env.SHELL ?? "bash",
-      repoRoot,
-      node: process.version,
-      channel: "webchat",
-    },
-  });
-  const minimalPrompt = buildAgentSystemPrompt({
-    workspaceDir: repoRoot,
-    promptMode: "minimal",
-    toolNames: ["read", "exec", "sessions_spawn"],
-    skillsPrompt,
-  });
-  const subagentPrompt = buildSubagentSystemPrompt({
-    childSessionKey: "qa-prompt-corpus-child",
-    label: "Prompt Corpus Sample",
-    task: "Analyze prompt sprawl and summarize prompt-shape risks.",
-  });
-
-  return [
-    {
-      id: "openclaw-main-full",
-      label: "OpenClaw main agent prompt (full)",
-      source: "openclaw",
-      status: "analyzed",
-      analysis: analyzePromptText(fullPrompt),
-    },
-    {
-      id: "openclaw-main-minimal",
-      label: "OpenClaw main agent prompt (minimal)",
-      source: "openclaw",
-      status: "analyzed",
-      analysis: analyzePromptText(minimalPrompt),
-    },
-    {
-      id: "openclaw-subagent",
-      label: "OpenClaw subagent prompt",
-      source: "openclaw",
-      status: "analyzed",
-      analysis: analyzePromptText(subagentPrompt),
-    },
-  ];
-}
-
-async function defaultFetchText(url: string): Promise<FetchTextResult> {
-  const timeoutMs = readPromptCorpusFetchTimeoutMsFromEnv();
-  const response = await fetch(url, {
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  return {
-    ok: response.ok,
-    status: response.status,
-    text: await response.text(),
-  };
-}
-
-async function defaultDelay(ms: number) {
-  await new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function readNonNegativeIntegerEnv(name: string, fallback: number) {
-  const raw = process.env[name]?.trim();
-  if (!raw) {
-    return fallback;
-  }
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    return fallback;
-  }
-  return Math.floor(parsed);
-}
-
-function readPromptCorpusFetchRetryLimitFromEnv() {
-  return readNonNegativeIntegerEnv(
-    "OPENCLAW_QA_PROMPT_CORPUS_FETCH_RETRIES",
-    DEFAULT_FETCH_RETRY_LIMIT,
-  );
-}
-
-function readPromptCorpusFetchRetryDelayMsFromEnv() {
-  return readNonNegativeIntegerEnv(
-    "OPENCLAW_QA_PROMPT_CORPUS_FETCH_RETRY_DELAY_MS",
-    DEFAULT_FETCH_RETRY_DELAY_MS,
-  );
-}
-
-function readPromptCorpusFetchTimeoutMsFromEnv() {
-  const timeoutMs = readNonNegativeIntegerEnv(
-    "OPENCLAW_QA_PROMPT_CORPUS_FETCH_TIMEOUT_MS",
-    DEFAULT_FETCH_TIMEOUT_MS,
-  );
-  return Math.max(1, timeoutMs);
-}
-
-async function fetchWithRetry(params: {
-  url: string;
-  fetchText: FetchTextLike;
-  retryLimit: number;
-  retryDelayMs: number;
-  delay: DelayLike;
-}) {
-  let lastStatus: number | undefined;
-  let lastError: unknown;
-  for (let attempt = 0; attempt <= params.retryLimit; attempt += 1) {
-    try {
-      const result = await params.fetchText(params.url);
-      if (result.ok) {
-        return result;
-      }
-      lastStatus = result.status;
-      if (attempt >= params.retryLimit || !shouldRetryStatus(result.status)) {
-        return result;
-      }
-    } catch (error) {
-      lastError = error;
-      if (attempt >= params.retryLimit || !shouldRetryFetchError(error)) {
-        throw error;
-      }
+    if (typeof entry.reason === "string" && entry.reason.trim()) {
+      normalized.reason = entry.reason.trim();
     }
-    await params.delay(params.retryDelayMs * (attempt + 1));
+    return normalized;
+  });
+  return { id, repo: normalizeRepoPath(repo), license, usage, pinnedCommit, files };
+}
+
+function resolveManifest(manifest: PromptCorpusManifest): PromptCorpusResolvedManifest {
+  return {
+    id: manifest.id,
+    repo: manifest.repo,
+    repositoryUrl: `https://github.com/${manifest.repo}`,
+    ref: {
+      type: "commit",
+      value: manifest.pinnedCommit,
+    },
+    license: manifest.license,
+    usage: manifest.usage,
+    files: manifest.files,
+  };
+}
+
+function createAnalysisAggregate(samples: PromptCorpusAnalysisSample[]): {
+  count: number;
+  maxEstimatedTokens: number;
+} {
+  const analyzed = samples.filter(
+    (sample): sample is PromptCorpusAnalysisSample & { analysis: PromptCorpusAnalysis } =>
+      sample.status === "analyzed" && Boolean(sample.analysis),
+  );
+  return {
+    count: analyzed.length,
+    maxEstimatedTokens: analyzed.reduce(
+      (max, sample) => Math.max(max, sample.analysis.estimatedTokens),
+      0,
+    ),
+  };
+}
+
+async function fetchUrlText(url: string): Promise<string> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Fetch failed for ${url}: ${response.status} ${response.statusText}`);
   }
-  if (lastError) {
-    throw lastError;
-  }
-  if (lastStatus !== undefined) {
-    throw new Error(`Prompt corpus fetch failed (${lastStatus}) for ${params.url}`);
-  }
-  throw new Error(`Prompt corpus fetch exhausted retries for ${params.url}`);
+  return await response.text();
+}
+
+export function analyzePromptCorpusText(text: string): PromptCorpusAnalysis {
+  const normalized = typeof text === "string" ? text : "";
+  const chars = normalized.length;
+  const boundaryIndex = normalized.indexOf(SYSTEM_PROMPT_CACHE_BOUNDARY);
+  const stablePrefixChars = boundaryIndex >= 0 ? boundaryIndex : chars;
+  const volatileSuffixChars =
+    boundaryIndex >= 0 ? chars - boundaryIndex - SYSTEM_PROMPT_CACHE_BOUNDARY.length : 0;
+  const sectionHistogram = countHeadings(normalized);
+  const repeatedBlocks = countRepeatedBlocks(normalized);
+
+  return {
+    chars,
+    estimatedTokens: estimatePromptTokens(chars),
+    lineCount: normalized.length > 0 ? normalized.split("\n").length : 0,
+    sectionCount: sectionHistogram.reduce((sum, entry) => sum + entry.count, 0),
+    sectionHistogram,
+    repeatedBlocks,
+    cacheBoundaryIndex: boundaryIndex >= 0 ? boundaryIndex : null,
+    stablePrefixChars,
+    volatileSuffixChars,
+  };
+}
+
+export function comparePromptCorpusAnalyses(
+  base: PromptCorpusAnalysis,
+  head: PromptCorpusAnalysis,
+): PromptCorpusComparison {
+  return {
+    charsDelta: head.chars - base.chars,
+    estimatedTokensDelta: head.estimatedTokens - base.estimatedTokens,
+    lineCountDelta: head.lineCount - base.lineCount,
+    sectionCountDelta: head.sectionCount - base.sectionCount,
+    stablePrefixCharsDelta: head.stablePrefixChars - base.stablePrefixChars,
+    volatileSuffixCharsDelta: head.volatileSuffixChars - base.volatileSuffixChars,
+  };
 }
 
 export async function fetchExternalPromptCorpus(params: {
@@ -545,131 +352,85 @@ export async function fetchExternalPromptCorpus(params: {
   manifestPath?: string;
   cacheRoot?: string;
   dryRun?: boolean;
-  readFile?: ReadFileLike;
-  writeFile?: WriteFileLike;
-  mkdir?: MkdirLike;
-  fetchText?: FetchTextLike;
-  delay?: DelayLike;
-  retryLimit?: number;
-  retryDelayMs?: number;
-}) {
-  const manifestPath = resolvePromptCorpusManifestPath(params.repoRoot, params.manifestPath);
-  const manifest = await readExternalPromptCorpusManifest(manifestPath, {
-    readFile: params.readFile,
-  });
-  if (process.env.CI && manifest.pinRequiredInCi !== false && manifest.ref.type !== "commit") {
-    throw new Error(
-      `Prompt corpus manifest "${manifest.id}" uses ref ${manifest.ref.type}:${manifest.ref.value}; CI requires a pinned commit ref.`,
-    );
+}): Promise<PromptCorpusFetchSummary> {
+  const resolvedManifestPath = resolveManifestPath(params.repoRoot, params.manifestPath);
+  const resolvedCacheRoot = resolveCacheRoot(params.repoRoot, params.cacheRoot);
+  const manifest = resolveManifest(await normalizeManifest(await readJson(resolvedManifestPath)));
+  const corpusDir = path.join(resolvedCacheRoot, manifest.id);
+  if (params.dryRun !== true) {
+    await ensureDir(corpusDir);
   }
-  const writeFile = params.writeFile ?? fs.writeFile;
-  const mkdir = params.mkdir ?? fs.mkdir;
-  const readFile = params.readFile ?? fs.readFile;
-  const fetchText = params.fetchText ?? defaultFetchText;
-  const delay = params.delay ?? defaultDelay;
-  const retryLimit = Math.max(0, params.retryLimit ?? readPromptCorpusFetchRetryLimitFromEnv());
-  const retryDelayMs = Math.max(
-    0,
-    params.retryDelayMs ?? readPromptCorpusFetchRetryDelayMsFromEnv(),
-  );
-  const cache = resolvePromptCorpusCachePaths({
-    repoRoot: params.repoRoot,
-    cacheRoot: params.cacheRoot,
-    manifest,
-  });
-  const warnings =
-    manifest.ref.type === "commit"
-      ? []
-      : [`Manifest ${manifest.id} is using an unpinned ${manifest.ref.type} ref.`];
-  const entries: ExternalPromptCorpusFetchEntry[] = [];
 
-  for (const file of manifest.files) {
-    const rawUrl = buildExternalPromptCorpusRawUrl(manifest, file.path);
-    const cachePath = path.join(cache.corpusDir, file.path);
+  const summary: PromptCorpusFetchSummary = {
+    manifest,
+    cache: {
+      corpusDir,
+    },
+    counts: {
+      downloaded: 0,
+      cached: 0,
+      dryRun: 0,
+      failed: 0,
+    },
+    warnings: [],
+    files: [],
+  };
+
+  for (const entry of manifest.files) {
+    const targetPath = path.join(corpusDir, entry.path);
     if (params.dryRun === true) {
-      entries.push({
-        path: file.path,
-        kind: file.kind,
-        label: file.label,
-        rawUrl,
-        cachePath,
-        status: "dry-run",
+      summary.counts.dryRun += 1;
+      summary.files.push({ path: entry.path, status: "planned" });
+      continue;
+    }
+
+    const cached = await readTextIfExists(targetPath);
+    if (cached !== undefined) {
+      summary.counts.cached += 1;
+      summary.files.push({
+        path: entry.path,
+        status: "cached",
+        bytes: Buffer.byteLength(cached, "utf8"),
+        sha256: sha256(cached),
       });
       continue;
     }
+
     try {
-      const fetched = await fetchWithRetry({
-        url: rawUrl,
-        fetchText,
-        retryLimit,
-        retryDelayMs,
-        delay,
-      });
-      if (!fetched.ok) {
-        throw new Error(`Prompt corpus fetch failed (${fetched.status}) for ${rawUrl}`);
-      }
-      const contentHash = sha256(fetched.text);
-      let status: ExternalPromptCorpusFetchEntry["status"] = "downloaded";
-      try {
-        const existing = await readFile(cachePath, "utf8");
-        if (sha256(existing) === contentHash) {
-          status = "cached";
-        }
-      } catch {
-        // Missing cache is expected on first fetch.
-      }
-      if (status !== "cached") {
-        await mkdir(path.dirname(cachePath), { recursive: true });
-        await writeFile(cachePath, fetched.text, "utf8");
-      }
-      entries.push({
-        path: file.path,
-        kind: file.kind,
-        label: file.label,
-        rawUrl,
-        cachePath,
-        status,
-        sha256: contentHash,
-        chars: fetched.text.length,
+      const rawUrl = `https://raw.githubusercontent.com/${manifest.repo}/${manifest.ref.value}/${encodeRepoPath(entry.path)}`;
+      const contents = await fetchUrlText(rawUrl);
+      await ensureDir(path.dirname(targetPath));
+      await fs.writeFile(targetPath, contents, "utf8");
+      summary.counts.downloaded += 1;
+      summary.files.push({
+        path: entry.path,
+        status: "downloaded",
+        bytes: Buffer.byteLength(contents, "utf8"),
+        sha256: sha256(contents),
       });
     } catch (error) {
-      warnings.push(`Fetch failed for ${file.path}: ${formatFetchErrorMessage(error)}`);
-      entries.push({
-        path: file.path,
-        kind: file.kind,
-        label: file.label,
-        rawUrl,
-        cachePath,
+      summary.counts.failed += 1;
+      summary.files.push({
+        path: entry.path,
         status: "failed",
-        error: formatFetchErrorMessage(error),
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
 
-  const counts = {
-    downloaded: entries.filter((entry) => entry.status === "downloaded").length,
-    cached: entries.filter((entry) => entry.status === "cached").length,
-    dryRun: entries.filter((entry) => entry.status === "dry-run").length,
-    failed: entries.filter((entry) => entry.status === "failed").length,
-  };
-
+  const indexPath = path.join(corpusDir, "index.json");
   if (params.dryRun !== true) {
-    await mkdir(cache.corpusDir, { recursive: true });
-    await writeFile(
-      path.join(cache.corpusDir, "manifest.json"),
-      `${JSON.stringify(manifest, null, 2)}\n`,
-      "utf8",
-    );
-    await writeFile(
-      path.join(cache.corpusDir, "index.json"),
+    await fs.writeFile(
+      indexPath,
       `${JSON.stringify(
         {
-          manifestId: manifest.id,
-          repositoryUrl: manifest.repositoryUrl,
-          ref: manifest.ref,
-          files: entries,
-          counts,
-          warnings,
+          id: manifest.id,
+          repo: manifest.repo,
+          pinnedCommit: manifest.ref.value,
+          usage: manifest.usage,
+          license: manifest.license,
+          fetchedAt: new Date().toISOString(),
+          files: summary.files,
         },
         null,
         2,
@@ -678,87 +439,56 @@ export async function fetchExternalPromptCorpus(params: {
     );
   }
 
-  return {
-    manifest: {
-      id: manifest.id,
-      repositoryUrl: manifest.repositoryUrl,
-      ref: manifest.ref,
-      fileCount: manifest.files.length,
-    },
-    cache,
-    warnings,
-    files: entries,
-    counts,
-  } satisfies ExternalPromptCorpusFetchSummary;
+  return summary;
 }
 
 export async function analyzePromptCorpus(params: {
   repoRoot: string;
   manifestPath?: string;
   cacheRoot?: string;
-  readFile?: ReadFileLike;
-}) {
-  const readFile = params.readFile ?? fs.readFile;
-  const manifestPath = resolvePromptCorpusManifestPath(params.repoRoot, params.manifestPath);
-  const manifest = await readExternalPromptCorpusManifest(manifestPath, { readFile });
-  const cache = resolvePromptCorpusCachePaths({
-    repoRoot: params.repoRoot,
-    cacheRoot: params.cacheRoot,
-    manifest,
-  });
-  const warnings =
-    manifest.ref.type === "commit"
-      ? []
-      : [`Manifest ${manifest.id} is using an unpinned ${manifest.ref.type} ref.`];
-  const localSamples = buildOpenClawPromptCorpusSamples(params.repoRoot);
-  const externalSamples: PromptCorpusSample[] = [];
+  openclawSamples?: PromptCorpusAnalysisSample[];
+}): Promise<PromptCorpusAnalyzeSummary> {
+  const resolvedManifestPath = resolveManifestPath(params.repoRoot, params.manifestPath);
+  const resolvedCacheRoot = resolveCacheRoot(params.repoRoot, params.cacheRoot);
+  const manifest = resolveManifest(await normalizeManifest(await readJson(resolvedManifestPath)));
+  const corpusDir = path.join(resolvedCacheRoot, manifest.id);
+  const warnings: string[] = [];
 
-  for (const file of manifest.files) {
-    const cachePath = path.join(cache.corpusDir, file.path);
-    const rawUrl = buildExternalPromptCorpusRawUrl(manifest, file.path);
-    try {
-      const text = await readFile(cachePath, "utf8");
+  const openclawSamples = params.openclawSamples ?? [];
+  const externalSamples: PromptCorpusAnalysisSample[] = [];
+
+  for (const entry of manifest.files) {
+    const targetPath = path.join(corpusDir, entry.path);
+    const contents = await readTextIfExists(targetPath);
+    if (contents === undefined) {
       externalSamples.push({
-        id: `${manifest.id}:${file.path}`,
-        label: file.label ?? file.path,
-        source: "external",
-        path: file.path,
-        kind: file.kind,
-        rawUrl,
-        cachePath,
-        status: "analyzed",
-        analysis: analyzePromptText(text),
-      });
-    } catch {
-      externalSamples.push({
-        id: `${manifest.id}:${file.path}`,
-        label: file.label ?? file.path,
-        source: "external",
-        path: file.path,
-        kind: file.kind,
-        rawUrl,
-        cachePath,
+        path: entry.path,
         status: "missing",
       });
+      continue;
     }
+    externalSamples.push({
+      path: entry.path,
+      status: "analyzed",
+      analysis: analyzePromptCorpusText(contents),
+    });
+  }
+
+  if ((await pathExists(corpusDir)) === false) {
+    warnings.push(`Cache directory does not exist yet: ${corpusDir}`);
   }
 
   return {
-    manifest: {
-      id: manifest.id,
-      repositoryUrl: manifest.repositoryUrl,
-      license: manifest.license,
-      usage: manifest.usage,
-      ref: manifest.ref,
-      fileCount: manifest.files.length,
+    manifest,
+    cache: {
+      corpusDir,
     },
-    cache,
     warnings,
-    localSamples,
+    openclawSamples,
     externalSamples,
     aggregates: {
-      openclaw: buildAggregate(localSamples),
-      external: buildAggregate(externalSamples),
+      openclaw: createAnalysisAggregate(openclawSamples),
+      external: createAnalysisAggregate(externalSamples),
     },
-  } satisfies PromptCorpusAnalysisSummary;
+  };
 }

@@ -99,6 +99,38 @@ describe("bash process registry", () => {
     expect(session.truncated).toBe(true);
   });
 
+  it("treats carriage returns as in-line progress rewrites", () => {
+    const session = createRegistrySession({
+      maxOutputChars: 100,
+      pendingMaxOutputChars: 100,
+      backgrounded: true,
+    });
+
+    addSession(session);
+    appendOutput(session, "stdout", "loading");
+    appendOutput(session, "stdout", "\rready");
+
+    const drained = drainSession(session);
+    expect(drained.stdout).toBe("readyng");
+    expect(session.aggregated).toBe("readyng");
+  });
+
+  it("keeps only the final visible frame when progress lines end with newline", () => {
+    const session = createRegistrySession({
+      maxOutputChars: 100,
+      pendingMaxOutputChars: 100,
+      backgrounded: true,
+    });
+
+    addSession(session);
+    appendOutput(session, "stdout", "\r RUN  preparing");
+    appendOutput(session, "stdout", "\r RUN  complete\nnext line");
+
+    const drained = drainSession(session);
+    expect(drained.stdout).toBe(" RUN  completeg\nnext line");
+    expect(session.aggregated).toBe(" RUN  completeg\nnext line");
+  });
+
   it("only persists finished sessions when backgrounded", () => {
     const session = createRegistrySession({
       maxOutputChars: 100,

@@ -1,13 +1,17 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 import {
+  forwardVitestOutput,
   installVitestNoOutputWatchdog,
   resolveDirectNodeVitestArgs,
   resolveVitestNodeArgs,
   resolveVitestNoOutputTimeoutMs,
   resolveVitestSpawnParams,
+  shouldUseVitestPty,
   shouldSuppressVitestOutputLine,
   shouldSuppressVitestStderrLine,
+  waitForVitestChildCompletion,
+  waitForVitestPtyCompletion,
 } from "../../scripts/run-vitest.mjs";
 
 describe("scripts/run-vitest", () => {
@@ -44,6 +48,19 @@ describe("scripts/run-vitest", () => {
     expect(
       resolveVitestNoOutputTimeoutMs({ OPENCLAW_VITEST_NO_OUTPUT_TIMEOUT_MS: "0" }),
     ).toBeNull();
+  });
+
+  it("uses a PTY for direct vitest runs by default on non-Windows", () => {
+    expect(shouldUseVitestPty({}, "linux", true)).toBe(true);
+    expect(shouldUseVitestPty({}, "darwin", true)).toBe(true);
+    expect(shouldUseVitestPty({}, "linux", false)).toBe(false);
+    expect(shouldUseVitestPty({}, "win32", true)).toBe(false);
+  });
+
+  it("allows disabling the PTY path explicitly", () => {
+    expect(shouldUseVitestPty({ OPENCLAW_VITEST_PTY: "0" }, "linux")).toBe(false);
+    expect(shouldUseVitestPty({ OPENCLAW_VITEST_PTY: "false" }, "linux")).toBe(false);
+    expect(shouldUseVitestPty({ OPENCLAW_VITEST_PTY: "1" }, "win32")).toBe(true);
   });
 
   it("spawns vitest in a detached process group on Unix hosts", () => {
@@ -222,5 +239,91 @@ describe("scripts/run-vitest", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("treats carriage-return reporter updates as watchdog activity", () => {
+    vi.useFakeTimers();
+    try {
+      const stdout = new EventEmitter();
+      const timeoutSpy = vi.fn();
+
+      installVitestNoOutputWatchdog({
+        monitoredStreams: [{ stream: stdout }],
+        timeoutMs: 1000,
+        forceKillAfterMs: 0,
+        onTimeout: timeoutSpy,
+      });
+
+      vi.advanceTimersByTime(900);
+      stdout.emit("data", "\r RUN  v4.1.5 /tmp/openclaw");
+      vi.advanceTimersByTime(900);
+      expect(timeoutSpy).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(100);
+      expect(timeoutSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("forwards carriage-return reporter updates immediately", () => {
+    const stdout = new EventEmitter();
+    stdout.setEncoding = vi.fn();
+    const target = {
+      isTTY: false,
+      write: vi.fn(),
+    };
+
+    forwardVitestOutput(stdout, target);
+    stdout.emit("data", "\r RUN  v4.1.5 /tmp/openclaw");
+
+    expect(target.write).toHaveBeenNthCalledWith(1, "\n");
+    expect(target.write).toHaveBeenNthCalledWith(2, " RUN  v4.1.5 /tmp/openclaw\n");
+  });
+
+  it("waits for close so piped stdio can drain after exit", async () => {
+    const child = new EventEmitter();
+    child.off = child.removeListener.bind(child);
+
+    const completion = waitForVitestChildCompletion(child);
+    child.emit("exit", 0, null);
+
+    let settled = false;
+    completion.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    child.emit("close", 0, null);
+    await expect(completion).resolves.toEqual({ code: 0, signal: null });
+  });
+
+  it("rejects when the vitest child errors before closing", async () => {
+    const child = new EventEmitter();
+    child.off = child.removeListener.bind(child);
+    const error = new Error("spawn failed");
+
+    const completion = waitForVitestChildCompletion(child);
+    child.emit("error", error);
+
+    await expect(completion).rejects.toBe(error);
+  });
+
+  it("waits for PTY exit events", async () => {
+    let exitListener: ((event: { exitCode: number; signal?: number }) => void) | undefined;
+    const dispose = vi.fn();
+    const pty = {
+      onExit: vi.fn((listener: (event: { exitCode: number; signal?: number }) => void) => {
+        exitListener = listener;
+        return { dispose };
+      }),
+    };
+
+    const completion = waitForVitestPtyCompletion(pty);
+    exitListener?.({ exitCode: 3, signal: 15 });
+
+    await expect(completion).resolves.toEqual({ code: 3, signal: 15 });
+    expect(dispose).toHaveBeenCalledTimes(1);
   });
 });

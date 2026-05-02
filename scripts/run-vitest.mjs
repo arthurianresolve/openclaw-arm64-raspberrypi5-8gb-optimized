@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { EventEmitter } from "node:events";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { resolveLocalVitestEnv } from "./lib/vitest-local-scheduling.mjs";
@@ -10,6 +11,7 @@ import {
 } from "./vitest-process-group.mjs";
 
 const TRUTHY_ENV_VALUES = new Set(["1", "true", "yes", "on"]);
+const FALSY_ENV_VALUES = new Set(["0", "false", "no", "off"]);
 const SUPPRESSED_VITEST_OUTPUT_PATTERNS = ["[PLUGIN_TIMINGS] Warning:"];
 const require = createRequire(import.meta.url);
 
@@ -20,6 +22,16 @@ function isTruthyEnvValue(value) {
 function parsePositiveInt(value) {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function toStringEnv(env = process.env) {
+  const result = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (value !== undefined) {
+      result[key] = String(value);
+    }
+  }
+  return result;
 }
 
 export function resolveVitestNodeArgs(env = process.env) {
@@ -37,6 +49,18 @@ export function resolveVitestCliEntry() {
 
 export function resolveVitestNoOutputTimeoutMs(env = process.env) {
   return parsePositiveInt(env.OPENCLAW_VITEST_NO_OUTPUT_TIMEOUT_MS);
+}
+
+export function shouldUseVitestPty(
+  env = process.env,
+  platform = process.platform,
+  stdioIsTty = process.stdout.isTTY === true && process.stderr.isTTY === true,
+) {
+  const explicit = env.OPENCLAW_VITEST_PTY?.trim().toLowerCase();
+  if (explicit) {
+    return !FALSY_ENV_VALUES.has(explicit);
+  }
+  return platform !== "win32" && stdioIsTty;
 }
 
 export function resolveVitestSpawnParams(env = process.env, platform = process.platform) {
@@ -86,6 +110,33 @@ export function shouldSuppressVitestStderrLine(line) {
   return shouldSuppressVitestOutputLine(line);
 }
 
+function formatVitestOutputForTarget(segment, target) {
+  if (target?.isTTY === true) {
+    return segment;
+  }
+  return segment.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+function extractDelimitedOutputSegment(buffered) {
+  for (let index = 0; index < buffered.length; index += 1) {
+    const char = buffered[index];
+    if (char === "\n") {
+      return {
+        segment: buffered.slice(0, index + 1),
+        rest: buffered.slice(index + 1),
+      };
+    }
+    if (char === "\r") {
+      const nextIndex = buffered[index + 1] === "\n" ? index + 2 : index + 1;
+      return {
+        segment: buffered.slice(0, nextIndex),
+        rest: buffered.slice(nextIndex),
+      };
+    }
+  }
+  return null;
+}
+
 function installVitestOutputActivityMonitor({ stream, shouldSuppressLine, onActivity }) {
   if (!stream) {
     return () => {};
@@ -95,15 +146,20 @@ function installVitestOutputActivityMonitor({ stream, shouldSuppressLine, onActi
   const handleData = (chunk) => {
     buffered += String(chunk);
     while (true) {
-      const newlineIndex = buffered.indexOf("\n");
-      if (newlineIndex === -1) {
+      const extracted = extractDelimitedOutputSegment(buffered);
+      if (!extracted) {
         break;
       }
-      const line = buffered.slice(0, newlineIndex + 1);
-      buffered = buffered.slice(newlineIndex + 1);
-      if (!shouldSuppressLine(line)) {
+      buffered = extracted.rest;
+      if (!shouldSuppressLine(extracted.segment)) {
         onActivity();
       }
+    }
+    if (buffered.length > 0) {
+      if (!shouldSuppressLine(buffered)) {
+        onActivity();
+      }
+      buffered = "";
     }
   };
 
@@ -134,6 +190,107 @@ function spawnVitestProcess({ pnpmArgs, spawnParams }) {
     pnpmArgs,
     ...spawnParams,
   });
+}
+
+export function waitForVitestChildCompletion(child) {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      child.off("error", handleError);
+      child.off("close", handleClose);
+    };
+    const handleError = (error) => {
+      cleanup();
+      reject(error);
+    };
+    const handleClose = (code, signal) => {
+      cleanup();
+      resolve({ code, signal });
+    };
+
+    child.on("error", handleError);
+    child.on("close", handleClose);
+  });
+}
+
+export function waitForVitestPtyCompletion(pty) {
+  return new Promise((resolve) => {
+    const dispose = pty.onExit((event) => {
+      dispose?.dispose?.();
+      resolve({
+        code: event?.exitCode ?? null,
+        signal: event?.signal ?? null,
+      });
+    });
+  });
+}
+
+let ptyModulePromise = null;
+
+async function loadVitestPtySpawn() {
+  ptyModulePromise ??= import("@lydell/node-pty");
+  const module = await ptyModulePromise;
+  return module.spawn ?? module.default?.spawn ?? null;
+}
+
+async function runVitestInPty({ command, args, env, cwd, label, onNoOutputTimeout }) {
+  const spawnPty = await loadVitestPtySpawn();
+  if (!spawnPty) {
+    throw new Error("PTY support is unavailable (node-pty spawn not found).");
+  }
+
+  const pty = spawnPty(command, args, {
+    cwd,
+    env: toStringEnv(env),
+    name: process.env.TERM ?? "xterm-256color",
+    cols: process.stdout.columns ?? 120,
+    rows: process.stdout.rows ?? 30,
+  });
+  const output = new EventEmitter();
+  output.setEncoding = () => {};
+
+  const dataSubscription = pty.onData((chunk) => {
+    output.emit("data", chunk);
+  });
+  const exitSubscription = pty.onExit(() => {
+    output.emit("end");
+  });
+
+  const teardownNoOutputWatchdog = installVitestNoOutputWatchdog({
+    monitoredStreams: [{ stream: output, shouldSuppressLine: shouldSuppressVitestOutputLine }],
+    timeoutMs: resolveVitestNoOutputTimeoutMs(env),
+    label,
+    log: (message) => {
+      console.error(message);
+    },
+    onTimeout: () => {
+      onNoOutputTimeout?.();
+      try {
+        pty.kill("SIGTERM");
+      } catch {
+        // ignore termination errors
+      }
+    },
+    onForceKill: () => {
+      try {
+        pty.kill("SIGKILL");
+      } catch {
+        // ignore termination errors
+      }
+    },
+  });
+  forwardVitestOutput(output, process.stdout, shouldSuppressVitestOutputLine);
+
+  const teardown = () => {
+    teardownNoOutputWatchdog();
+    dataSubscription?.dispose?.();
+    exitSubscription?.dispose?.();
+  };
+
+  return {
+    pty,
+    teardown,
+    completion: waitForVitestPtyCompletion(pty),
+  };
 }
 
 export function installVitestNoOutputWatchdog(params) {
@@ -231,17 +388,25 @@ export function forwardVitestOutput(stream, target, shouldSuppressLine = () => f
   let buffered = "";
   stream.setEncoding("utf8");
   stream.on("data", (chunk) => {
-    buffered += chunk;
+    const text = String(chunk);
+    const sawCarriageReturn = text.includes("\r");
+    buffered += text;
     while (true) {
-      const newlineIndex = buffered.indexOf("\n");
-      if (newlineIndex === -1) {
+      const extracted = extractDelimitedOutputSegment(buffered);
+      if (!extracted) {
         break;
       }
-      const line = buffered.slice(0, newlineIndex + 1);
-      buffered = buffered.slice(newlineIndex + 1);
-      if (!shouldSuppressLine(line)) {
-        target.write(line);
+      buffered = extracted.rest;
+      if (!shouldSuppressLine(extracted.segment)) {
+        target.write(formatVitestOutputForTarget(extracted.segment, target));
       }
+    }
+    if (buffered.length > 0) {
+      if (!shouldSuppressLine(buffered)) {
+        const trailing = sawCarriageReturn && target?.isTTY !== true ? `${buffered}\n` : buffered;
+        target.write(formatVitestOutputForTarget(trailing, target));
+      }
+      buffered = "";
     }
   });
   stream.on("end", () => {
@@ -263,40 +428,45 @@ export function spawnWatchedVitestProcess({
     spawnParams,
   });
   const teardownChildCleanup = installVitestProcessGroupCleanup({ child });
-  const teardownNoOutputWatchdog = installVitestNoOutputWatchdog({
-    monitoredStreams: [
-      {
-        stream: child.stdout,
-        shouldSuppressLine: shouldSuppressVitestOutputLine,
-      },
-      {
-        stream: child.stderr,
-        shouldSuppressLine: shouldSuppressVitestOutputLine,
-      },
-    ],
-    timeoutMs: resolveVitestNoOutputTimeoutMs(env),
-    label,
-    log: (message) => {
-      console.error(message);
-    },
-    onTimeout: () => {
-      onNoOutputTimeout?.();
-      forwardSignalToVitestProcessGroup({
-        child,
-        signal: "SIGTERM",
-        kill: process.kill.bind(process),
-      });
-    },
-    onForceKill: () => {
-      forwardSignalToVitestProcessGroup({
-        child,
-        signal: "SIGKILL",
-        kill: process.kill.bind(process),
-      });
-    },
-  });
-  forwardVitestOutput(child.stdout, process.stdout, shouldSuppressVitestOutputLine);
-  forwardVitestOutput(child.stderr, process.stderr, shouldSuppressVitestOutputLine);
+  const usesPipedOutput = Boolean(child.stdout || child.stderr);
+  const teardownNoOutputWatchdog = usesPipedOutput
+    ? installVitestNoOutputWatchdog({
+        monitoredStreams: [
+          {
+            stream: child.stdout,
+            shouldSuppressLine: shouldSuppressVitestOutputLine,
+          },
+          {
+            stream: child.stderr,
+            shouldSuppressLine: shouldSuppressVitestOutputLine,
+          },
+        ],
+        timeoutMs: resolveVitestNoOutputTimeoutMs(env),
+        label,
+        log: (message) => {
+          console.error(message);
+        },
+        onTimeout: () => {
+          onNoOutputTimeout?.();
+          forwardSignalToVitestProcessGroup({
+            child,
+            signal: "SIGTERM",
+            kill: process.kill.bind(process),
+          });
+        },
+        onForceKill: () => {
+          forwardSignalToVitestProcessGroup({
+            child,
+            signal: "SIGKILL",
+            kill: process.kill.bind(process),
+          });
+        },
+      })
+    : () => {};
+  if (usesPipedOutput) {
+    forwardVitestOutput(child.stdout, process.stdout, shouldSuppressVitestOutputLine);
+    forwardVitestOutput(child.stderr, process.stderr, shouldSuppressVitestOutputLine);
+  }
 
   return {
     child,
@@ -313,27 +483,84 @@ function main(argv = process.argv.slice(2), env = process.env) {
     process.exit(1);
   }
 
+  const pnpmArgs = [
+    "exec",
+    "node",
+    ...resolveVitestNodeArgs(env),
+    resolveVitestCliEntry(),
+    ...argv,
+  ];
+  const directNodeArgs = resolveDirectNodeVitestArgs(pnpmArgs);
+  const label = argv.join(" ");
+
+  if (shouldUseVitestPty(env, process.platform) && directNodeArgs) {
+    runVitestInPty({
+      command: process.execPath,
+      args: directNodeArgs,
+      env,
+      cwd: process.cwd(),
+      label,
+    })
+      .then(async ({ completion, teardown }) => {
+        const { code, signal } = await completion;
+        teardown();
+        process.exitCode = code ?? (signal ? 128 + signal : 1);
+      })
+      .catch((error) => {
+        console.error(
+          `[vitest] PTY startup failed; falling back to inherited stdio: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        const { child, teardown } = spawnWatchedVitestProcess({
+          pnpmArgs,
+          spawnParams: {
+            ...resolveVitestSpawnParams(env),
+            stdio: "inherit",
+          },
+          env,
+          label,
+        });
+        waitForVitestChildCompletion(child)
+          .then(({ code, signal }) => {
+            teardown();
+            if (signal) {
+              process.kill(process.pid, signal);
+              return;
+            }
+            process.exitCode = code ?? 1;
+          })
+          .catch((fallbackError) => {
+            teardown();
+            console.error(fallbackError);
+            process.exitCode = 1;
+          });
+      });
+    return;
+  }
+
   const { child, teardown } = spawnWatchedVitestProcess({
-    pnpmArgs: ["exec", "node", ...resolveVitestNodeArgs(env), resolveVitestCliEntry(), ...argv],
-    spawnParams: resolveVitestSpawnParams(env),
+    pnpmArgs,
+    spawnParams: {
+      ...resolveVitestSpawnParams(env),
+      stdio: "inherit",
+    },
     env,
-    label: argv.join(" "),
+    label,
   });
 
-  child.on("exit", (code, signal) => {
-    teardown();
-    if (signal) {
-      process.kill(process.pid, signal);
-      return;
-    }
-    process.exit(code ?? 1);
-  });
-
-  child.on("error", (error) => {
-    teardown();
-    console.error(error);
-    process.exit(1);
-  });
+  waitForVitestChildCompletion(child)
+    .then(({ code, signal }) => {
+      teardown();
+      if (signal) {
+        process.kill(process.pid, signal);
+        return;
+      }
+      process.exitCode = code ?? 1;
+    })
+    .catch((error) => {
+      teardown();
+      console.error(error);
+      process.exitCode = 1;
+    });
 }
 
 if (import.meta.main) {

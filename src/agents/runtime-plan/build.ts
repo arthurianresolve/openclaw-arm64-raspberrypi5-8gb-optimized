@@ -12,9 +12,14 @@ import {
 import { resolvePreparedExtraParams } from "../pi-embedded-runner/extra-params.js";
 import { classifyEmbeddedPiRunResultForModelFallback } from "../pi-embedded-runner/result-fallback-classifier.js";
 import {
+  renderRunPromptProfileGuidance,
+  type RunPromptProfile,
+} from "../pi-embedded-runner/run/prompt-profile.js";
+import {
   logProviderToolSchemaDiagnostics,
   normalizeProviderToolSchemas,
 } from "../pi-embedded-runner/tool-schema-runtime.js";
+import type { ProviderSystemPromptContribution } from "../system-prompt-contribution.js";
 import { resolveTranscriptPolicy } from "../transcript-policy.js";
 import { buildAgentRuntimeAuthPlan } from "./auth.js";
 import type {
@@ -23,6 +28,7 @@ import type {
   AgentRuntimePlan,
   BuildAgentRuntimeDeliveryPlanParams,
   BuildAgentRuntimePlanParams,
+  AgentRuntimePromptProfile,
 } from "./types.js";
 
 function formatResolvedRef(params: { provider: string; modelId: string }): string {
@@ -47,6 +53,46 @@ function asProviderRuntimeModel(
 
 function asThinkLevel(value: BuildAgentRuntimePlanParams["thinkingLevel"]): ThinkLevel | undefined {
   return value !== undefined ? (value as ThinkLevel) : undefined;
+}
+
+function mergeSystemPromptContributions(
+  first?: ProviderSystemPromptContribution,
+  second?: ProviderSystemPromptContribution,
+): ProviderSystemPromptContribution | undefined {
+  if (!first) {
+    return second;
+  }
+  if (!second) {
+    return first;
+  }
+  const mergedSectionOverrides: NonNullable<ProviderSystemPromptContribution["sectionOverrides"]> =
+    {
+      ...(first.sectionOverrides ?? {}),
+      ...(second.sectionOverrides ?? {}),
+    };
+  return {
+    stablePrefix:
+      [first.stablePrefix, second.stablePrefix].filter(Boolean).join("\n\n") || undefined,
+    dynamicSuffix:
+      [first.dynamicSuffix, second.dynamicSuffix].filter(Boolean).join("\n\n") || undefined,
+    sectionOverrides:
+      Object.keys(mergedSectionOverrides).length > 0 ? mergedSectionOverrides : undefined,
+  };
+}
+
+function resolveRuntimePromptProfileContribution(
+  profile: AgentRuntimePromptProfile | undefined,
+): ProviderSystemPromptContribution | undefined {
+  if (!profile || profile === "default") {
+    return undefined;
+  }
+  const guidance = renderRunPromptProfileGuidance(profile as RunPromptProfile);
+  if (!guidance) {
+    return undefined;
+  }
+  return {
+    stablePrefix: guidance,
+  };
 }
 
 export function buildAgentRuntimeDeliveryPlan(
@@ -163,7 +209,7 @@ export function buildAgentRuntimePlan(params: BuildAgentRuntimePlanParams): Agen
       provider: params.provider,
       modelId: params.modelId,
       resolveSystemPromptContribution(context) {
-        return resolveProviderSystemPromptContribution({
+        const providerContribution = resolveProviderSystemPromptContribution({
           provider: params.provider,
           config,
           workspaceDir: context.workspaceDir ?? params.workspaceDir,
@@ -172,6 +218,10 @@ export function buildAgentRuntimePlan(params: BuildAgentRuntimePlanParams): Agen
             config: asOpenClawConfig(context.config),
           },
         });
+        const profileContribution = resolveRuntimePromptProfileContribution(
+          context.promptProfile ?? params.promptProfile,
+        );
+        return mergeSystemPromptContributions(profileContribution, providerContribution);
       },
     },
     tools: {

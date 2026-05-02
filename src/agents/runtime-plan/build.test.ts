@@ -116,4 +116,36 @@ describe("AgentRuntimePlan", () => {
     expect(normalized[0]?.name).toBe("ping");
     expect(normalized[0]?.parameters).toBeTypeOf("object");
   });
+
+  it("prepends delegated prompt-profile guidance without changing the default path", () => {
+    const plan = buildAgentRuntimePlan({
+      provider: "openai",
+      modelId: "gpt-5.4",
+      modelApi: "openai-responses",
+      config: {},
+      workspaceDir: "/tmp/openclaw-runtime-plan",
+      promptProfile: "explore",
+      model: {
+        id: "gpt-5.4",
+        name: "GPT-5.4",
+        api: "openai-responses",
+        provider: "openai",
+        baseUrl: "https://api.openai.com/v1",
+        reasoning: true,
+        input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 200_000,
+        maxTokens: 8_192,
+      },
+    });
+
+    const contribution = plan.prompt.resolveSystemPromptContribution({
+      provider: "openai",
+      modelId: "gpt-5.4",
+      promptMode: "minimal",
+    });
+
+    expect(contribution?.stablePrefix).toContain("Delegated Profile: Explore");
+    expect(contribution?.stablePrefix).toContain("<persona_latch>");
+  });
 });

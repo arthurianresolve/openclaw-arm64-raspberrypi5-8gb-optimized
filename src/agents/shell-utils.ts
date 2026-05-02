@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { stripAnsi } from "../terminal/ansi.js";
 
 export function resolvePowerShellPath(): string {
   // Prefer PowerShell 7 when available; PS 5.1 lacks "&&" support.
@@ -163,7 +164,7 @@ export function detectRuntimeShell(): string | undefined {
 }
 
 export function sanitizeBinaryOutput(text: string): string {
-  const scrubbed = text.replace(/[\p{Format}\p{Surrogate}]/gu, "");
+  const scrubbed = stripAnsi(text).replace(/[\p{Format}\p{Surrogate}]/gu, "");
   if (!scrubbed) {
     return scrubbed;
   }

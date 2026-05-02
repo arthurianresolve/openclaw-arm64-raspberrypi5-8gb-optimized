@@ -4,6 +4,9 @@ import { buildCompactionSummarizationInstructions } from "./compaction.js";
 describe("compaction identifier policy", () => {
   it("defaults to strict identifier preservation", () => {
     const built = buildCompactionSummarizationInstructions();
+    expect(built).toContain("RESUME STATE:");
+    expect(built).toContain("Current task");
+    expect(built).toContain("Next step");
     expect(built).toContain("Preserve all opaque identifiers exactly as written");
     expect(built).toContain("UUIDs");
     expect(built).not.toContain("tokens");
@@ -14,7 +17,8 @@ describe("compaction identifier policy", () => {
     const built = buildCompactionSummarizationInstructions(undefined, {
       identifierPolicy: "off",
     });
-    expect(built).toBeUndefined();
+    expect(built).toContain("RESUME STATE:");
+    expect(built).not.toContain("Preserve all opaque identifiers exactly as written");
   });
 
   it("supports custom identifier instructions", () => {
@@ -39,6 +43,8 @@ describe("compaction identifier policy", () => {
     const built = buildCompactionSummarizationInstructions("Track release blockers.", {
       identifierPolicy: "off",
     });
-    expect(built).toBe("Additional focus:\nTrack release blockers.");
+    expect(built).toContain("RESUME STATE:");
+    expect(built).not.toContain("Preserve all opaque identifiers exactly as written");
+    expect(built).toContain("Additional focus:\nTrack release blockers.");
   });
 });

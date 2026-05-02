@@ -1,8 +1,11 @@
 #!/usr/bin/env -S node --import tsx
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildCompactionSummarizationInstructions } from "../src/agents/compaction.js";
+import { buildAgentSystemPrompt } from "../src/agents/system-prompt.js";
 import {
   analyzePromptCorpus,
+  analyzePromptCorpusText,
   fetchExternalPromptCorpus,
 } from "../src/infra/prompt-corpus-analysis.js";
 
@@ -65,6 +68,34 @@ function resolveDefaultRepoRoot() {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 }
 
+function buildOpenClawAnalysisSamples(repoRoot: string) {
+  const fullPrompt = buildAgentSystemPrompt({
+    workspaceDir: repoRoot,
+  });
+  const minimalPrompt = buildAgentSystemPrompt({
+    workspaceDir: repoRoot,
+    promptMode: "minimal",
+  });
+  const compactionPrompt = buildCompactionSummarizationInstructions() ?? "";
+  return [
+    {
+      path: "openclaw/system-prompt/full",
+      status: "analyzed" as const,
+      analysis: analyzePromptCorpusText(fullPrompt),
+    },
+    {
+      path: "openclaw/system-prompt/minimal",
+      status: "analyzed" as const,
+      analysis: analyzePromptCorpusText(minimalPrompt),
+    },
+    {
+      path: "openclaw/compaction/resume-state",
+      status: "analyzed" as const,
+      analysis: analyzePromptCorpusText(compactionPrompt),
+    },
+  ];
+}
+
 function renderFetchSummary(summary: Awaited<ReturnType<typeof fetchExternalPromptCorpus>>) {
   const lines = [
     `Prompt corpus manifest: ${summary.manifest.id}`,
@@ -118,6 +149,7 @@ async function main() {
     repoRoot,
     manifestPath: options.manifest,
     cacheRoot: options.cacheRoot,
+    openclawSamples: buildOpenClawAnalysisSamples(repoRoot),
   });
   process.stdout.write(
     options.json ? `${JSON.stringify(summary, null, 2)}\n` : renderAnalysisSummary(summary),

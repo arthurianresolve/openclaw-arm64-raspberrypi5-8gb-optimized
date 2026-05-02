@@ -17,6 +17,7 @@ import {
   resolveVitestNodeArgs,
   resolveVitestSpawnParams,
   spawnWatchedVitestProcess,
+  waitForVitestChildCompletion,
 } from "./run-vitest.mjs";
 import {
   applyDefaultMultiSpecVitestCachePaths,
@@ -137,17 +138,17 @@ function runVitestSpec(spec) {
       },
     });
 
-    child.on("exit", (code, signal) => {
-      teardown();
-      cleanupVitestRunSpec(spec);
-      resolve({ code: code ?? (signal ? 143 : 1), noOutputTimedOut, signal });
-    });
-
-    child.on("error", (error) => {
-      teardown();
-      cleanupVitestRunSpec(spec);
-      reject(error);
-    });
+    waitForVitestChildCompletion(child)
+      .then(({ code, signal }) => {
+        teardown();
+        cleanupVitestRunSpec(spec);
+        resolve({ code: code ?? (signal ? 143 : 1), noOutputTimedOut, signal });
+      })
+      .catch((error) => {
+        teardown();
+        cleanupVitestRunSpec(spec);
+        reject(error);
+      });
   });
 }
 

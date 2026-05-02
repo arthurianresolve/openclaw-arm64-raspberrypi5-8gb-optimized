@@ -1,0 +1,33 @@
+{
+  "id": "piebald-claude-code-system-prompts",
+  "repo": "Piebald-AI/claude-code-system-prompts",
+  "license": "GPL-3.0",
+  "usage": "eval-only",
+  "pinnedCommit": "15a5ca29921ee3fb49e930eb9878a19b7f8932fc",
+  "files": [
+    {
+      "path": "README.md",
+      "reason": "corpus index and version metadata"
+    },
+    {
+      "path": "system-prompts/agent-prompt-explore.md",
+      "reason": "read-only exploration profile comparison"
+    },
+    {
+      "path": "system-prompts/agent-prompt-plan-mode-enhanced.md",
+      "reason": "planning profile comparison"
+    },
+    {
+      "path": "system-prompts/system-prompt-partial-compaction-instructions.md",
+      "reason": "compaction resume-state comparison"
+    },
+    {
+      "path": "system-prompts/data-prompt-caching-design-optimization.md",
+      "reason": "cache-stability comparison"
+    },
+    {
+      "path": "system-prompts/agent-prompt-conversation-summarization.md",
+      "reason": "summary-quality comparison"
+    }
+  ]
+}

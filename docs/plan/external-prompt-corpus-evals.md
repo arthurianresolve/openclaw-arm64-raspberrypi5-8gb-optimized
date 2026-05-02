@@ -36,7 +36,7 @@ OpenClaw should not:
 
 ## Why this RFC exists
 
-The repository `x1xhlol/system-prompts-and-models-of-ai-tools` is useful as a
+The repository `Piebald-AI/claude-code-system-prompts` is useful as a
 large cross-tool prompt corpus, but it is not a reusable runtime library. Its
 main value is as adversarial and comparative reference material.
 
@@ -126,14 +126,14 @@ Add a manifest that describes what is allowed to be fetched and why.
 
 Suggested path:
 
-`qa/external-corpora/system-prompts-and-models-of-ai-tools.manifest.json`
+`qa/external-corpora/piebald-claude-code-system-prompts.manifest.json`
 
 Suggested shape:
 
 ```json
 {
-  "id": "system-prompts-and-models-of-ai-tools",
-  "repo": "x1xhlol/system-prompts-and-models-of-ai-tools",
+  "id": "piebald-claude-code-system-prompts",
+  "repo": "Piebald-AI/claude-code-system-prompts",
   "license": "GPL-3.0",
   "usage": "eval-only",
   "pinnedCommit": "<sha>",
@@ -165,6 +165,7 @@ Add a script that:
 Suggested paths:
 
 - `scripts/fetch-external-prompt-corpus.mjs`
+- `scripts/qa-prompt-corpus.ts`
 - `qa/.cache/external-corpora/`
 
 The fetch tool must fail closed:
@@ -219,10 +220,11 @@ Proposed minimal layout:
 
 ```text
 docs/plan/external-prompt-corpus-evals.md
-qa/external-corpora/system-prompts-and-models-of-ai-tools.manifest.json
+qa/external-corpora/piebald-claude-code-system-prompts.manifest.json
 qa/prompt-evals/extraction-scenarios/
 qa/prompt-evals/shape-benchmarks/
 scripts/fetch-external-prompt-corpus.mjs
+scripts/qa-prompt-corpus.ts
 src/infra/prompt-corpus-analysis.ts
 src/infra/prompt-corpus-analysis.test.ts
 ```

@@ -112,6 +112,14 @@ explicitly, while the Matrix CLI and manual workflow input default remain
 `e2ee-deep`, and `e2ee-cli` jobs. `OpenClaw Release Checks` runs parity plus
 the fast Matrix and Telegram lanes before release approval.
 
+Workflow action bumps are reviewed as behavior changes, not just version bumps:
+`openai/codex-action` updates can tighten bot eligibility for the maintainer
+agent jobs, while `pnpm/action-setup` only changes the bundled pnpm when a
+workflow does not pin `version` itself. In this repo, the reusable release
+workflows pass `version: ${{ env.PNPM_VERSION }}` and `package.json` already
+pins `pnpm@10.33.0`, so the bundled pnpm version does not change the normal
+install/runtime path.
+
 - `pnpm openclaw qa suite`
   - Runs repo-backed QA scenarios directly on the host.
   - Runs multiple selected scenarios in parallel by default with isolated

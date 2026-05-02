@@ -55,6 +55,10 @@ It does not replace:
   should stay observable and configurable without collapsing into the next.
 - Make trust explicit. Synthetic, fallback, or replay-derived events should not
   look user-authored.
+- Treat third-party GitHub Actions as part of the trust boundary. Version bumps
+  can change bot eligibility rules or bundled tool behavior, so review them
+  against the job's ownership and execution model rather than treating them as
+  cosmetic dependency updates.
 - Preserve replay and inspection. Session state should be durable, serialized,
   and understandable after the fact.
 - Prefer explicit blocked or failed states over silent plan-only completion.

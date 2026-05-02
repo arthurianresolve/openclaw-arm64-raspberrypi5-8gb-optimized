@@ -267,7 +267,9 @@ describe("scripts/run-vitest", () => {
   });
 
   it("forwards carriage-return reporter updates immediately", () => {
-    const stdout = new EventEmitter();
+    const stdout = new EventEmitter() as EventEmitter & {
+      setEncoding: (encoding: BufferEncoding) => void;
+    };
     stdout.setEncoding = vi.fn();
     const target = {
       isTTY: false,

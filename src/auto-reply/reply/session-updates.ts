@@ -99,6 +99,16 @@ function resolvePositiveTokenCount(value: number | undefined): number | undefine
     : undefined;
 }
 
+export function hydrateResolvedSkills(
+  snapshot: NonNullable<SessionEntry["skillsSnapshot"]>,
+  rebuild: () => NonNullable<SessionEntry["skillsSnapshot"]>,
+): NonNullable<SessionEntry["skillsSnapshot"]> {
+  if (snapshot.resolvedSkills) {
+    return snapshot;
+  }
+  return { ...snapshot, resolvedSkills: rebuild().resolvedSkills };
+}
+
 export async function ensureSkillSnapshot(params: {
   sessionEntry?: SessionEntry;
   sessionStore?: Record<string, SessionEntry>;
@@ -185,11 +195,12 @@ export async function ensureSkillSnapshot(params: {
   const hasFreshSnapshotInEntry =
     Boolean(nextEntry?.skillsSnapshot) &&
     (nextEntry?.skillsSnapshot !== existingSnapshot || !shouldRefreshSnapshot);
-  const skillsSnapshot = hasFreshSnapshotInEntry
-    ? nextEntry?.skillsSnapshot
-    : shouldRefreshSnapshot || !nextEntry?.skillsSnapshot
-      ? buildSnapshot()
-      : nextEntry.skillsSnapshot;
+  const skillsSnapshot =
+    hasFreshSnapshotInEntry && nextEntry?.skillsSnapshot
+      ? hydrateResolvedSkills(nextEntry.skillsSnapshot, buildSnapshot)
+      : shouldRefreshSnapshot || !nextEntry?.skillsSnapshot
+        ? buildSnapshot()
+        : hydrateResolvedSkills(nextEntry.skillsSnapshot, buildSnapshot);
   if (
     skillsSnapshot &&
     sessionStore &&

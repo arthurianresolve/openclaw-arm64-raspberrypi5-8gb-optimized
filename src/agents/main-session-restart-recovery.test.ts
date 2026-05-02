@@ -44,9 +44,9 @@ async function writeTranscript(
   await fs.writeFile(path.join(sessionsDir, `${sessionId}.jsonl`), `${lines}\n`);
 }
 
-function cleanedLock(sessionsDir: string, sessionId: string): SessionLockInspection {
+function cleanedLockForPath(lockPath: string): SessionLockInspection {
   return {
-    lockPath: path.join(sessionsDir, `${sessionId}.jsonl.lock`),
+    lockPath,
     pid: 999_999,
     pidAlive: false,
     createdAt: new Date(Date.now() - 1_000).toISOString(),
@@ -55,6 +55,10 @@ function cleanedLock(sessionsDir: string, sessionId: string): SessionLockInspect
     staleReasons: ["dead-pid"],
     removed: true,
   };
+}
+
+function cleanedLock(sessionsDir: string, sessionId: string): SessionLockInspection {
+  return cleanedLockForPath(path.join(sessionsDir, `${sessionId}.jsonl.lock`));
 }
 
 describe("main-session-restart-recovery", () => {
@@ -92,6 +96,29 @@ describe("main-session-restart-recovery", () => {
     expect(store["agent:main:main"]?.abortedLastRun).toBe(true);
     expect(store["agent:main:subagent:child"]?.abortedLastRun).toBeUndefined();
     expect(store["agent:main:other"]?.abortedLastRun).toBeUndefined();
+  });
+
+  it("marks main sessions whose transcript lock uses a topic-suffixed session file", async () => {
+    const sessionsDir = await makeSessionsDir();
+    const sessionId = "main-session";
+    const sessionFile = `${sessionId}-topic-1234567890.jsonl`;
+    await writeStore(sessionsDir, {
+      "agent:main:discord:channel:123:thread:1234567890": {
+        sessionId,
+        sessionFile,
+        updatedAt: Date.now() - 10_000,
+        status: "running",
+      },
+    });
+
+    const result = await markRestartAbortedMainSessionsFromLocks({
+      sessionsDir,
+      cleanedLocks: [cleanedLockForPath(path.join(sessionsDir, `${sessionFile}.lock`))],
+    });
+
+    const store = loadSessionStore(path.join(sessionsDir, "sessions.json"));
+    expect(result).toEqual({ marked: 1, skipped: 0 });
+    expect(store["agent:main:discord:channel:123:thread:1234567890"]?.abortedLastRun).toBe(true);
   });
 
   it("resumes marked sessions with a tool-result transcript tail", async () => {

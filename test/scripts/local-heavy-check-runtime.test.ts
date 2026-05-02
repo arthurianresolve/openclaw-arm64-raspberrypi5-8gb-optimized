@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   acquireLocalHeavyCheckLockSync,
   applyLocalOxlintPolicy,
@@ -352,6 +352,82 @@ describe("local-heavy-check-runtime", () => {
 
     release();
     expect(fs.existsSync(lockDir)).toBe(false);
+  });
+
+  it("reclaims stale local heavy-check locks when process lookup is denied", () => {
+    const cwd = createTempDir("openclaw-local-heavy-check-eperm-");
+    const commonDir = path.join(cwd, ".git");
+    const lockDir = path.join(commonDir, "openclaw-local-checks", "heavy-check.lock");
+    fs.mkdirSync(lockDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(lockDir, "owner.json"),
+      `${JSON.stringify({
+        pid: 123_456,
+        tool: "tsgo",
+        cwd,
+      })}\n`,
+      "utf8",
+    );
+
+    const killSpy = vi.spyOn(process, "kill").mockImplementation((pid) => {
+      if (pid === 123_456) {
+        const error = new Error("permission denied") as NodeJS.ErrnoException;
+        error.code = "EPERM";
+        throw error;
+      }
+      return true;
+    });
+
+    try {
+      const release = acquireLocalHeavyCheckLockSync({
+        cwd,
+        env: makeEnv(),
+        toolName: "oxlint",
+      });
+
+      expect(killSpy).toHaveBeenCalledWith(123_456, 0);
+      const owner = JSON.parse(fs.readFileSync(path.join(lockDir, "owner.json"), "utf8"));
+      expect(owner.pid).toBe(process.pid);
+
+      release();
+      expect(fs.existsSync(lockDir)).toBe(false);
+    } finally {
+      killSpy.mockRestore();
+    }
+  });
+
+  it("logs stale lock reclamation when a dead pid is detected", () => {
+    const cwd = createTempDir("openclaw-local-heavy-check-reclaim-log-");
+    const commonDir = path.join(cwd, ".git");
+    const lockDir = path.join(commonDir, "openclaw-local-checks", "heavy-check.lock");
+    fs.mkdirSync(lockDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(lockDir, "owner.json"),
+      `${JSON.stringify({
+        pid: 999_999_998,
+        tool: "tsgo",
+        cwd,
+      })}\n`,
+      "utf8",
+    );
+
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const release = acquireLocalHeavyCheckLockSync({
+        cwd,
+        env: makeEnv(),
+        toolName: "oxlint",
+      });
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[oxlint] reclaimed stale local heavy-check lock at"),
+      );
+
+      release();
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it("cleans up stale legacy test locks when acquiring the shared heavy-check lock", () => {

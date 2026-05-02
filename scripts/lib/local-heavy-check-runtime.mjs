@@ -233,6 +233,12 @@ export function acquireLocalHeavyCheckLockSync(params) {
 
       const owner = readOwnerFile(ownerPath);
       if (shouldReclaimLock({ owner, lockDir, staleLockMs })) {
+        const ownerLabel = describeOwner(owner);
+        console.error(
+          `[${params.toolName}] reclaimed stale local heavy-check lock at ${lockDir}${
+            ownerLabel ? ` (${ownerLabel})` : ""
+          }`,
+        );
         fs.rmSync(lockDir, { recursive: true, force: true });
         continue;
       }
@@ -375,7 +381,7 @@ function isProcessAlive(pid) {
     process.kill(pid, 0);
     return true;
   } catch (error) {
-    return Boolean(error && typeof error === "object" && "code" in error && error.code === "EPERM");
+    return false;
   }
 }
 

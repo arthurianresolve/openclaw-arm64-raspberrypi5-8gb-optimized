@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Skill } from "../../agents/skills/skill-contract.js";
 
 const {
   buildWorkspaceSkillSnapshotMock,
@@ -55,7 +56,7 @@ vi.mock("../../routing/session-key.js", () => ({
   resolveAgentIdFromSessionKey: resolveAgentIdFromSessionKeyMock,
 }));
 
-const { ensureSkillSnapshot } = await import("./session-updates.js");
+const { ensureSkillSnapshot, hydrateResolvedSkills } = await import("./session-updates.js");
 
 describe("ensureSkillSnapshot", () => {
   beforeEach(() => {
@@ -104,5 +105,50 @@ describe("ensureSkillSnapshot", () => {
       expect.objectContaining({ agentId: "writer" }),
     );
     expect(resolveAgentIdFromSessionKeyMock).not.toHaveBeenCalled();
+  });
+
+  it("rehydrates stripped resolvedSkills snapshots without changing persisted fields", () => {
+    const persistedSnapshot = {
+      prompt: "persisted prompt",
+      skills: [{ name: "cli-skill" }],
+      skillFilter: ["cli-skill"],
+      version: 7,
+    };
+    const rebuiltSkills: Skill[] = [
+      {
+        name: "cli-skill",
+        description: "CLI skill",
+        filePath: "/tmp/workspace/skills/cli-skill/SKILL.md",
+        baseDir: "/tmp/workspace/skills/cli-skill",
+        source: "workspace",
+        sourceInfo: {
+          path: "/tmp/workspace/skills/cli-skill/SKILL.md",
+          source: "workspace",
+          scope: "project",
+          origin: "top-level",
+          baseDir: "/tmp/workspace/skills/cli-skill",
+        },
+        disableModelInvocation: false,
+      },
+    ];
+    let buildCalls = 0;
+    const result = hydrateResolvedSkills(persistedSnapshot, () => {
+      buildCalls += 1;
+      return {
+        prompt: "rebuilt prompt",
+        skills: [{ name: "different" }],
+        resolvedSkills: rebuiltSkills,
+        version: 99,
+      };
+    });
+
+    expect(buildCalls).toBe(1);
+    expect(result).toMatchObject({
+      prompt: "persisted prompt",
+      skills: [{ name: "cli-skill" }],
+      skillFilter: ["cli-skill"],
+      version: 7,
+      resolvedSkills: rebuiltSkills,
+    });
   });
 });

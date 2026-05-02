@@ -738,6 +738,7 @@ jobs:
   label-issues:
     permissions:
       issues: write
+    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/create-github-app-token@v3

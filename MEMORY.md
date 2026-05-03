@@ -16,7 +16,7 @@ Updated: 2026-05-03
 - Treat third-party GitHub Actions as trust-boundary dependencies. Review action bumps for behavior changes, not just version numbers.
 - Use clean-room spec-first workflow ideas from `warpdotdev/warp` only as process influence. Do not import Warp implementation code, command-signature bundles, UI code, or verbatim skill text.
 - For substantial or ambiguous work, prefer repo-local spec skills: `$excaliclaw-product-spec` for `PRODUCT.md`, `$excaliclaw-tech-spec` for `TECH.md`, and `$excaliclaw-spec-driven-implementation` to decide whether the overhead is warranted.
-- Treat `blakecrosley.com/guides` as a clean-room review vocabulary source only. Adopt agent harness, media prompt, iOS boundary, and retrieval evaluation ideas only when they map to OpenClaw owner paths and validation artifacts.
+- Treat `blakecrosley.com/guides` as a clean-room review vocabulary source only. Adopt agent harness, media prompt, iOS boundary, retrieval evaluation, and learning-path sequencing ideas only when they map to OpenClaw owner paths and validation artifacts.
 
 ## Validation
 
@@ -55,6 +55,7 @@ Updated: 2026-05-03
 - Added `docs/concepts/agentic-architecture.md` and docs nav entry. The page captures orchestration, context, harnesses, advanced feature engineering, command and prompt adoption, debugging, validation, upstream/downstream port review, external references considered, and agentic pattern applicability.
 - Added clean-room spec workflow skills inspired by Warp's public repository process, adapted to excaliclaw and tied to the existing agentic change record.
 - Added an Excaliclaw agent harness review skill and iOS scoped agent guidance after reviewing Blake Crosley's public guide set. Runtime retrieval changes remain deferred until benchmarked in a dedicated spec.
+- Added role-based OpenClaw learning paths after reviewing the Learning Paths section of Blake Crosley's public guide page. The adopted pattern is documentation sequencing only; the external page remains a design influence, not an implementation or prose source.
 - PR #22 (Gradle wrapper bump) was merged after fixing maintainer automation skips for Dependabot PRs. The durable fix was committed on `master` because `pull_request_target` uses the base-branch workflow files.
 - PR #23 (actions group bump) was merged; it updated `openai/codex-action` to `v1.8` and `pnpm/action-setup` to `v6.0.3`. The `codex-action` change was behavior-relevant, while the pnpm action bump was effectively pinned away by the repo's explicit pnpm versioning.
 - Documentation now records the trust-boundary impact of workflow-action bumps in `docs/concepts/agentic-architecture.md` and `docs/help/testing.md`.

@@ -139,6 +139,7 @@ Telegraph style. Root rules only. Read scoped `AGENTS.md` before subtree work.
 ## Docs / Changelog
 
 - Docs change with behavior/API. Use docs list/read_when hints; docs links per `docs/AGENTS.md`.
+- Learning-path docs should sequence existing OpenClaw pages for a role or task. Keep them clean-room, generic, and root-relative; do not copy third-party guide text or vendor claims.
 - Changelog user-facing only; pure test/internal usually no entry.
 - Changelog placement: active version `### Changes`/`### Fixes`; every added entry must include at least one `Thanks @author` attribution, using credited GitHub username(s). Never add `Thanks @codex`, `Thanks @openclaw`, or `Thanks @steipete`.
 - Changelog bullets are always single-line. No wrapping/continuation across multiple lines. Long entries stay on one long line so dedupe, PR-ref, and credit-audit tooling work and so the visual style stays uniform.

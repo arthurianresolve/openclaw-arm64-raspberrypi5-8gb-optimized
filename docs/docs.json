@@ -965,6 +965,7 @@
                 "group": "First steps",
                 "pages": [
                   "start/getting-started",
+                  "start/learning-paths",
                   "start/onboarding-overview",
                   "start/wizard",
                   "start/onboarding"

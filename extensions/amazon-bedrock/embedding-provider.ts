@@ -223,35 +223,53 @@ function buildCohereBody(
 // Response parsers
 // ---------------------------------------------------------------------------
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function asNumberArray(value: unknown): number[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is number => typeof item === "number")
+    : [];
+}
+
+function asNumberArrayBatch(value: unknown): number[][] {
+  return Array.isArray(value) ? value.map(asNumberArray).filter((item) => item.length > 0) : [];
+}
+
 function parseSingle(family: Family, raw: string): number[] {
-  const data = JSON.parse(raw);
+  const data = JSON.parse(raw) as Record<string, unknown>;
   switch (family) {
-    case "nova":
-      return data.embeddings?.[0]?.embedding ?? [];
+    case "nova": {
+      const embeddings = Array.isArray(data.embeddings) ? data.embeddings : [];
+      const first = embeddings[0];
+      return isRecord(first) ? asNumberArray(first.embedding) : [];
+    }
     case "twelvelabs": {
       if (Array.isArray(data.data)) {
-        return data.data[0]?.embedding ?? [];
+        const first = data.data[0];
+        return isRecord(first) ? asNumberArray(first.embedding) : [];
       }
-      if (Array.isArray(data.data?.embedding)) {
-        return data.data.embedding;
+      if (isRecord(data.data) && Array.isArray(data.data.embedding)) {
+        return asNumberArray(data.data.embedding);
       }
-      return data.embedding ?? [];
+      return asNumberArray(data.embedding);
     }
     default:
-      return data.embedding ?? [];
+      return asNumberArray(data.embedding);
   }
 }
 
 function parseCohereBatch(family: Family, raw: string): number[][] {
-  const data = JSON.parse(raw);
+  const data = JSON.parse(raw) as Record<string, unknown>;
   const embeddings = data.embeddings;
   if (!embeddings) {
     return [];
   }
   if (family === "cohere-v4" && !Array.isArray(embeddings)) {
-    return embeddings.float ?? [];
+    return isRecord(embeddings) ? asNumberArrayBatch(embeddings.float) : [];
   }
-  return embeddings;
+  return asNumberArrayBatch(embeddings);
 }
 
 // ---------------------------------------------------------------------------

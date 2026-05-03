@@ -314,7 +314,7 @@ async function readFileProviderPayload(params: {
       if (params.providerConfig.mode === "singleValue") {
         return text.replace(/\r?\n$/, "");
       }
-      const parsed = JSON.parse(text) as unknown;
+      const parsed = JSON.parse(text);
       if (!isRecord(parsed)) {
         throw new Error(`File provider "${params.providerName}" payload is not a JSON object.`);
       }
@@ -571,13 +571,13 @@ function parseExecValues(params: {
   let parsed: unknown;
   if (!params.jsonOnly && params.ids.length === 1) {
     try {
-      parsed = JSON.parse(trimmed) as unknown;
+      parsed = JSON.parse(trimmed);
     } catch {
       return { [params.ids[0]]: trimmed };
     }
   } else {
     try {
-      parsed = JSON.parse(trimmed) as unknown;
+      parsed = JSON.parse(trimmed);
     } catch {
       throw providerResolutionError({
         source: "exec",

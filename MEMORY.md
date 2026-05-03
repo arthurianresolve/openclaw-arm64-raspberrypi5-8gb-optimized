@@ -17,10 +17,12 @@ Updated: 2026-05-03
 - Use clean-room spec-first workflow ideas from `warpdotdev/warp` only as process influence. Do not import Warp implementation code, command-signature bundles, UI code, or verbatim skill text.
 - For substantial or ambiguous work, prefer repo-local spec skills: `$excaliclaw-product-spec` for `PRODUCT.md`, `$excaliclaw-tech-spec` for `TECH.md`, and `$excaliclaw-spec-driven-implementation` to decide whether the overhead is warranted.
 - Treat `blakecrosley.com/guides` as a clean-room review vocabulary source only. Adopt agent harness, media prompt, iOS boundary, retrieval evaluation, and learning-path sequencing ideas only when they map to OpenClaw owner paths and validation artifacts.
+- Use `@total-typescript/ts-reset` narrowly for internal production type safety only. Excaliclaw enables the JSON.parse and fetch Response.json rules through `internal-types/ts-reset.d.ts`; do not import the full reset bundle, force test-fixture churn, or leak reset globals into published plugin SDK declarations without API drift proof.
 
 ## Validation
 
 - On the Raspberry Pi 8 GB / Raspberry Pi OS Trixie host, run heavy checks sequentially.
+- For `oxlint` on the Raspberry Pi 5 8 GB host, use the shard runner's sequential file-chunking path with the 4 GB Node heap cap. Treat that tuning as arm64/Raspberry Pi 5 8 GB specific unless a later benchmark proves it safe to widen.
 - Do not run multiple independent `pnpm test` or `tsgo` jobs in parallel in one worktree.
 - Default strict compile proof:
   - `OPENCLAW_TSGO_HEAVY_CHECK_LOCK_HELD=1 pnpm tsgo:core`
@@ -56,6 +58,7 @@ Updated: 2026-05-03
 - Added clean-room spec workflow skills inspired by Warp's public repository process, adapted to excaliclaw and tied to the existing agentic change record.
 - Added an Excaliclaw agent harness review skill and iOS scoped agent guidance after reviewing Blake Crosley's public guide set. Runtime retrieval changes remain deferred until benchmarked in a dedicated spec.
 - Added role-based OpenClaw learning paths after reviewing the Learning Paths section of Blake Crosley's public guide page. The adopted pattern is documentation sequencing only; the external page remains a design influence, not an implementation or prose source.
+- Added a scoped `ts-reset` integration for safer JSON boundaries. Validation must include strict tsgo lanes plus plugin SDK declaration drift checks because global declaration packages can affect public type surfaces.
 - PR #22 (Gradle wrapper bump) was merged after fixing maintainer automation skips for Dependabot PRs. The durable fix was committed on `master` because `pull_request_target` uses the base-branch workflow files.
 - PR #23 (actions group bump) was merged; it updated `openai/codex-action` to `v1.8` and `pnpm/action-setup` to `v6.0.3`. The `codex-action` change was behavior-relevant, while the pnpm action bump was effectively pinned away by the repo's explicit pnpm versioning.
 - Documentation now records the trust-boundary impact of workflow-action bumps in `docs/concepts/agentic-architecture.md` and `docs/help/testing.md`.

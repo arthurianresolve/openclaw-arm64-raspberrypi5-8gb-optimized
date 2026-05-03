@@ -266,7 +266,7 @@ export function createGatewayConfigModuleMock(actual: GatewayConfigModule): Gate
     getRuntimeConfig: loadRuntimeAwareTestConfig,
     parseConfigJson5: (raw: string) => {
       try {
-        return { ok: true, parsed: JSON.parse(raw) as unknown };
+        return { ok: true, parsed: JSON.parse(raw) };
       } catch (err) {
         return { ok: false, error: String(err) };
       }

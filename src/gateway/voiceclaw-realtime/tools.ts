@@ -31,7 +31,7 @@ export function toGeminiToolDeclarations(
 
 export function parseToolArgs(args: string): Record<string, unknown> {
   try {
-    const parsed = JSON.parse(args) as unknown;
+    const parsed = JSON.parse(args);
     return parsed && typeof parsed === "object" && !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
       : {};

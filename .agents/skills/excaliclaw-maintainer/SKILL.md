@@ -24,6 +24,7 @@ Use this skill for `arthurianresolve/excaliclaw`.
 - Keep public docs generic OpenClaw-facing. Put fork-local, machine-local, and session-local facts in memory, skill guidance, or handoff notes.
 - For agentic architecture work, use `docs/concepts/agentic-architecture.md` as the durable map.
 - Treat third-party GitHub Actions as trust-boundary dependencies. Review them for behavior changes, not just version bumps.
+- Treat global TypeScript declaration packages as public type-surface risks. `@total-typescript/ts-reset` is allowed only through `internal-types/ts-reset.d.ts` with scoped JSON/fetch imports unless plugin SDK declaration drift checks prove a broader reset is safe.
 - Use clean-room process ideas from `warpdotdev/warp` only when they fit OpenClaw ownership and validation. Do not import Warp code, command-signature bundles, UI code, or verbatim skill text.
 - Use clean-room learning-path ideas from public guide sets only as docs information architecture. Sequence existing OpenClaw docs by role or task; do not copy guide text, external ordering, or vendor claims.
 - For substantial or ambiguous changes, consider `$excaliclaw-spec-driven-implementation`. Use `$excaliclaw-product-spec` for behavior and `$excaliclaw-tech-spec` for implementation plans.
@@ -32,6 +33,7 @@ Use this skill for `arthurianresolve/excaliclaw`.
 ## Validation
 
 - On the Raspberry Pi host, run heavy checks sequentially.
+- For `oxlint`, prefer the sequential shard runner with the 4 GB heap cap and small file batches on the Raspberry Pi 5 8 GB host; treat that tuning as arm64-specific unless a later benchmark proves otherwise.
 - Do not launch multiple independent `pnpm test` or `tsgo` jobs in parallel in the same worktree.
 - Use these compile checks first:
   - `OPENCLAW_TSGO_HEAVY_CHECK_LOCK_HELD=1 pnpm tsgo:core`
@@ -76,3 +78,4 @@ Use this skill for `arthurianresolve/excaliclaw`.
 - Dependabot PR maintenance lesson: if a `pull_request_target` job fails on a merged or rebased Dependabot PR, update the base branch workflow file on `master` and then rebase the PR head so GitHub reevaluates the real policy.
 - Warp review lesson: the useful integration path is clean-room spec workflow guidance, not direct terminal/UI/code integration.
 - Blake guide-set review lesson: adopt clean-room review vocabulary and docs sequencing only. Keep media prompt guidance provider-neutral, enforce iOS agent boundaries locally, sequence existing OpenClaw docs by role, and defer retrieval runtime changes until benchmarked.
+- ts-reset review lesson: scoped JSON/fetch reset improves internal boundary safety, but full reset bundles are rejected by default because Excaliclaw publishes plugin SDK declarations.

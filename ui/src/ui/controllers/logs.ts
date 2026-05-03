@@ -32,7 +32,7 @@ function parseMaybeJsonString(value: unknown) {
     return null;
   }
   try {
-    const parsed = JSON.parse(trimmed) as unknown;
+    const parsed = JSON.parse(trimmed);
     return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
   } catch {
     return null;

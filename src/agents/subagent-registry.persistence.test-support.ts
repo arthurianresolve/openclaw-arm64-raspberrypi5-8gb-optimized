@@ -11,7 +11,7 @@ export function resolveSubagentSessionStorePath(stateDir: string, agentId: strin
 export async function readSubagentSessionStore(storePath: string): Promise<SessionStore> {
   try {
     const raw = await fs.readFile(storePath, "utf8");
-    const parsed = JSON.parse(raw) as unknown;
+    const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
       return parsed as SessionStore;
     }

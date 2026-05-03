@@ -250,7 +250,7 @@ function queueSessionStoreTouch(params: {
 function parseSessionKeyFromPayloadJSON(payloadJSON: string): string | null {
   let payload: unknown;
   try {
-    payload = JSON.parse(payloadJSON) as unknown;
+    payload = JSON.parse(payloadJSON) as u;
   } catch {
     return null;
   }
@@ -268,7 +268,7 @@ function parsePayloadObject(payloadJSON?: string | null): Record<string, unknown
   }
   let payload: unknown;
   try {
-    payload = JSON.parse(payloadJSON) as unknown;
+    payload = JSON.parse(payloadJSON) as u;
   } catch {
     return null;
   }

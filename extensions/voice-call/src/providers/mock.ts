@@ -38,7 +38,7 @@ export class MockProvider implements VoiceCallProvider {
     _options?: WebhookParseOptions,
   ): ProviderWebhookParseResult {
     try {
-      const payload = JSON.parse(ctx.rawBody);
+      const payload = JSON.parse(ctx.rawBody) as Record<string, unknown>;
       const events: NormalizedEvent[] = [];
 
       if (Array.isArray(payload.events)) {
@@ -48,7 +48,7 @@ export class MockProvider implements VoiceCallProvider {
             events.push(normalized);
           }
         }
-      } else if (payload.event) {
+      } else if (payload.event && typeof payload.event === "object") {
         const normalized = this.normalizeEvent(payload.event);
         if (normalized) {
           events.push(normalized);

@@ -74,7 +74,7 @@ function summarizeQmdStderr(raw: string): string {
 
 function parseQmdQueryResultArray(raw: string): QmdQueryResult[] | null {
   try {
-    const parsed = JSON.parse(raw) as unknown;
+    const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) {
       return null;
     }

@@ -17,4 +17,8 @@ export function runPluginRegistryPostinstallMigration(params?: Record<string, un
 export function isSourceCheckoutRoot(params: { cwd: string }): boolean;
 export function pruneBundledPluginSourceNodeModules(params?: Record<string, unknown>): void;
 export function runBundledPluginPostinstall(params?: Record<string, unknown>): void;
-export function isDirectPostinstallInvocation(params: { argv: string[] }): boolean;
+export function isDirectPostinstallInvocation(params?: {
+  entryPath?: string;
+  modulePath?: string;
+  realpathSync?: (path: string) => string;
+}): boolean;

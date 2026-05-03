@@ -36,7 +36,7 @@ export function registerNodesInvokeCommands(nodes: Command) {
               `command "${command}" is reserved for shell execution; use the exec tool with host=node instead`,
             );
           }
-          const params = JSON.parse(opts.params ?? "{}") as unknown;
+          const params = JSON.parse(opts.params ?? "{}");
           const timeoutMs = opts.invokeTimeout
             ? Number.parseInt(opts.invokeTimeout, 10)
             : undefined;

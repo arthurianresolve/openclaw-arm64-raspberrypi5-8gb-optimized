@@ -12,7 +12,7 @@ import {
 
 async function readJsonObject(filePath: string): Promise<Record<string, unknown>> {
   try {
-    const raw = JSON.parse(await fs.readFile(filePath, "utf-8")) as unknown;
+    const raw = JSON.parse(await fs.readFile(filePath, "utf-8"));
     return raw && typeof raw === "object" && !Array.isArray(raw)
       ? ({ ...raw } as Record<string, unknown>)
       : {};

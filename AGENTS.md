@@ -110,6 +110,7 @@ Telegraph style. Root rules only. Read scoped `AGENTS.md` before subtree work.
 - TS ESM, strict. Avoid `any`; prefer real types, `unknown`, narrow adapters.
 - No `@ts-nocheck`. Lint suppressions only intentional + explained.
 - External boundaries: prefer `zod` or existing schema helpers.
+- `internal-types/ts-reset.d.ts` scopes `@total-typescript/ts-reset` to JSON/fetch only for production type projects. Treat `JSON.parse` and `Response.json()` as `unknown`; narrow with schemas/guards instead of casting back to `any`. Do not import the full reset bundle or DOM storage rules without public API drift proof.
 - Runtime branching: discriminated unions/closed codes over freeform strings.
 - Avoid semantic sentinels: `?? 0`, empty object/string, etc.
 - Dynamic import: no static+dynamic import for same prod module. Use `*.runtime.ts` lazy boundary. After edits: `pnpm build`; check `[INEFFECTIVE_DYNAMIC_IMPORT]`.

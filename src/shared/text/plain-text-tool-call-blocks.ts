@@ -104,7 +104,7 @@ function consumeJsonObject(
       if (depth === 0) {
         const rawJson = text.slice(cursor, index + 1);
         try {
-          const parsed = JSON.parse(rawJson) as unknown;
+          const parsed = JSON.parse(rawJson);
           if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
             return null;
           }

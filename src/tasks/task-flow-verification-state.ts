@@ -66,10 +66,10 @@ function normalizeVerificationCommand(value: unknown): TaskFlowVerificationComma
     command,
     passed,
     ...(record.exitCode === null || typeof record.exitCode === "number"
-      ? { exitCode: record.exitCode as number | null }
+      ? { exitCode: record.exitCode }
       : {}),
     ...(record.signal === null || typeof record.signal === "string"
-      ? { signal: record.signal as string | null }
+      ? { signal: record.signal }
       : {}),
     ...(asNumber(record.durationMs) !== undefined
       ? { durationMs: asNumber(record.durationMs)! }

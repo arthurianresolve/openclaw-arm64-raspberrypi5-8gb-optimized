@@ -77,7 +77,7 @@ function resolveExternalCatalogPreferOver(channelId: string, env: NodeJS.Process
       continue;
     }
     try {
-      const payload = JSON.parse(fs.readFileSync(resolved, "utf-8")) as unknown;
+      const payload = JSON.parse(fs.readFileSync(resolved, "utf-8"));
       const channel = parseExternalCatalogChannelEntries(payload).find(
         (entry) => entry.id === channelId,
       );

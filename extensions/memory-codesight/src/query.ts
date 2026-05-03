@@ -151,10 +151,9 @@ async function loadArtifacts(params: {
         `[memory-codesight] artifact scan failed for ${params.workspaceDir}; serving last-known-good cache (${nextFailures} consecutive failures).`,
       );
     }
-    return Array.from(cache.values()).map((entry) => ({
-      ...entry.artifact,
-      stale: true,
-    }));
+    return Array.from(cache.values()).map((entry) =>
+      Object.assign({}, entry.artifact, { stale: true }),
+    );
   }
   workspaceFailureCounts.set(params.workspaceDir, 0);
   const nextCache: WorkspaceCache = new Map();

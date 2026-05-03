@@ -11,13 +11,7 @@ import { normalizePackageTagInput } from "./package-tag.js";
 import { runGlobalPackageUpdateSteps } from "./package-update-steps.js";
 import { trimLogTail } from "./restart-sentinel.js";
 import { resolveStableNodePath } from "./stable-node-path.js";
-import {
-  DEFAULT_PACKAGE_CHANNEL,
-  DEV_BRANCH,
-  isBetaTag,
-  isStableTag,
-  type UpdateChannel,
-} from "./update-channels.js";
+import { DEV_BRANCH, isBetaTag, isStableTag, type UpdateChannel } from "./update-channels.js";
 import { compareSemverStrings } from "./update-check.js";
 import {
   cleanupGlobalRenameDirs,
@@ -1412,7 +1406,6 @@ export async function runGatewayUpdate(opts: UpdateRunnerOptions = {}): Promise<
       globalRoot: path.dirname(pkgRoot),
       packageName,
     });
-    const channel = opts.channel ?? DEFAULT_PACKAGE_CHANNEL;
     const tag = normalizeTag(opts.tag ?? OPENCLAW_UPDATE_GITHUB_BRANCH);
     const globalInstallEnv = await createGlobalInstallEnv();
     const spec = resolveGlobalInstallSpec({

@@ -67,8 +67,8 @@ function mergeSystemPromptContributions(
   }
   const mergedSectionOverrides: NonNullable<ProviderSystemPromptContribution["sectionOverrides"]> =
     {
-      ...(first.sectionOverrides ?? {}),
-      ...(second.sectionOverrides ?? {}),
+      ...first.sectionOverrides,
+      ...second.sectionOverrides,
     };
   return {
     stablePrefix:

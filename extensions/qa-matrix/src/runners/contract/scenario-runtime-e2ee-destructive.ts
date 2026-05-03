@@ -353,7 +353,7 @@ function parseMatrixQaCliJson(result: MatrixQaCliRunResult): unknown {
     throw new Error(`${formatMatrixQaCliCommand(result.args)} did not print JSON`);
   }
   try {
-    return JSON.parse(payload) as unknown;
+    return JSON.parse(payload);
   } catch (error) {
     throw new Error(
       `${formatMatrixQaCliCommand(result.args)} printed invalid JSON: ${

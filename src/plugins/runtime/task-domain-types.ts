@@ -1,9 +1,5 @@
 import type { JsonValue } from "../../tasks/task-flow-registry.types.js";
-import type {
-  TaskFlowVerificationCommand,
-  TaskFlowVerificationHistoryEntry,
-  TaskFlowVerificationState,
-} from "../../tasks/task-flow-verification-state.js";
+import type { TaskFlowVerificationState } from "../../tasks/task-flow-verification-state.js";
 import type {
   TaskDeliveryStatus,
   TaskNotifyPolicy,

@@ -34,7 +34,7 @@ async function sanitizeManifestForNpmInstall(targetDir: string): Promise<void> {
 
   let manifest: Record<string, unknown>;
   try {
-    const parsed = JSON.parse(manifestRaw) as unknown;
+    const parsed = JSON.parse(manifestRaw);
     if (!isObjectRecord(parsed)) {
       return;
     }

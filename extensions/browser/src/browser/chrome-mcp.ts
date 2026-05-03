@@ -767,7 +767,15 @@ export async function closeChromeMcpSession(profileName: string): Promise<boolea
 }
 
 export async function stopAllChromeMcpSessions(): Promise<void> {
-  const names = [...new Set([...sessions.keys()].map((key) => JSON.parse(key)[0] as string))];
+  const names = [
+    ...new Set(
+      [...sessions.keys()]
+        .map((key) => JSON.parse(key))
+        .filter(Array.isArray)
+        .map((keyParts) => keyParts[0])
+        .filter((name): name is string => typeof name === "string"),
+    ),
+  ];
   for (const name of names) {
     await closeChromeMcpSession(name).catch(() => {});
   }

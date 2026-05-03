@@ -66,6 +66,10 @@ It does not replace:
   runtime behavior needs broader proof.
 - Every advanced feature needs an owner, state lifetime, prompt effect,
   transcript effect, debug surface, and validation target.
+- Treat global type-declaration changes as architecture changes when they can
+  alter public plugin SDK or extension contracts. Scoped internal type resets
+  are acceptable only when they improve boundary safety and pass public
+  declaration drift checks.
 
 ### Port policy
 
@@ -106,6 +110,7 @@ identifies a concrete owner path and validation target.
 | `FareedKhan-dev/all-agentic-architectures`      | Educational pattern catalog for agentic architecture choices                                   | pattern taxonomy, PEV, dry-run, meta-controller, memory, ensemble, and evaluation framing                                                                                  | LangChain, LangGraph, Jupyter, Nebius, Tavily, Neo4j, FAISS, notebook code, autonomous policy mutation                                                        |
 | `warpdotdev/warp`                               | Public repository reference for agent-assisted spec workflow                                   | clean-room spec-first workflow ideas: product behavior specs, technical implementation specs, and keeping specs current during implementation                              | Rust terminal code, UI code, AGPL-covered implementation, command-signature bundle, or verbatim skill text                                                    |
 | `blakecrosley.com/guides`                       | Public guide set for agent, media, iOS, design, retrieval, and learning-path review vocabulary | clean-room review vocabulary for hooks, skills, MCP, memory, subagents, media prompt structure, iOS agent boundaries, retrieval evaluation, and role-based docs sequencing | copied guide text, tool-specific commands as source of truth, vendor or model claims without official docs, Python/FastAPI stack changes, or new dependencies |
+| `mattpocock/ts-reset`                           | Type declaration reference for safer built-in JavaScript API boundaries                        | scoped internal JSON/fetch reset rules that make `JSON.parse` and `Response.json()` return `unknown`, with public declaration drift checks                                 | full reset bundle, DOM storage rules, collection ergonomic rewrites, or published SDK type-surface changes without explicit API review                        |
 | OpenAI Codex and GPT-5 docs                     | Model and runtime behavior plus prompt-upgrade reference                                       | model-family-aware prompt review and strict agentic execution expectations                                                                                                 | undocumented assumptions about model availability, pricing, or provider behavior                                                                              |
 | OpenClaw QA and trajectory docs                 | Existing validation and debugging surfaces                                                     | QA summaries, trajectory bundles, parity reports as evidence artifacts                                                                                                     | treating smoke coverage as proof of runtime invariants                                                                                                        |
 
@@ -125,6 +130,16 @@ docs or skill update unless measured evidence shows runtime code needs to
 change. If the idea is about learning paths, implement it as OpenClaw-specific
 navigation over existing docs; do not copy external guide sequences or imply
 third-party content is an OpenClaw source of truth.
+
+### Type declaration reset rule
+
+Global TypeScript declaration packages change the compiler's view of every
+included source file. Excaliclaw uses `@total-typescript/ts-reset` only through
+`internal-types/ts-reset.d.ts`, and only for JSON/fetch boundaries. The goal
+is to keep untrusted JSON as `unknown` until a local schema, guard, or adapter
+narrows it. Do not import the full reset bundle or DOM storage rules unless the
+change has a concrete owner path, an API drift artifact for published plugin SDK
+declarations, and strict TypeScript proof across core, extensions, and tests.
 
 ## Agentic Pattern Applicability
 

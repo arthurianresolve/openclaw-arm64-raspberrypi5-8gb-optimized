@@ -77,15 +77,15 @@ export async function startNgrokTunnel(config: {
 
     const processLine = (line: string) => {
       try {
-        const log = JSON.parse(line);
+        const log = JSON.parse(line) as Record<string, unknown>;
 
         // ngrok logs the public URL in a 'started tunnel' message
-        if (log.msg === "started tunnel" && log.url) {
+        if (log.msg === "started tunnel" && typeof log.url === "string") {
           publicUrl = log.url;
         }
 
         // Also check for the URL field directly
-        if (log.addr && log.url && !publicUrl) {
+        if (log.addr && typeof log.url === "string" && !publicUrl) {
           publicUrl = log.url;
         }
 

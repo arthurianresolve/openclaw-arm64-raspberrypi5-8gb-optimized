@@ -96,7 +96,7 @@ function consumeJsonObject(
       depth -= 1;
       if (depth === 0) {
         try {
-          const parsed = JSON.parse(text.slice(cursor, index + 1)) as unknown;
+          const parsed = JSON.parse(text.slice(cursor, index + 1));
           if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
             return null;
           }

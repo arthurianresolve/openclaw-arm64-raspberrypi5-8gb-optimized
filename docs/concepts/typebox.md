@@ -55,6 +55,17 @@ Common methods + events:
 Authoritative advertised **discovery** inventory lives in
 `src/gateway/server-methods-list.ts` (`listGatewayMethods`, `GATEWAY_EVENTS`).
 
+## JSON boundary typing
+
+OpenClaw treats parsed JSON as untrusted until a schema, guard, or adapter
+narrows it. The repo includes a scoped internal `@total-typescript/ts-reset`
+entry for `JSON.parse` and `Response.json()`, so those APIs return `unknown` in
+production strict TypeScript checks.
+
+Do not cast parsed JSON directly to an application type unless the code
+immediately validates the boundary. Prefer TypeBox protocol validators, zod, or
+small local guards that return a narrowed type.
+
 ## Where the schemas live
 
 - Source: `src/gateway/protocol/schema.ts`

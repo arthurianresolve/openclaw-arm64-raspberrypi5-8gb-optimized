@@ -97,8 +97,8 @@ export function parseFaceTags(text: string | undefined | null): string {
         return "[Emoji: unknown emoji]";
       }
       const decoded = Buffer.from(ext, "base64").toString("utf-8");
-      const parsed = JSON.parse(decoded);
-      const faceName = parsed.text || "unknown emoji";
+      const parsed = JSON.parse(decoded) as { text?: unknown };
+      const faceName = typeof parsed.text === "string" ? parsed.text : "unknown emoji";
       return `[Emoji: ${faceName}]`;
     } catch {
       return _match;

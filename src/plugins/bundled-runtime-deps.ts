@@ -228,7 +228,7 @@ function readInstalledDependencyVersion(rootDir: string, depName: string): strin
 
 function readJsonObject(filePath: string): JsonObject | null {
   try {
-    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as unknown;
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return null;
     }
@@ -282,7 +282,7 @@ function readRuntimeDepsLockOwner(lockDir: string): RuntimeDepsLockOwner {
     // The owner file may not exist yet, or may have been removed by the lock owner.
   }
   try {
-    const parsed = JSON.parse(fs.readFileSync(ownerFilePath, "utf8")) as unknown;
+    const parsed = JSON.parse(fs.readFileSync(ownerFilePath, "utf8"));
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
       owner = parsed as JsonObject;
       ownerFileState = "ok";

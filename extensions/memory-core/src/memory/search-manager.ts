@@ -108,6 +108,7 @@ export async function getMemorySearchManager(params: {
     const transient = params.purpose === "status" || params.purpose === "cli";
     const scopeKey = buildQmdManagerScopeKey(normalizedAgentId);
     const identityKey = buildQmdManagerIdentityKey(normalizedAgentId, qmdResolved, runtimeConfig);
+    let resolvedManager: MemorySearchManagerResult | null = null;
 
     const createPrimaryQmdManager = async (
       mode: "full" | "status" | "cli",
@@ -189,16 +190,19 @@ export async function getMemorySearchManager(params: {
           // Status callers often close the manager they receive. Wrap the live
           // full manager with a no-op close so health/status probes do not tear
           // down the active QMD manager for the process.
-          return { manager: new BorrowedMemoryManager(cached.manager) };
+          resolvedManager = { manager: new BorrowedMemoryManager(cached.manager) };
+          break;
         }
         if (params.purpose !== "cli") {
-          return { manager: cached.manager };
+          resolvedManager = { manager: cached.manager };
+          break;
         }
       }
 
       if (transient) {
         const manager = await createPrimaryQmdManager(params.purpose === "cli" ? "cli" : "status");
-        return manager ? { manager } : await getBuiltinMemorySearchManager(params);
+        resolvedManager = manager ? { manager } : await getBuiltinMemorySearchManager(params);
+        break;
       }
 
       const pending = PENDING_QMD_MANAGER_CREATES.get(scopeKey);
@@ -230,8 +234,11 @@ export async function getMemorySearchManager(params: {
       };
       PENDING_QMD_MANAGER_CREATES.set(scopeKey, pendingCreate);
       const manager = await pendingCreate.promise;
-      return manager ? { manager } : await getBuiltinMemorySearchManager(params);
+      resolvedManager = manager ? { manager } : await getBuiltinMemorySearchManager(params);
+      break;
     }
+
+    return resolvedManager ?? (await getBuiltinMemorySearchManager(params));
   }
 
   return await getBuiltinMemorySearchManager(params);

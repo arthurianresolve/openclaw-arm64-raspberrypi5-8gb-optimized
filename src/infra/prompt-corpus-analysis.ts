@@ -131,7 +131,9 @@ function countHeadings(text: string): PromptCorpusSectionCount[] {
   }
   return [...counts.entries()]
     .map(([heading, count]) => ({ heading, count }))
-    .sort((left, right) => right.count - left.count || left.heading.localeCompare(right.heading));
+    .toSorted(
+      (left, right) => right.count - left.count || left.heading.localeCompare(right.heading),
+    );
 }
 
 function countRepeatedBlocks(text: string): PromptCorpusRepeatedBlock[] {
@@ -150,7 +152,7 @@ function countRepeatedBlocks(text: string): PromptCorpusRepeatedBlock[] {
   }
   return [...counts.values()]
     .filter((entry) => entry.count > 1)
-    .sort((left, right) => right.count - left.count || right.text.length - left.text.length);
+    .toSorted((left, right) => right.count - left.count || right.text.length - left.text.length);
 }
 
 function isValidSha(value: unknown): value is string {
@@ -355,7 +357,7 @@ export async function fetchExternalPromptCorpus(params: {
 }): Promise<PromptCorpusFetchSummary> {
   const resolvedManifestPath = resolveManifestPath(params.repoRoot, params.manifestPath);
   const resolvedCacheRoot = resolveCacheRoot(params.repoRoot, params.cacheRoot);
-  const manifest = resolveManifest(await normalizeManifest(await readJson(resolvedManifestPath)));
+  const manifest = resolveManifest(normalizeManifest(await readJson(resolvedManifestPath)));
   const corpusDir = path.join(resolvedCacheRoot, manifest.id);
   if (params.dryRun !== true) {
     await ensureDir(corpusDir);
@@ -450,7 +452,7 @@ export async function analyzePromptCorpus(params: {
 }): Promise<PromptCorpusAnalyzeSummary> {
   const resolvedManifestPath = resolveManifestPath(params.repoRoot, params.manifestPath);
   const resolvedCacheRoot = resolveCacheRoot(params.repoRoot, params.cacheRoot);
-  const manifest = resolveManifest(await normalizeManifest(await readJson(resolvedManifestPath)));
+  const manifest = resolveManifest(normalizeManifest(await readJson(resolvedManifestPath)));
   const corpusDir = path.join(resolvedCacheRoot, manifest.id);
   const warnings: string[] = [];
 
@@ -474,7 +476,7 @@ export async function analyzePromptCorpus(params: {
     });
   }
 
-  if ((await pathExists(corpusDir)) === false) {
+  if (!(await pathExists(corpusDir))) {
     warnings.push(`Cache directory does not exist yet: ${corpusDir}`);
   }
 

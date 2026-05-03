@@ -223,7 +223,7 @@ async function* readJsonlRecords(filePath: string): AsyncGenerator<Record<string
         continue;
       }
       try {
-        const parsed = JSON.parse(trimmed) as unknown;
+        const parsed = JSON.parse(trimmed);
         if (!parsed || typeof parsed !== "object") {
           continue;
         }

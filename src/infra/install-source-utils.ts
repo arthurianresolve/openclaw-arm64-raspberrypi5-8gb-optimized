@@ -85,7 +85,7 @@ export async function resolveNpmSpecMetadata(params: { spec: string; timeoutMs?:
   }
 
   try {
-    const parsed = JSON.parse(res.stdout.trim()) as unknown;
+    const parsed = JSON.parse(res.stdout.trim());
     const metadata = normalizeNpmViewMetadata(parsed);
     if (!metadata?.name || !metadata.version) {
       return { ok: false, error: "npm view produced incomplete package metadata" };

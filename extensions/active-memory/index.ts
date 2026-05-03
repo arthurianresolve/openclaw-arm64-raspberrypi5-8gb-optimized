@@ -455,7 +455,7 @@ function resolveToggleStatePath(api: OpenClawPluginApi): string {
 async function readToggleStore(statePath: string): Promise<ActiveMemoryToggleStore> {
   try {
     const raw = await fs.readFile(statePath, "utf8");
-    const parsed = JSON.parse(raw) as unknown;
+    const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") {
       return {};
     }
@@ -1219,7 +1219,7 @@ async function readActiveMemorySearchDebug(
   for (let index = lines.length - 1; index >= 0; index -= 1) {
     const line = lines[index];
     try {
-      const parsed = JSON.parse(line) as unknown;
+      const parsed = JSON.parse(line);
       const record = asRecord(parsed);
       const nestedMessage = asRecord(record?.message);
       const topLevelMessage =

@@ -135,7 +135,7 @@ function loadCatalogEntriesFromPaths(paths: Iterable<string>): ExternalCatalogEn
       continue;
     }
     try {
-      const payload = JSON.parse(fs.readFileSync(resolvedPath, "utf-8")) as unknown;
+      const payload = JSON.parse(fs.readFileSync(resolvedPath, "utf-8"));
       entries.push(...parseCatalogEntries(payload));
     } catch {
       // Ignore invalid catalog files.

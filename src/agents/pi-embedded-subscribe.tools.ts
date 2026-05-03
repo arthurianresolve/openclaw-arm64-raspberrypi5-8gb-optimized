@@ -428,7 +428,7 @@ export function extractToolErrorMessage(result: unknown): string | undefined {
   const text = extractToolResultText(result);
   if (text) {
     try {
-      const parsed = JSON.parse(text) as unknown;
+      const parsed = JSON.parse(text);
       const fromJson = extractErrorField(parsed);
       if (fromJson) {
         return fromJson;

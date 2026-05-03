@@ -410,7 +410,7 @@ export function parseJsonMessageParam(params: Record<string, unknown>, key: stri
     return;
   }
   try {
-    params[key] = JSON.parse(trimmed) as unknown;
+    params[key] = JSON.parse(trimmed);
   } catch {
     throw new Error(`--${key} must be valid JSON`);
   }
@@ -427,7 +427,7 @@ export function parseInteractiveParam(params: Record<string, unknown>): void {
     return;
   }
   try {
-    params.interactive = JSON.parse(trimmed) as unknown;
+    params.interactive = JSON.parse(trimmed);
   } catch {
     throw new Error("--interactive must be valid JSON");
   }

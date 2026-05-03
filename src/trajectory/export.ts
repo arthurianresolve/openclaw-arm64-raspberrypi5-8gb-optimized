@@ -170,7 +170,7 @@ function parseJsonlFile<T>(
       );
     }
     try {
-      const value = JSON.parse(row) as unknown;
+      const value = JSON.parse(row);
       if (!params.validate || params.validate(value)) {
         parsed.push(value as T);
       }
@@ -228,7 +228,7 @@ function readRuntimePointerFile(sessionFile: string, sessionId: string): string 
     return undefined;
   }
   try {
-    const parsed = JSON.parse(fs.readFileSync(pointerPath, "utf8")) as unknown;
+    const parsed = JSON.parse(fs.readFileSync(pointerPath, "utf8"));
     if (!isRecord(parsed)) {
       return undefined;
     }

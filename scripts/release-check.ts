@@ -814,7 +814,7 @@ async function main() {
   checkAppcastSparkleVersions();
   checkCliBootstrapExternalImports({
     logger: {
-      error: (message: string) => console.error(`release-check: ${message}`),
+      error: (...args: unknown[]) => console.error("release-check:", ...args),
     },
   });
   await checkPluginSdkExports();

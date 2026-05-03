@@ -13,8 +13,10 @@ function getConfiguredLogFiles(): string[] {
       if (!fs.existsSync(cfgPath)) {
         continue;
       }
-      const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
-      const logFile = cfg?.logging?.file;
+      const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8")) as {
+        logging?: { file?: unknown };
+      };
+      const logFile = cfg.logging?.file;
       if (logFile && typeof logFile === "string") {
         files.push(path.resolve(logFile));
       }

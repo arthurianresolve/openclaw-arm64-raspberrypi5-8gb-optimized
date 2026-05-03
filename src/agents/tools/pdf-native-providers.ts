@@ -86,7 +86,7 @@ export async function anthropicAnalyzePdf(params: {
     );
   }
 
-  const json = (await res.json().catch(() => null)) as unknown;
+  const json = await res.json().catch(() => null);
   if (!isRecord(json)) {
     throw new Error("Anthropic PDF response was not JSON.");
   }
@@ -171,7 +171,7 @@ export async function geminiAnalyzePdf(params: {
     );
   }
 
-  const json = (await res.json().catch(() => null)) as unknown;
+  const json = await res.json().catch(() => null);
   if (!isRecord(json)) {
     throw new Error("Gemini PDF response was not JSON.");
   }

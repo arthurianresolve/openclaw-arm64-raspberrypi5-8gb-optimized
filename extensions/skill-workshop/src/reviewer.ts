@@ -70,7 +70,7 @@ function parseReviewerJson(raw: string): ReviewerJson | undefined {
   const match = /```(?:json)?\s*([\s\S]*?)```/i.exec(trimmed);
   const jsonText = match?.[1]?.trim() ?? trimmed;
   try {
-    const parsed = JSON.parse(jsonText) as unknown;
+    const parsed = JSON.parse(jsonText);
     return isRecord(parsed) ? parsed : undefined;
   } catch {
     return undefined;

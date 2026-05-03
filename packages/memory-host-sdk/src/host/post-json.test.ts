@@ -21,7 +21,7 @@ function textResponse(body: string, status: number): Response {
   return {
     ok: status >= 200 && status < 300,
     status,
-    json: async () => JSON.parse(body) as unknown,
+    json: async () => JSON.parse(body),
     text: async () => body,
   } as Response;
 }

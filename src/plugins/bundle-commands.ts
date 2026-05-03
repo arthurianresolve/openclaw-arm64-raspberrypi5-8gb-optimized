@@ -66,7 +66,7 @@ function readClaudeBundleManifest(rootDir: string): Record<string, unknown> {
     return {};
   }
   try {
-    const raw = JSON.parse(fs.readFileSync(opened.fd, "utf-8")) as unknown;
+    const raw = JSON.parse(fs.readFileSync(opened.fd, "utf-8"));
     return raw && typeof raw === "object" && !Array.isArray(raw)
       ? (raw as Record<string, unknown>)
       : {};

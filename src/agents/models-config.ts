@@ -75,7 +75,7 @@ async function readExistingModelsFile(pathname: string): Promise<{
     const raw = await fs.readFile(pathname, "utf8");
     return {
       raw,
-      parsed: JSON.parse(raw) as unknown,
+      parsed: JSON.parse(raw),
     };
   } catch {
     return {

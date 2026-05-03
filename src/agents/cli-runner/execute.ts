@@ -124,7 +124,7 @@ function parseCliBackendPreserveEnv(raw: string | undefined): Set<string> {
   }
   if (trimmed.startsWith("[")) {
     try {
-      const parsed = JSON.parse(trimmed) as unknown;
+      const parsed = JSON.parse(trimmed);
       return new Set(
         Array.isArray(parsed)
           ? parsed.filter((entry): entry is string => typeof entry === "string")

@@ -171,7 +171,7 @@ export function buildGuardedModelFetch(model: Model<Api>, timeoutMs?: number): t
   const dispatcherPolicy = buildProviderRequestDispatcherPolicy(requestConfig);
   const requestTimeoutMs = resolveModelRequestTimeoutMs(model, timeoutMs);
   const fetchWithOptionalPreconnect = fetch as typeof fetch & {
-    preconnect?: (...args: any[]) => unknown;
+    preconnect?: (...args: unknown[]) => unknown;
   };
   const guardedFetch = async (input: URL | RequestInfo, init?: RequestInit) => {
     const request = input instanceof Request ? new Request(input, init) : undefined;

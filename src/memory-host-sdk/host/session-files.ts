@@ -197,7 +197,7 @@ function readSessionTranscriptClassificationStore(
   storePath: string,
 ): Record<string, SessionTranscriptStoreEntry> {
   try {
-    const parsed = JSON.parse(fsSync.readFileSync(storePath, "utf-8")) as unknown;
+    const parsed = JSON.parse(fsSync.readFileSync(storePath, "utf-8"));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return {};
     }

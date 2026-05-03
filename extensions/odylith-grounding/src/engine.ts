@@ -426,7 +426,7 @@ function rankComponents(
       } satisfies CandidateMatch;
     })
     .filter((candidate) => candidate.score > 0)
-    .sort(
+    .toSorted(
       (left, right) =>
         right.score - left.score || left.component.id.localeCompare(right.component.id),
     );

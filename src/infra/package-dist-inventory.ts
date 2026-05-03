@@ -234,7 +234,7 @@ export async function writePackageDistInventory(packageRoot: string): Promise<st
 export async function readPackageDistInventory(packageRoot: string): Promise<string[]> {
   const inventoryPath = path.join(packageRoot, PACKAGE_DIST_INVENTORY_RELATIVE_PATH);
   const raw = await fs.readFile(inventoryPath, "utf8");
-  const parsed = JSON.parse(raw) as unknown;
+  const parsed = JSON.parse(raw);
   if (!Array.isArray(parsed) || parsed.some((entry) => typeof entry !== "string")) {
     throw new Error(`Invalid package dist inventory at ${PACKAGE_DIST_INVENTORY_RELATIVE_PATH}`);
   }

@@ -25,6 +25,10 @@ type SessionTitleFieldsCacheEntry = SessionTitleFields & {
   size: number;
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
 const sessionTitleFieldsCache = new Map<string, SessionTitleFieldsCacheEntry>();
 const MAX_SESSION_TITLE_FIELDS_CACHE_ENTRIES = 5000;
 
@@ -111,7 +115,10 @@ export function readSessionMessages(
     }
     try {
       const parsed = JSON.parse(line);
-      if (parsed?.message) {
+      if (!isRecord(parsed)) {
+        continue;
+      }
+      if (parsed.message) {
         messageSeq += 1;
         messages.push(
           attachOpenClawTranscriptMeta(parsed.message, {
@@ -124,7 +131,7 @@ export function readSessionMessages(
 
       // Compaction entries are not "message" records, but they're useful context for debugging.
       // Emit a lightweight synthetic message that the Web UI can render as a divider.
-      if (parsed?.type === "compaction") {
+      if (parsed.type === "compaction") {
         const ts = typeof parsed.timestamp === "string" ? Date.parse(parsed.timestamp) : Number.NaN;
         const timestamp = Number.isFinite(ts) ? ts : Date.now();
         messageSeq += 1;
@@ -293,7 +300,7 @@ function extractFirstUserMessageFromTranscriptChunk(
     }
     try {
       const parsed = JSON.parse(line);
-      const msg = parsed?.message as TranscriptMessage | undefined;
+      const msg = isRecord(parsed) ? (parsed.message as TranscriptMessage | undefined) : undefined;
       if (msg?.role !== "user") {
         continue;
       }
@@ -377,7 +384,7 @@ function readLastMessagePreviewFromOpenTranscript(params: {
     const line = tailLines[i];
     try {
       const parsed = JSON.parse(line);
-      const msg = parsed?.message as TranscriptMessage | undefined;
+      const msg = isRecord(parsed) ? (parsed.message as TranscriptMessage | undefined) : undefined;
       if (msg?.role !== "user" && msg?.role !== "assistant") {
         continue;
       }
@@ -756,7 +763,9 @@ function readRecentMessagesFromTranscript(
       const line = tailLines[i];
       try {
         const parsed = JSON.parse(line);
-        const msg = parsed?.message as TranscriptPreviewMessage | undefined;
+        const msg = isRecord(parsed)
+          ? (parsed.message as TranscriptPreviewMessage | undefined)
+          : undefined;
         if (msg && typeof msg === "object") {
           collected.push(msg);
           if (collected.length >= maxMessages) {

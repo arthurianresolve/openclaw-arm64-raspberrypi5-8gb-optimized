@@ -397,7 +397,7 @@ async function loadDreamingStoreStats(
   const phaseSignalPath = path.join(workspaceDir, SHORT_TERM_PHASE_SIGNAL_RELATIVE_PATH);
   try {
     const raw = await fs.readFile(storePath, "utf-8");
-    const parsed = JSON.parse(raw) as unknown;
+    const parsed = JSON.parse(raw);
     const store = asRecord(parsed);
     const entries = asRecord(store?.entries) ?? {};
     let shortTermCount = 0;
@@ -483,7 +483,7 @@ async function loadDreamingStoreStats(
     let phaseSignalError: string | undefined;
     try {
       const phaseRaw = await fs.readFile(phaseSignalPath, "utf-8");
-      const parsedPhase = JSON.parse(phaseRaw) as unknown;
+      const parsedPhase = JSON.parse(phaseRaw);
       const phaseStore = asRecord(parsedPhase);
       const phaseEntries = asRecord(phaseStore?.entries) ?? {};
       for (const [key, value] of Object.entries(phaseEntries)) {

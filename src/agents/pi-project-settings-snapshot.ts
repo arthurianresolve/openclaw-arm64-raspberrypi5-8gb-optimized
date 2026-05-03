@@ -55,7 +55,7 @@ function loadBundleSettingsFile(params: {
     return null;
   }
   try {
-    const raw = JSON.parse(fs.readFileSync(opened.fd, "utf-8")) as unknown;
+    const raw = JSON.parse(fs.readFileSync(opened.fd, "utf-8"));
     if (!isRecord(raw)) {
       log.warn(`skipping bundle settings file with non-object JSON: ${absolutePath}`);
       return null;

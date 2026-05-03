@@ -36,7 +36,7 @@ type SecretsApplyOptions = {
 
 function readPlanFile(pathname: string): SecretsApplyPlan {
   const raw = fs.readFileSync(pathname, "utf8");
-  const parsed = JSON.parse(raw) as unknown;
+  const parsed = JSON.parse(raw);
   if (!isSecretsApplyPlan(parsed)) {
     throw new Error(`Invalid secrets plan file: ${pathname}`);
   }

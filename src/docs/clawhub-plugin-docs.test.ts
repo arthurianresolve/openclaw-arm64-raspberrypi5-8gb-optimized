@@ -22,7 +22,7 @@ function extractNamedJsonBlock(markdown: string, label: string) {
   if (!match?.[1]) {
     throw new Error(`Missing json code block for ${label}`);
   }
-  return JSON.parse(match[1].trim()) as unknown;
+  return JSON.parse(match[1].trim());
 }
 
 describe("ClawHub plugin docs", () => {
@@ -32,7 +32,7 @@ describe("ClawHub plugin docs", () => {
         path.join(DOCS_ROOT, "snippets", "plugin-publish", "minimal-package.json"),
         "utf8",
       ),
-    ) as unknown;
+    );
     const pluginManifest = JSON.parse(
       await fs.readFile(
         path.join(DOCS_ROOT, "snippets", "plugin-publish", "minimal-openclaw.plugin.json"),
@@ -58,7 +58,7 @@ describe("ClawHub plugin docs", () => {
         path.join(DOCS_ROOT, "snippets", "plugin-publish", "minimal-package.json"),
         "utf8",
       ),
-    ) as unknown;
+    );
     const buildingPlugins = await fs.readFile(
       path.join(DOCS_ROOT, "plugins", "building-plugins.md"),
       "utf8",

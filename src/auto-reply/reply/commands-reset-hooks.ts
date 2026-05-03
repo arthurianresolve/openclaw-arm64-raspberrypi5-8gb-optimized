@@ -15,6 +15,10 @@ function loadRouteReplyRuntime() {
 
 export type ResetCommandAction = "new" | "reset";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
 function parseTranscriptMessages(content: string): unknown[] {
   const messages: unknown[] = [];
   for (const line of content.split("\n")) {
@@ -23,7 +27,7 @@ function parseTranscriptMessages(content: string): unknown[] {
     }
     try {
       const entry = JSON.parse(line);
-      if (entry.type === "message" && entry.message) {
+      if (isRecord(entry) && entry.type === "message" && entry.message) {
         messages.push(entry.message);
       }
     } catch {

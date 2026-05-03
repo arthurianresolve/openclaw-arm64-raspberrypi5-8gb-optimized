@@ -18,6 +18,7 @@ Updated: 2026-05-03
 - For substantial or ambiguous work, prefer repo-local spec skills: `$excaliclaw-product-spec` for `PRODUCT.md`, `$excaliclaw-tech-spec` for `TECH.md`, and `$excaliclaw-spec-driven-implementation` to decide whether the overhead is warranted.
 - Treat `blakecrosley.com/guides` as a clean-room review vocabulary source only. Adopt agent harness, media prompt, iOS boundary, retrieval evaluation, and learning-path sequencing ideas only when they map to OpenClaw owner paths and validation artifacts.
 - Use `@total-typescript/ts-reset` narrowly for internal production type safety only. Excaliclaw enables the JSON.parse and fetch Response.json rules through `internal-types/ts-reset.d.ts`; do not import the full reset bundle, force test-fixture churn, or leak reset globals into published plugin SDK declarations without API drift proof.
+- Keep `oxlint` and `vitest` on stable pins in `master` unless a prerelease canary proves a concrete win. Canary prereleases only on a separate branch or CI lane, and promote only if they reduce churn, runtime, or wrapper complexity without losing repo-specific behavior.
 
 ## Validation
 

@@ -29,6 +29,7 @@ Use this skill for `arthurianresolve/excaliclaw`.
 - Use clean-room learning-path ideas from public guide sets only as docs information architecture. Sequence existing OpenClaw docs by role or task; do not copy guide text, external ordering, or vendor claims.
 - For substantial or ambiguous changes, consider `$excaliclaw-spec-driven-implementation`. Use `$excaliclaw-product-spec` for behavior and `$excaliclaw-tech-spec` for implementation plans.
 - For risky agent runtime, prompt, tool, sandbox, approval, memory, subagent, MCP, or autonomous workflow changes, use `$excaliclaw-agent-harness-review`.
+- Keep `oxlint` and `vitest` stable on `master`. If prereleases are worth evaluating, do it on a canary branch or CI lane first and only promote after they show a concrete repo-level benefit without breaking custom wrappers or sequential validation.
 
 ## Validation
 

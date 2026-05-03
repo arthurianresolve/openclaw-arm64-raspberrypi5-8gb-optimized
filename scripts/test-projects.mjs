@@ -7,14 +7,14 @@ import {
   resolveLocalFullSuiteProfile,
   resolveLocalVitestEnv,
 } from "./lib/vitest-local-scheduling.mjs";
+import { buildVitestPlanJson } from "./lib/vitest-plan-json.mjs";
+import { createVitestRunSpecsFromPlans } from "./lib/vitest-run-specs.mjs";
 import {
   createShardTimingSample,
   readShardTimings,
   writeShardTimings,
 } from "./lib/vitest-shard-timings.mjs";
 import {
-  resolveVitestCliEntry,
-  resolveVitestNodeArgs,
   resolveVitestSpawnParams,
   spawnWatchedVitestProcess,
   waitForVitestChildCompletion,
@@ -100,6 +100,8 @@ const FULL_SUITE_CONFIG_WEIGHT = new Map([
   ["test/vitest/vitest.extension-memory.config.ts", 6],
   ["test/vitest/vitest.extension-msteams.config.ts", 4],
 ]);
+const PLAN_JSON_ARG = "--plan-json";
+
 const releaseLockOnce = () => {
   if (lockReleased) {
     return;
@@ -274,7 +276,9 @@ async function runVitestSpecsParallel(specs, concurrency) {
 
 async function main() {
   const suiteStartedAt = performance.now();
-  const args = process.argv.slice(2);
+  const rawArgs = process.argv.slice(2);
+  const planJson = rawArgs.includes(PLAN_JSON_ARG);
+  const args = rawArgs.filter((arg) => arg !== PLAN_JSON_ARG);
   const baseEnv = resolveLocalVitestEnv(process.env);
   const { targetArgs } = parseTestProjectsArgs(args, process.cwd());
   const changedTargetArgs =
@@ -283,24 +287,9 @@ async function main() {
       : null;
   const rawRunSpecs =
     targetArgs.length === 0 && changedTargetArgs === null
-      ? buildFullSuiteVitestRunPlans(args, process.cwd()).map((plan) => ({
-          config: plan.config,
-          continueOnFailure: true,
-          env: baseEnv,
-          includeFilePath: null,
-          includePatterns: null,
-          pnpmArgs: [
-            "exec",
-            "node",
-            ...resolveVitestNodeArgs(process.env),
-            resolveVitestCliEntry(),
-            ...(plan.watchMode ? [] : ["run"]),
-            "--config",
-            plan.config,
-            ...plan.forwardedArgs,
-          ],
-          watchMode: plan.watchMode,
-        }))
+      ? createVitestRunSpecsFromPlans(buildFullSuiteVitestRunPlans(args, process.cwd()), {
+          baseEnv,
+        }).map((spec) => Object.assign({}, spec, { continueOnFailure: true }))
       : createVitestRunSpecs(args, {
           baseEnv,
           cwd: process.cwd(),
@@ -311,6 +300,18 @@ async function main() {
   );
 
   if (runSpecs.length === 0) {
+    if (planJson) {
+      printRunPlanJson({
+        args,
+        baseEnv,
+        changedTargetArgs,
+        isFullSuiteRun: false,
+        isParallelShardRun: false,
+        runSpecs,
+        targetArgs,
+      });
+      return;
+    }
     console.error("[test] no changed test targets; skipping Vitest.");
     printTestSummary("skipped", 0, performance.now() - suiteStartedAt);
     return;
@@ -334,6 +335,18 @@ async function main() {
     !runSpecs.some((spec) => spec.watchMode);
   const isParallelShardRun =
     isFullSuiteRun || isFullExtensionsProjectRun(runSpecs) || isExplicitParallelMultiConfigRun;
+  if (planJson) {
+    printRunPlanJson({
+      args,
+      baseEnv,
+      changedTargetArgs,
+      isFullSuiteRun,
+      isParallelShardRun,
+      runSpecs,
+      targetArgs,
+    });
+    return;
+  }
   if (isParallelShardRun) {
     const concurrency = resolveParallelFullSuiteConcurrency(runSpecs.length, baseEnv);
     if (concurrency > 1) {
@@ -415,6 +428,15 @@ function printTestSummary(status, shardCount, durationMs, detail) {
   console.error(
     `[test] ${status} ${shardCount} Vitest shard${shardCount === 1 ? "" : "s"} in ${formatMs(durationMs)}${suffix}`,
   );
+}
+
+function printRunPlanJson(params) {
+  const output = buildVitestPlanJson({
+    ...params,
+    resolveParallelFullSuiteConcurrency,
+    shouldAcquireLocalHeavyCheckLock,
+  });
+  process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
 }
 
 main().catch((error) => {

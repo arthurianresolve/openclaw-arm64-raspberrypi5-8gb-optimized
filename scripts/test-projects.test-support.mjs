@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { isChannelSurfaceTestFile } from "../test/vitest/vitest.channel-paths.mjs";
 import {
@@ -44,7 +43,26 @@ import {
   listChangedPathsFromGit as listChangedPathsFromGitSource,
 } from "./changed-lanes.mjs";
 import { isCiLikeEnv, resolveLocalFullSuiteProfile } from "./lib/vitest-local-scheduling.mjs";
-import { resolveVitestCliEntry, resolveVitestNodeArgs } from "./run-vitest.mjs";
+import {
+  DEFAULT_TEST_PROJECTS_VITEST_NO_OUTPUT_TIMEOUT_MS,
+  INCLUDE_FILE_ENV_KEY,
+  applyDefaultMultiSpecVitestCachePaths,
+  applyDefaultVitestNoOutputTimeout,
+  applyParallelVitestCachePaths,
+  createVitestArgs,
+  createVitestRunSpecsFromPlans,
+  shouldRetryVitestNoOutputTimeout,
+  writeVitestIncludeFile,
+} from "./lib/vitest-run-specs.mjs";
+
+export {
+  DEFAULT_TEST_PROJECTS_VITEST_NO_OUTPUT_TIMEOUT_MS,
+  applyDefaultMultiSpecVitestCachePaths,
+  applyDefaultVitestNoOutputTimeout,
+  applyParallelVitestCachePaths,
+  shouldRetryVitestNoOutputTimeout,
+  writeVitestIncludeFile,
+};
 
 const DEFAULT_VITEST_CONFIG = "test/vitest/vitest.unit.config.ts";
 const AGENTS_VITEST_CONFIG = "test/vitest/vitest.agents.config.ts";
@@ -128,8 +146,6 @@ const TUI_VITEST_CONFIG = "test/vitest/vitest.tui.config.ts";
 const UI_VITEST_CONFIG = "test/vitest/vitest.ui.config.ts";
 const UTILS_VITEST_CONFIG = "test/vitest/vitest.utils.config.ts";
 const WIZARD_VITEST_CONFIG = "test/vitest/vitest.wizard.config.ts";
-const INCLUDE_FILE_ENV_KEY = "OPENCLAW_VITEST_INCLUDE_FILE";
-const FS_MODULE_CACHE_PATH_ENV_KEY = "OPENCLAW_VITEST_FS_MODULE_CACHE_PATH";
 const CHANGED_ARGS_PATTERN = /^--changed(?:=(.+))?$/u;
 const VITEST_CONFIG_BY_KIND = {
   acp: ACP_VITEST_CONFIG,
@@ -233,6 +249,16 @@ const TOOLING_SOURCE_TEST_TARGETS = new Map([
   ["scripts/lib/live-docker-stage.sh", ["test/scripts/live-docker-stage.test.ts"]],
   ["scripts/lib/vitest-local-scheduling.mjs", ["test/scripts/vitest-local-scheduling.test.ts"]],
   [
+    "scripts/lib/vitest-runtime.mjs",
+    [
+      "test/scripts/run-vitest.test.ts",
+      "test/scripts/test-projects.test.ts",
+      "test/scripts/vitest-local-scheduling.test.ts",
+    ],
+  ],
+  ["scripts/lib/vitest-plan-json.mjs", ["test/scripts/test-projects.test.ts"]],
+  ["scripts/lib/vitest-run-specs.mjs", ["test/scripts/test-projects.test.ts"]],
+  [
     "scripts/run-vitest.mjs",
     [
       "test/scripts/run-vitest.test.ts",
@@ -308,9 +334,6 @@ const IMPORTABLE_FILE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts"];
 const IMPORT_SPECIFIER_PATTERN =
   /\b(?:import|export)\s+(?:type\s+)?(?:[^'"]*?\s+from\s+)?["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)/gu;
 const BROAD_CHANGED_ENV_KEY = "OPENCLAW_TEST_CHANGED_BROAD";
-const VITEST_NO_OUTPUT_TIMEOUT_ENV_KEY = "OPENCLAW_VITEST_NO_OUTPUT_TIMEOUT_MS";
-const VITEST_NO_OUTPUT_RETRY_ENV_KEY = "OPENCLAW_VITEST_NO_OUTPUT_RETRY";
-export const DEFAULT_TEST_PROJECTS_VITEST_NO_OUTPUT_TIMEOUT_MS = "180000";
 const VITEST_CONFIG_TARGET_KIND_BY_PATH = new Map(
   Object.entries(VITEST_CONFIG_BY_KIND).map(([kind, config]) => [config, kind]),
 );
@@ -989,19 +1012,6 @@ function shouldUseWholeConfigTarget(kind, targetArg, cwd) {
   return relative.startsWith("ui/src/") && !relative.startsWith("ui/src/ui/");
 }
 
-function createVitestArgs(params) {
-  return [
-    "exec",
-    "node",
-    ...resolveVitestNodeArgs(params.env),
-    resolveVitestCliEntry(),
-    ...(params.watchMode ? [] : ["run"]),
-    "--config",
-    params.config,
-    ...params.forwardedArgs,
-  ];
-}
-
 export function parseTestProjectsArgs(args, cwd = process.cwd()) {
   const forwardedArgs = [];
   const targetArgs = [];
@@ -1270,72 +1280,6 @@ export function resolveParallelFullSuiteConcurrency(specCount, env = process.env
   return Math.min(resolveLocalFullSuiteProfile(env, hostInfo).shardParallelism, specCount);
 }
 
-function sanitizeVitestCachePathSegment(value) {
-  return (
-    value
-      .replace(/[^a-zA-Z0-9._-]+/gu, "-")
-      .replace(/^-+|-+$/gu, "")
-      .slice(0, 180) || "default"
-  );
-}
-
-export function applyParallelVitestCachePaths(specs, params = {}) {
-  const baseEnv = params.env ?? process.env;
-  if (baseEnv[FS_MODULE_CACHE_PATH_ENV_KEY]?.trim()) {
-    return specs;
-  }
-  const cwd = params.cwd ?? process.cwd();
-  return specs.map((spec, index) => {
-    if (spec.env?.[FS_MODULE_CACHE_PATH_ENV_KEY]?.trim()) {
-      return spec;
-    }
-    const cacheSegment = sanitizeVitestCachePathSegment(`${index}-${spec.config}`);
-    return {
-      ...spec,
-      env: {
-        ...spec.env,
-        [FS_MODULE_CACHE_PATH_ENV_KEY]: path.join(
-          cwd,
-          "node_modules",
-          ".experimental-vitest-cache",
-          cacheSegment,
-        ),
-      },
-    };
-  });
-}
-
-export function applyDefaultMultiSpecVitestCachePaths(specs, params = {}) {
-  if (specs.length <= 1 || specs.some((spec) => spec.watchMode)) {
-    return specs;
-  }
-  return applyParallelVitestCachePaths(specs, params);
-}
-
-export function applyDefaultVitestNoOutputTimeout(specs, params = {}) {
-  const baseEnv = params.env ?? process.env;
-  if (Object.hasOwn(baseEnv, VITEST_NO_OUTPUT_TIMEOUT_ENV_KEY)) {
-    return specs;
-  }
-  return specs.map((spec) => {
-    if (spec.watchMode || Object.hasOwn(spec.env ?? {}, VITEST_NO_OUTPUT_TIMEOUT_ENV_KEY)) {
-      return spec;
-    }
-    return {
-      ...spec,
-      env: {
-        ...spec.env,
-        [VITEST_NO_OUTPUT_TIMEOUT_ENV_KEY]: DEFAULT_TEST_PROJECTS_VITEST_NO_OUTPUT_TIMEOUT_MS,
-      },
-    };
-  });
-}
-
-export function shouldRetryVitestNoOutputTimeout(env = process.env) {
-  const value = env[VITEST_NO_OUTPUT_RETRY_ENV_KEY]?.trim().toLowerCase();
-  return !["0", "false", "no", "off"].includes(value ?? "");
-}
-
 export function createVitestRunSpecs(args, params = {}) {
   const cwd = params.cwd ?? process.cwd();
   const baseEnv = params.baseEnv ?? process.env;
@@ -1343,27 +1287,7 @@ export function createVitestRunSpecs(args, params = {}) {
     buildVitestRunPlans(args, cwd, listChangedPathsFromGit, { env: baseEnv }),
     baseEnv,
   );
-  return plans.map((plan, index) => {
-    const includeFilePath = plan.includePatterns
-      ? path.join(
-          params.tempDir ?? os.tmpdir(),
-          `openclaw-vitest-include-${process.pid}-${Date.now()}-${index}.json`,
-        )
-      : null;
-    return {
-      config: plan.config,
-      env: includeFilePath
-        ? {
-            ...baseEnv,
-            [INCLUDE_FILE_ENV_KEY]: includeFilePath,
-          }
-        : baseEnv,
-      includeFilePath,
-      includePatterns: plan.includePatterns,
-      pnpmArgs: createVitestArgs(plan),
-      watchMode: plan.watchMode,
-    };
-  });
+  return createVitestRunSpecsFromPlans(plans, params);
 }
 
 function loadIncludePatternsForSpecFilter(env) {
@@ -1416,10 +1340,6 @@ export function shouldAcquireLocalHeavyCheckLock(runSpecs, env = process.env) {
     Array.isArray(runSpecs[0]?.includePatterns) &&
     runSpecs[0].includePatterns.length > 0
   );
-}
-
-export function writeVitestIncludeFile(filePath, includePatterns) {
-  fs.writeFileSync(filePath, `${JSON.stringify(includePatterns, null, 2)}\n`);
 }
 
 export function buildVitestArgs(args, cwd = process.cwd()) {

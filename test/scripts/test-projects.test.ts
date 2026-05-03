@@ -1,6 +1,7 @@
 import path from "node:path";
 import fg from "fast-glob";
 import { describe, expect, it } from "vitest";
+import { buildVitestPlanJson } from "../../scripts/lib/vitest-plan-json.mjs";
 import {
   DEFAULT_TEST_PROJECTS_VITEST_NO_OUTPUT_TIMEOUT_MS,
   applyDefaultMultiSpecVitestCachePaths,
@@ -1324,5 +1325,46 @@ describe("scripts/test-projects Vitest cache isolation", () => {
       },
     ];
     expect(applyDefaultMultiSpecVitestCachePaths(watch, { cwd: "/repo", env: {} })).toBe(watch);
+  });
+});
+
+describe("scripts/test-projects plan-json", () => {
+  it("serializes a deterministic plan without exposing generated include paths", () => {
+    const parsed = buildVitestPlanJson({
+      args: ["test/scripts/run-vitest.test.ts"],
+      baseEnv: {},
+      changedTargetArgs: null,
+      isFullSuiteRun: false,
+      isParallelShardRun: false,
+      resolveParallelFullSuiteConcurrency,
+      runSpecs: [
+        {
+          config: "test/vitest/vitest.tooling.config.ts",
+          env: {
+            OPENCLAW_VITEST_INCLUDE_FILE: "/tmp/generated.json",
+            OPENCLAW_VITEST_NO_OUTPUT_TIMEOUT_MS: DEFAULT_TEST_PROJECTS_VITEST_NO_OUTPUT_TIMEOUT_MS,
+          },
+          includeFilePath: "/tmp/generated.json",
+          includePatterns: ["test/scripts/run-vitest.test.ts"],
+          pnpmArgs: ["exec", "node", "vitest.mjs", "run"],
+          watchMode: false,
+        },
+      ],
+      shouldAcquireLocalHeavyCheckLock,
+      targetArgs: ["test/scripts/run-vitest.test.ts"],
+    });
+
+    expect(parsed.status).toBe("planned");
+    expect(parsed.heavyCheckLock).toBe(false);
+    expect(parsed.specs).toEqual([
+      expect.objectContaining({
+        config: "test/vitest/vitest.tooling.config.ts",
+        includeFile: true,
+        includePatterns: ["test/scripts/run-vitest.test.ts"],
+        env: expect.objectContaining({
+          OPENCLAW_VITEST_INCLUDE_FILE: "<generated>",
+        }),
+      }),
+    ]);
   });
 });

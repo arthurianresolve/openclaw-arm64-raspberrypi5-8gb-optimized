@@ -5,9 +5,11 @@ export function createAutoReplyReplyVitestConfig(env?: Record<string, string | u
   return createScopedVitestConfig([...autoReplyReplySubtreeTestInclude], {
     dir: "src/auto-reply",
     env,
-    fileParallelism: false,
     name: "auto-reply-reply",
-  } as Parameters<typeof createScopedVitestConfig>[1]);
+    sequence: {
+      groupOrder: 1,
+    },
+  });
 }
 
 export default createAutoReplyReplyVitestConfig();

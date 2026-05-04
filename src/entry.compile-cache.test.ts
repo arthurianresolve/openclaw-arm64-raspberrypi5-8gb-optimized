@@ -58,7 +58,7 @@ describe("entry compile cache", () => {
   it("scopes packaged compile cache by package install metadata", async () => {
     const root = makeTempDir(tempDirs, "openclaw-compile-cache-package-key-");
     const packageJsonPath = path.join(root, "package.json");
-    await fs.writeFile(packageJsonPath, '{"version":"2026.4.27-beta.1"}\n', "utf8");
+    await fs.writeFile(packageJsonPath, '{"version":"2026.4.29"}\n', "utf8");
 
     const directory = resolveOpenClawCompileCacheDirectory({
       env: { NODE_COMPILE_CACHE: path.join(root, ".node-cache") },
@@ -66,7 +66,7 @@ describe("entry compile cache", () => {
     });
 
     expect(directory).toContain(path.join(".node-cache", "openclaw"));
-    expect(directory).toContain("2026.4.27-beta.1");
+    expect(directory).toContain("2026.4.29");
     expect(path.basename(directory)).toMatch(/^\d+-\d+$/);
   });
 

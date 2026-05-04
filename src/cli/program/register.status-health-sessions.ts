@@ -1,10 +1,7 @@
 import type { Command } from "commander";
-import {
-  flowsAuditCommand,
-  flowsCancelCommand,
-  flowsListCommand,
-  flowsShowCommand,
-} from "../../commands/flows.js";
+import { commitmentsDismissCommand, commitmentsListCommand } from "../../commands/commitments.js";
+import { exportTrajectoryCommand } from "../../commands/export-trajectory.js";
+import { flowsCancelCommand, flowsListCommand, flowsShowCommand } from "../../commands/flows.js";
 import { healthCommand } from "../../commands/health.js";
 import { sessionsCleanupCommand } from "../../commands/sessions-cleanup.js";
 import { sessionsCommand } from "../../commands/sessions.js";
@@ -228,6 +225,113 @@ export function registerStatusHealthSessionsCommands(program: Command) {
       });
     });
 
+  sessionsCmd
+    .command("export-trajectory")
+    .description("Export a redacted trajectory bundle for a stored session")
+    .option("--session-key <key>", "Session key to export")
+    .option("--output <path>", "Output directory name inside .openclaw/trajectory-exports")
+    .option("--workspace <path>", "Workspace root for the export (default: current directory)")
+    .option("--store <path>", "Path to session store (default: resolved from session key)")
+    .option("--agent <id>", "Agent id for resolving the default session store")
+    .option("--request-json-base64 <payload>", "Base64url-encoded export request")
+    .option("--json", "Output JSON", false)
+    .action(async (opts, command) => {
+      const parentOpts = command.parent?.opts() as
+        | {
+            store?: string;
+            agent?: string;
+            json?: boolean;
+          }
+        | undefined;
+      await runCommandWithRuntime(defaultRuntime, async () => {
+        await exportTrajectoryCommand(
+          {
+            sessionKey: opts.sessionKey as string | undefined,
+            output: opts.output as string | undefined,
+            workspace: opts.workspace as string | undefined,
+            store: (opts.store as string | undefined) ?? parentOpts?.store,
+            agent: (opts.agent as string | undefined) ?? parentOpts?.agent,
+            requestJsonBase64: opts.requestJsonBase64 as string | undefined,
+            json: Boolean(opts.json || parentOpts?.json),
+          },
+          defaultRuntime,
+        );
+      });
+    });
+
+  const commitmentsCmd = program
+    .command("commitments")
+    .description("List and manage inferred follow-up commitments")
+    .option("--json", "Output JSON instead of text", false)
+    .option("--agent <id>", "Agent id to inspect")
+    .option("--status <status>", "Filter by status (pending, sent, dismissed, snoozed, expired)")
+    .option("--all", "Show all statuses", false)
+    .addHelpText(
+      "after",
+      () =>
+        `\n${theme.heading("Examples:")}\n${formatHelpExamples([
+          ["openclaw commitments", "List pending inferred follow-ups."],
+          ["openclaw commitments --all", "List all inferred follow-ups."],
+          ["openclaw commitments --agent work", "List one agent's inferred follow-ups."],
+          ["openclaw commitments dismiss cm_abc123", "Dismiss a follow-up."],
+        ])}`,
+    )
+    .action(async (opts) => {
+      await runCommandWithRuntime(defaultRuntime, async () => {
+        await commitmentsListCommand(
+          {
+            json: Boolean(opts.json),
+            agent: opts.agent as string | undefined,
+            status: opts.status as string | undefined,
+            all: Boolean(opts.all),
+          },
+          defaultRuntime,
+        );
+      });
+    });
+  commitmentsCmd.enablePositionalOptions();
+
+  commitmentsCmd
+    .command("list")
+    .description("List inferred follow-up commitments")
+    .option("--json", "Output JSON instead of text", false)
+    .option("--agent <id>", "Agent id to inspect")
+    .option("--status <status>", "Filter by status (pending, sent, dismissed, snoozed, expired)")
+    .option("--all", "Show all statuses", false)
+    .action(async (opts, command) => {
+      const parentOpts = command.parent?.opts() as
+        | { json?: boolean; agent?: string; status?: string; all?: boolean }
+        | undefined;
+      await runCommandWithRuntime(defaultRuntime, async () => {
+        await commitmentsListCommand(
+          {
+            json: Boolean(opts.json || parentOpts?.json),
+            agent: (opts.agent as string | undefined) ?? parentOpts?.agent,
+            status: (opts.status as string | undefined) ?? parentOpts?.status,
+            all: Boolean(opts.all || parentOpts?.all),
+          },
+          defaultRuntime,
+        );
+      });
+    });
+
+  commitmentsCmd
+    .command("dismiss <ids...>")
+    .description("Dismiss inferred follow-up commitments")
+    .option("--json", "Output JSON instead of text", false)
+    .action(async (ids: string[], opts, command) => {
+      const parentOpts = command.parent?.opts() as { json?: boolean } | undefined;
+      await runCommandWithRuntime(defaultRuntime, async () => {
+        await commitmentsDismissCommand(
+          {
+            ids,
+            json: Boolean(opts.json || parentOpts?.json),
+          },
+          defaultRuntime,
+        );
+      });
+    });
+
   const tasksCmd = program
     .command("tasks")
     .description("Inspect durable background tasks and TaskFlow state")
@@ -418,23 +522,6 @@ export function registerStatusHealthSessionsCommands(program: Command) {
     .action(async (lookup, opts) => {
       await runCommandWithRuntime(defaultRuntime, async () => {
         await flowsShowCommand(
-          {
-            lookup,
-            json: Boolean(opts.json),
-          },
-          defaultRuntime,
-        );
-      });
-    });
-
-  tasksFlowCmd
-    .command("audit")
-    .description("Show verification and repair audit details for one TaskFlow")
-    .argument("<lookup>", "Flow id or owner key")
-    .option("--json", "Output as JSON", false)
-    .action(async (lookup, opts) => {
-      await runCommandWithRuntime(defaultRuntime, async () => {
-        await flowsAuditCommand(
           {
             lookup,
             json: Boolean(opts.json),

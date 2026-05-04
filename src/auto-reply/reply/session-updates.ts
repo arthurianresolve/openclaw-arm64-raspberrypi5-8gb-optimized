@@ -10,6 +10,7 @@ import {
   shouldRefreshSnapshotForVersion,
 } from "../../agents/skills/refresh-state.js";
 import { ensureSkillsWatcher } from "../../agents/skills/refresh.js";
+import { hydrateResolvedSkills as hydrateResolvedSkillsSnapshot } from "../../agents/skills/snapshot-hydration.js";
 import {
   resolveSessionFilePath,
   resolveSessionFilePathOptions,
@@ -26,6 +27,11 @@ import { normalizeOptionalString } from "../../shared/string-coerce.js";
 import { buildSessionEndHookPayload, buildSessionStartHookPayload } from "./session-hooks.js";
 export { drainFormattedSystemEvents } from "./session-system-events.js";
 
+// nextEntry.skillsSnapshot may carry resolvedSkills (full Skill[] with
+// SKILL.md bodies) for in-turn use. The persistence layer in
+// src/config/sessions/store-load.ts strips resolvedSkills before serializing,
+// so the on-disk sessions.json stays small. The in-memory params.sessionStore
+// reference still carries the runtime cache for the rest of this turn.
 async function persistSessionEntryUpdate(params: {
   sessionStore?: Record<string, SessionEntry>;
   sessionKey?: string;
@@ -180,7 +186,9 @@ export async function ensureSkillSnapshot(params: {
         updatedAt: Date.now(),
       };
     const skillSnapshot =
-      !current.skillsSnapshot || shouldRefreshSnapshot ? buildSnapshot() : current.skillsSnapshot;
+      !current.skillsSnapshot || shouldRefreshSnapshot
+        ? buildSnapshot()
+        : hydrateResolvedSkillsSnapshot(current.skillsSnapshot, buildSnapshot);
     nextEntry = {
       ...current,
       sessionId: sessionId ?? current.sessionId ?? crypto.randomUUID(),
@@ -197,10 +205,10 @@ export async function ensureSkillSnapshot(params: {
     (nextEntry?.skillsSnapshot !== existingSnapshot || !shouldRefreshSnapshot);
   const skillsSnapshot =
     hasFreshSnapshotInEntry && nextEntry?.skillsSnapshot
-      ? hydrateResolvedSkills(nextEntry.skillsSnapshot, buildSnapshot)
+      ? hydrateResolvedSkillsSnapshot(nextEntry.skillsSnapshot, buildSnapshot)
       : shouldRefreshSnapshot || !nextEntry?.skillsSnapshot
         ? buildSnapshot()
-        : hydrateResolvedSkills(nextEntry.skillsSnapshot, buildSnapshot);
+        : hydrateResolvedSkillsSnapshot(nextEntry.skillsSnapshot, buildSnapshot);
   if (
     skillsSnapshot &&
     sessionStore &&

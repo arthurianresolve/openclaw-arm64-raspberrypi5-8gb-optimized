@@ -1,5 +1,6 @@
 import { formatCliCommand } from "../cli/command-format.js";
 import { resolveOpenClawPackageRoot } from "../infra/openclaw-root.js";
+import { normalizeUpdateChannel, resolveRegistryUpdateChannel } from "../infra/update-channels.js";
 import {
   checkUpdateStatus,
   compareSemverStrings,
@@ -11,7 +12,9 @@ export async function getUpdateCheckResult(params: {
   timeoutMs: number;
   fetchGit: boolean;
   includeRegistry: boolean;
+  updateConfigChannel?: string | null;
 }): Promise<UpdateCheckResult> {
+  const configChannel = normalizeUpdateChannel(params.updateConfigChannel);
   const root = await resolveOpenClawPackageRoot({
     moduleUrl: import.meta.url,
     argv1: process.argv[1],
@@ -22,6 +25,10 @@ export async function getUpdateCheckResult(params: {
     timeoutMs: params.timeoutMs,
     fetchGit: params.fetchGit,
     includeRegistry: params.includeRegistry,
+    registryChannel: resolveRegistryUpdateChannel({
+      configChannel,
+      currentVersion: VERSION,
+    }),
   });
 }
 
@@ -63,9 +70,7 @@ export function formatUpdateAvailableHint(update: UpdateCheckResult): string | n
     details.push(`git behind ${availability.gitBehind}`);
   }
   if (availability.hasRegistryUpdate && availability.latestVersion) {
-    details.push(
-      `${update.registry?.sourceLabel ?? "update source"} ${availability.latestVersion}`,
-    );
+    details.push(`npm ${availability.latestVersion}`);
   }
   const suffix = details.length > 0 ? ` (${details.join(" · ")})` : "";
   return `Update available${suffix}. Run: ${formatCliCommand("openclaw update")}`;
@@ -75,23 +80,30 @@ export function formatUpdateOneLiner(update: UpdateCheckResult): string {
   const parts: string[] = [];
 
   const appendRegistryUpdateSummary = () => {
-    const sourceLabel = update.registry?.sourceLabel ?? "update source";
+    const registryLabel =
+      update.registry?.tag && update.registry.tag !== "latest"
+        ? `npm ${update.registry.tag}`
+        : "npm latest";
     if (update.registry?.latestVersion) {
       const cmp = compareSemverStrings(VERSION, update.registry.latestVersion);
       if (cmp === 0) {
         if (update.installKind !== "git") {
           parts.push("up to date");
         }
-        parts.push(`${sourceLabel} ${update.registry.latestVersion}`);
+        parts.push(`${registryLabel} ${update.registry.latestVersion}`);
       } else if (cmp != null && cmp < 0) {
-        parts.push(`${sourceLabel} ${update.registry.latestVersion}`);
+        parts.push(
+          update.registry.tag && update.registry.tag !== "latest"
+            ? `${registryLabel} update ${update.registry.latestVersion}`
+            : `npm update ${update.registry.latestVersion}`,
+        );
       } else {
-        parts.push(`${sourceLabel} ${update.registry.latestVersion} (local newer)`);
+        parts.push(`${registryLabel} ${update.registry.latestVersion} (local newer)`);
       }
       return;
     }
     if (update.registry?.error) {
-      parts.push(`${sourceLabel} unknown`);
+      parts.push(`${registryLabel} unknown`);
     }
   };
 

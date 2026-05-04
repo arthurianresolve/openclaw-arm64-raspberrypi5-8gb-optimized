@@ -1,4 +1,3 @@
-import { resolveInboundMentionDecision } from "openclaw/plugin-sdk/channel-inbound";
 import { createStartAccountContext } from "openclaw/plugin-sdk/channel-test-helpers";
 import type { PluginRuntime } from "openclaw/plugin-sdk/core";
 import {
@@ -27,6 +26,14 @@ function createMockQaRuntime(params?: {
   const sessionUpdatedAt = new Map<string, number>();
   return {
     channel: {
+      mentions: {
+        buildMentionRegexes() {
+          return [/^@openclaw\b/i];
+        },
+        matchesMentionPatterns(text: string, patterns: RegExp[]) {
+          return patterns.some((pattern) => pattern.test(text));
+        },
+      },
       routing: {
         resolveAgentRoute({
           accountId,
@@ -55,30 +62,6 @@ function createMockQaRuntime(params?: {
         },
         recordInboundSession({ sessionKey }: { sessionKey: string }) {
           sessionUpdatedAt.set(sessionKey, Date.now());
-        },
-      },
-      text: {
-        hasControlCommand() {
-          return false;
-        },
-      },
-      mentions: {
-        buildMentionRegexes() {
-          return [/\b@?openclaw\b/i];
-        },
-        matchesMentionPatterns(text: string, regexes: RegExp[]) {
-          return regexes.some((regex) => regex.test(text));
-        },
-        resolveInboundMentionDecision,
-      },
-      groups: {
-        resolveRequireMention() {
-          return true;
-        },
-      },
-      commands: {
-        shouldHandleTextCommands() {
-          return true;
         },
       },
       reply: {
@@ -167,6 +150,35 @@ describe("qa-channel plugin", () => {
     expect(route?.threadId).toBeUndefined();
   });
 
+  it("derives group outbound session routes from explicit group targets", async () => {
+    const route = await qaChannelPlugin.messaging?.resolveOutboundSessionRoute?.({
+      cfg: {},
+      agentId: "main",
+      accountId: "default",
+      target: "group:qa-room",
+    });
+
+    expect(route).toMatchObject({
+      sessionKey: "agent:main:qa-channel:group:group:qa-room",
+      baseSessionKey: "agent:main:qa-channel:group:group:qa-room",
+      chatType: "group",
+      to: "group:qa-room",
+    });
+  });
+
+  it("normalizes explicit group targets for session group policy lookup", () => {
+    const resolved = qaChannelPlugin.messaging?.resolveSessionConversation?.({
+      kind: "group",
+      rawId: "group:qa-room",
+    });
+
+    expect(resolved).toMatchObject({
+      id: "qa-room",
+      baseConversationId: "qa-room",
+      parentConversationCandidates: ["qa-room"],
+    });
+  });
+
   it("recovers thread-aware outbound session routes from currentSessionKey", async () => {
     const route = await qaChannelPlugin.messaging?.resolveOutboundSessionRoute?.({
       cfg: {},
@@ -222,77 +234,52 @@ describe("qa-channel plugin", () => {
     }
   });
 
-  it("marks mentioned threaded group traffic before dispatch", { timeout: 20_000 }, async () => {
-    let dispatchedCtx: Record<string, unknown> | null = null;
-    const harness = await startQaChannelTestHarness({
-      allowFrom: ["*"],
-      runtime: createMockQaRuntime({
-        onDispatch: (ctx) => {
-          dispatchedCtx = ctx;
-        },
-      }),
-    });
-
-    try {
-      harness.state.addInboundMessage({
-        conversation: { id: "qa-room", kind: "channel", title: "QA Room" },
-        senderId: "alice",
-        senderName: "Alice",
-        text: "@openclaw thread memory check",
-        threadId: "thread-1",
-        threadTitle: "Thread 1",
-      });
-
-      const outbound = await harness.state.waitFor({
-        kind: "message-text",
-        textIncludes: "qa-echo: @openclaw thread memory check",
-        direction: "outbound",
-        timeoutMs: 15_000,
-      });
-      expect("threadId" in outbound && outbound.threadId).toBe("thread-1");
-      expect(dispatchedCtx).toMatchObject({
-        ChatType: "group",
-        WasMentioned: true,
-        MessageThreadId: "thread-1",
-      });
-    } finally {
-      await harness.stop();
-    }
-  });
-
-  it("drops unmentioned group traffic when mention is required", { timeout: 20_000 }, async () => {
-    let didDispatch = false;
-    const harness = await startQaChannelTestHarness({
-      allowFrom: ["*"],
-      runtime: createMockQaRuntime({
-        onDispatch: () => {
-          didDispatch = true;
-        },
-      }),
-    });
-
-    try {
-      harness.state.addInboundMessage({
-        conversation: { id: "qa-room", kind: "channel", title: "QA Room" },
-        senderId: "alice",
-        senderName: "Alice",
-        text: "thread memory check",
-        threadId: "thread-1",
-      });
-
-      await expect(
-        harness.state.waitFor({
-          kind: "message-text",
-          textIncludes: "qa-echo:",
-          direction: "outbound",
-          timeoutMs: 750,
+  it(
+    "surfaces shared group traffic with the room target as From",
+    { timeout: 20_000 },
+    async () => {
+      let dispatchedCtx: Record<string, unknown> | null = null;
+      const harness = await startQaChannelTestHarness({
+        allowFrom: ["*"],
+        runtime: createMockQaRuntime({
+          onDispatch: (ctx) => {
+            dispatchedCtx = ctx;
+          },
         }),
-      ).rejects.toThrow(/wait timeout/i);
-      expect(didDispatch).toBe(false);
-    } finally {
-      await harness.stop();
-    }
-  });
+      });
+
+      try {
+        harness.state.addInboundMessage({
+          conversation: { id: "qa-room", kind: "group", title: "QA Room" },
+          senderId: "alice",
+          senderName: "Alice",
+          text: "@openclaw hello",
+        });
+
+        const outbound = await harness.state.waitFor({
+          kind: "message-text",
+          textIncludes: "qa-echo: @openclaw hello",
+          direction: "outbound",
+          timeoutMs: 15_000,
+        });
+
+        expect(dispatchedCtx).toMatchObject({
+          ChatType: "group",
+          From: "group:qa-room",
+          To: "group:qa-room",
+          SessionKey: "qa-agent:group:group:qa-room",
+          SenderId: "alice",
+          GroupSubject: "QA Room",
+        });
+        expect("conversation" in outbound && outbound.conversation).toMatchObject({
+          id: "qa-room",
+          kind: "group",
+        });
+      } finally {
+        await harness.stop();
+      }
+    },
+  );
 
   it("stages inbound image attachments into agent media payload", { timeout: 20_000 }, async () => {
     let dispatchedCtx: Record<string, unknown> | null = null;
@@ -489,6 +476,43 @@ describe("qa-channel plugin", () => {
         throw new Error("expected outbound message match");
       }
       expect(outbound.conversation).toMatchObject({ id: "qa-room", kind: "channel" });
+    } finally {
+      await bus.stop();
+    }
+  });
+
+  it("routes group send targets to group qa bus conversations", async () => {
+    installQaChannelTestRegistry();
+    const state = createQaBusState();
+    const bus = await startQaBusServer({ state });
+
+    try {
+      const cfg = createQaChannelConfig({ baseUrl: bus.baseUrl });
+
+      const result = await qaChannelPlugin.actions?.handleAction?.({
+        channel: "qa-channel",
+        action: "send",
+        cfg,
+        accountId: "default",
+        params: {
+          target: "group:qa-room",
+          message: "hello group",
+        },
+      });
+      const payload = extractToolPayload(result);
+      expect(payload).toMatchObject({ message: { text: "hello group" } });
+
+      const outbound = await state.waitFor({
+        kind: "message-text",
+        direction: "outbound",
+        textIncludes: "hello group",
+        timeoutMs: 5_000,
+      });
+      expect("conversation" in outbound).toBe(true);
+      if (!("conversation" in outbound)) {
+        throw new Error("expected outbound message match");
+      }
+      expect(outbound.conversation).toMatchObject({ id: "qa-room", kind: "group" });
     } finally {
       await bus.stop();
     }

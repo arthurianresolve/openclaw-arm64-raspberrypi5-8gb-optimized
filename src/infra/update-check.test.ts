@@ -7,8 +7,9 @@ import {
   checkDepsStatus,
   checkUpdateStatus,
   compareSemverStrings,
-  fetchPackageUpdateSourceVersion,
+  fetchNpmLatestVersion,
   fetchNpmPackageTargetStatus,
+  fetchNpmRegistryVersionForChannel,
   fetchNpmTagVersion,
   formatGitInstallLabel,
   resolveNpmChannelTag,
@@ -76,16 +77,17 @@ describe("resolveNpmChannelTag", () => {
   });
 
   it("resolves package updates from the GitHub master branch", async () => {
-    githubVersion = "1.2.3";
+    versionByTag.beta = "1.0.2";
+    versionByTag.latest = "1.2.3";
     const resolved = await resolveNpmChannelTag({ channel: "beta", timeoutMs: 1000 });
-    expect(resolved).toEqual({ tag: "master", version: "1.2.3" });
+    expect(resolved).toEqual({ tag: "latest", version: "1.2.3" });
   });
 
   it("keeps non-beta channels unchanged", async () => {
-    githubVersion = "1.0.3";
+    versionByTag.latest = "1.0.3";
 
     await expect(resolveNpmChannelTag({ channel: "stable", timeoutMs: 1000 })).resolves.toEqual({
-      tag: "master",
+      tag: "latest",
       version: "1.0.3",
     });
   });
@@ -105,13 +107,24 @@ describe("resolveNpmChannelTag", () => {
       tag: "latest",
       version: "1.0.4",
     });
-    await expect(fetchPackageUpdateSourceVersion({ timeoutMs: 1000 })).resolves.toEqual({
+    await expect(fetchNpmLatestVersion({ timeoutMs: 1000 })).resolves.toEqual({
       latestVersion: "1.0.4",
-      sourceLabel: "github arthurianresolve/excaliclaw#master",
       error: undefined,
+    });
+    versionByTag.beta = "1.0.5-beta.1";
+    await expect(
+      fetchNpmRegistryVersionForChannel({ channel: "beta", timeoutMs: 1000 }),
+    ).resolves.toEqual({
+      latestVersion: "1.0.5-beta.1",
+      tag: "beta",
     });
     await expect(fetchNpmTagVersion({ tag: "beta", timeoutMs: 1000 })).resolves.toEqual({
       tag: "beta",
+      version: "1.0.5-beta.1",
+      error: undefined,
+    });
+    await expect(fetchNpmTagVersion({ tag: "missing", timeoutMs: 1000 })).resolves.toEqual({
+      tag: "missing",
       version: null,
       error: "HTTP 404",
     });

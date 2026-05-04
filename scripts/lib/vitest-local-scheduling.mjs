@@ -3,11 +3,10 @@
 
 import os from "node:os";
 
-export const DEFAULT_LOCAL_FULL_SUITE_PARALLELISM = 4;
-export const LARGE_LOCAL_FULL_SUITE_PARALLELISM = 10;
-export const DEFAULT_LOCAL_FULL_SUITE_VITEST_WORKERS = 1;
-export const LARGE_LOCAL_FULL_SUITE_VITEST_WORKERS = 2;
-export const PI5_8GB_TEST_PROFILE = "pi5-8gb";
+const DEFAULT_LOCAL_FULL_SUITE_PARALLELISM = 4;
+const LARGE_LOCAL_FULL_SUITE_PARALLELISM = 10;
+const DEFAULT_LOCAL_FULL_SUITE_VITEST_WORKERS = 1;
+const LARGE_LOCAL_FULL_SUITE_VITEST_WORKERS = 2;
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -21,46 +20,20 @@ function isSystemThrottleDisabled(env) {
   return normalized === "1" || normalized === "true";
 }
 
-function resolveTestProfile(value) {
-  const normalized = value?.trim().toLowerCase();
-  return normalized === PI5_8GB_TEST_PROFILE ? PI5_8GB_TEST_PROFILE : null;
-}
-
-function applyPi5_8gbVitestEnv(env) {
-  const nextEnv = {
-    ...env,
-    OPENCLAW_LOCAL_CHECK: "1",
-    OPENCLAW_TEST_PROFILE: PI5_8GB_TEST_PROFILE,
-  };
-
-  // Raspberry Pi 5 8 GB defaults: run one shard and one Vitest worker unless
-  // the caller explicitly chooses a different concurrency budget.
-  if (!nextEnv.OPENCLAW_TEST_PROJECTS_SERIAL?.trim()) {
-    nextEnv.OPENCLAW_TEST_PROJECTS_SERIAL = "1";
-  }
-  if (!nextEnv.OPENCLAW_VITEST_MAX_WORKERS?.trim() && !nextEnv.OPENCLAW_TEST_WORKERS?.trim()) {
-    nextEnv.OPENCLAW_VITEST_MAX_WORKERS = "1";
-  }
-
-  return nextEnv;
-}
-
 export function isCiLikeEnv(env = process.env) {
   return env.CI === "true" || env.GITHUB_ACTIONS === "true";
 }
 
 export function resolveLocalVitestEnv(env = process.env) {
-  const testProfile = resolveTestProfile(env.OPENCLAW_TEST_PROFILE);
   const normalizedLocalCheck = env.OPENCLAW_LOCAL_CHECK?.trim().toLowerCase();
   if (isCiLikeEnv(env) || (normalizedLocalCheck !== "0" && normalizedLocalCheck !== "false")) {
-    return testProfile === PI5_8GB_TEST_PROFILE ? applyPi5_8gbVitestEnv(env) : env;
+    return env;
   }
 
-  const localEnv = {
+  return {
     ...env,
     OPENCLAW_LOCAL_CHECK: "1",
   };
-  return testProfile === PI5_8GB_TEST_PROFILE ? applyPi5_8gbVitestEnv(localEnv) : localEnv;
 }
 
 export function detectVitestHostInfo() {

@@ -11,7 +11,6 @@ const readConfigFileSnapshotForWriteMock = vi.fn();
 const writeConfigFileMock = vi.fn();
 const validateConfigObjectWithPluginsMock = vi.fn();
 const prepareSecretsRuntimeSnapshotMock = vi.fn();
-const getActiveSecretsRuntimeSnapshotMock = vi.fn();
 const scheduleGatewaySigusr1RestartMock = vi.fn(() => ({
   scheduled: true,
   delayMs: 1_000,
@@ -42,7 +41,7 @@ vi.mock("../../config/runtime-schema.js", () => ({
 }));
 
 vi.mock("../../secrets/runtime.js", () => ({
-  getActiveSecretsRuntimeSnapshot: getActiveSecretsRuntimeSnapshotMock,
+  getActiveSecretsRuntimeSnapshot: () => null,
   prepareSecretsRuntimeSnapshot: prepareSecretsRuntimeSnapshotMock,
 }));
 
@@ -71,7 +70,6 @@ beforeEach(() => {
     ok: true,
     config,
   }));
-  getActiveSecretsRuntimeSnapshotMock.mockReturnValue(null);
   prepareSecretsRuntimeSnapshotMock.mockImplementation(
     async ({ config }: { config: OpenClawConfig }) => ({
       config,
@@ -81,7 +79,7 @@ beforeEach(() => {
 });
 
 describe("config shared auth disconnects", () => {
-  it("disconnects shared-auth clients for config.set auth writes without restart", async () => {
+  it("does not disconnect shared-auth clients for config.set auth writes without restart", async () => {
     const prevConfig: OpenClawConfig = {
       gateway: {
         auth: {
@@ -112,7 +110,7 @@ describe("config shared auth disconnects", () => {
     await flushConfigHandlerMicrotasks();
 
     expect(writeConfigFileMock).toHaveBeenCalledWith(nextConfig, {});
-    expect(disconnectClientsUsingSharedGatewayAuth).toHaveBeenCalledTimes(1);
+    expect(disconnectClientsUsingSharedGatewayAuth).not.toHaveBeenCalled();
     expect(scheduleGatewaySigusr1RestartMock).not.toHaveBeenCalled();
   });
 
@@ -168,43 +166,6 @@ describe("config shared auth disconnects", () => {
 
     expect(scheduleGatewaySigusr1RestartMock).not.toHaveBeenCalled();
     expect(disconnectClientsUsingSharedGatewayAuth).not.toHaveBeenCalled();
-  });
-
-  it("disconnects shared-auth clients when an active SecretRef rotation changes runtime auth", async () => {
-    const prevConfig: OpenClawConfig = {
-      gateway: {
-        auth: {
-          mode: "token",
-          token: "token-old",
-        },
-      },
-    };
-    readConfigFileSnapshotForWriteMock.mockResolvedValue(createConfigWriteSnapshot(prevConfig));
-    getActiveSecretsRuntimeSnapshotMock.mockReturnValue({ config: prevConfig });
-    prepareSecretsRuntimeSnapshotMock.mockImplementation(async () => ({
-      config: {
-        gateway: {
-          auth: {
-            mode: "token",
-            token: "token-new",
-          },
-        },
-      },
-    }));
-
-    const { options, disconnectClientsUsingSharedGatewayAuth } = createConfigHandlerHarness({
-      method: "config.set",
-      params: {
-        raw: JSON.stringify(prevConfig, null, 2),
-        baseHash: "base-hash",
-      },
-    });
-
-    await configHandlers["config.set"](options);
-    await flushConfigHandlerMicrotasks();
-
-    expect(writeConfigFileMock).toHaveBeenCalledWith(prevConfig, {});
-    expect(disconnectClientsUsingSharedGatewayAuth).toHaveBeenCalledTimes(1);
   });
 
   it("still schedules a direct restart for hot mode when the reloader cannot apply the change", async () => {

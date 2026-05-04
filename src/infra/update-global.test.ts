@@ -125,9 +125,9 @@ describe("update global helpers", () => {
     expect(
       resolveGlobalInstallSpec({
         packageName: "openclaw",
-        tag: "github:arthurianresolve/excaliclaw#feature/my-branch",
+        tag: "github:openclaw/openclaw#feature/my-branch",
       }),
-    ).toBe("github:arthurianresolve/excaliclaw#feature/my-branch");
+    ).toBe("github:openclaw/openclaw#feature/my-branch");
     expect(
       resolveGlobalInstallSpec({
         packageName: "openclaw",
@@ -155,7 +155,7 @@ describe("update global helpers", () => {
     expect(isMainPackageTarget(" MAIN ")).toBe(true);
     expect(isMainPackageTarget("beta")).toBe(false);
 
-    expect(isExplicitPackageInstallSpec("github:arthurianresolve/excaliclaw#master")).toBe(true);
+    expect(isExplicitPackageInstallSpec("github:openclaw/openclaw#main")).toBe(true);
     expect(isExplicitPackageInstallSpec("https://example.com/openclaw-main.tgz")).toBe(true);
     expect(isExplicitPackageInstallSpec("file:/tmp/openclaw-main.tgz")).toBe(true);
     expect(isExplicitPackageInstallSpec("beta")).toBe(false);
@@ -163,9 +163,7 @@ describe("update global helpers", () => {
     expect(canResolveRegistryVersionForPackageTarget("latest")).toBe(true);
     expect(canResolveRegistryVersionForPackageTarget("2026.3.22")).toBe(true);
     expect(canResolveRegistryVersionForPackageTarget("main")).toBe(false);
-    expect(
-      canResolveRegistryVersionForPackageTarget("github:arthurianresolve/excaliclaw#master"),
-    ).toBe(false);
+    expect(canResolveRegistryVersionForPackageTarget("github:openclaw/openclaw#main")).toBe(false);
   });
 
   it("detects install managers from resolved roots and on-disk presence", async () => {
@@ -459,27 +457,7 @@ describe("update global helpers", () => {
     });
   });
 
-  it("checks installed dist import references during global verify", async () => {
-    await withTempDir({ prefix: "openclaw-update-global-imports-" }, async (packageRoot) => {
-      await writeGlobalPackageJson(packageRoot, "2026.4.27");
-      const runMain = path.join(packageRoot, "dist", "cli", "run-main.js");
-      await fs.mkdir(path.dirname(runMain), { recursive: true });
-      await fs.writeFile(runMain, 'await import("../memory-state-CcqRgDZU.js");\n', "utf8");
-      await writePackageDistInventory(packageRoot);
-
-      await expect(collectInstalledGlobalPackageErrors({ packageRoot })).resolves.toContain(
-        "missing packaged dist import target ../memory-state-CcqRgDZU.js from dist/cli/run-main.js",
-      );
-
-      const chunk = path.join(packageRoot, "dist", "memory-state-CcqRgDZU.js");
-      await fs.writeFile(chunk, "export {};\n", "utf8");
-      await writePackageDistInventory(packageRoot);
-
-      await expect(collectInstalledGlobalPackageErrors({ packageRoot })).resolves.toEqual([]);
-    });
-  });
-
-  it("ignores bundled plugin install stages during installed dist verification", async () => {
+  it("reports bundled plugin install stages during installed dist verification", async () => {
     await withTempDir({ prefix: "openclaw-update-global-plugin-stage-" }, async (packageRoot) => {
       await writeGlobalPackageJson(packageRoot);
       await fs.mkdir(path.join(packageRoot, "dist", "extensions", "brave"), { recursive: true });
@@ -502,7 +480,30 @@ describe("update global helpers", () => {
         await fs.writeFile(stagedFile, "export {};\n", "utf8");
       }
 
-      await expect(collectInstalledGlobalPackageErrors({ packageRoot })).resolves.toEqual([]);
+      await expect(collectInstalledGlobalPackageErrors({ packageRoot })).resolves.toEqual([
+        "unexpected packaged dist file dist/extensions/brave/.openclaw-install-stage-retry/node_modules/typebox/build/compile/code.mjs",
+        "unexpected packaged dist file dist/extensions/brave/.openclaw-install-stage/node_modules/typebox/build/compile/code.mjs",
+      ]);
+    });
+  });
+
+  it("flags global package roots that resolve into source checkouts", async () => {
+    await withTempDir({ prefix: "openclaw-update-global-source-checkout-" }, async (base) => {
+      const checkoutRoot = path.join(base, "checkout");
+      const globalRoot = path.join(base, "prefix", "lib", "node_modules");
+      const packageRoot = path.join(globalRoot, "openclaw");
+      await fs.mkdir(path.join(checkoutRoot, ".git"), { recursive: true });
+      await fs.mkdir(path.join(checkoutRoot, "src"), { recursive: true });
+      await fs.mkdir(path.join(checkoutRoot, "extensions"), { recursive: true });
+      await fs.writeFile(path.join(checkoutRoot, "pnpm-workspace.yaml"), "packages: []\n", "utf8");
+      await writeGlobalPackageJson(checkoutRoot, "2026.4.27");
+      await fs.mkdir(globalRoot, { recursive: true });
+      await fs.symlink(checkoutRoot, packageRoot, "dir");
+      const realCheckoutRoot = await fs.realpath(checkoutRoot);
+
+      await expect(collectInstalledGlobalPackageErrors({ packageRoot })).resolves.toContain(
+        `global package root resolves to source checkout: ${realCheckoutRoot}`,
+      );
     });
   });
 

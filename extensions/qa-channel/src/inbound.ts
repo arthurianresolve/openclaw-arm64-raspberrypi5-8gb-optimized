@@ -77,52 +77,25 @@ export async function handleQaInbound(params: {
     channel: params.channelId,
     accountId: params.account.accountId,
     peer: {
-      kind: inbound.conversation.kind === "direct" ? "direct" : "channel",
+      kind:
+        inbound.conversation.kind === "direct"
+          ? "direct"
+          : inbound.conversation.kind === "group"
+            ? "group"
+            : "channel",
       id: target,
     },
   });
   const isGroup = inbound.conversation.kind !== "direct";
-  const mentionRegexes = isGroup
-    ? runtime.channel.mentions.buildMentionRegexes(params.config as OpenClawConfig, route.agentId)
-    : [];
-  const wasMentioned =
-    isGroup && mentionRegexes.length > 0
-      ? runtime.channel.mentions.matchesMentionPatterns(inbound.text, mentionRegexes)
-      : false;
-  const allowTextCommands = runtime.channel.commands.shouldHandleTextCommands({
-    cfg: params.config as OpenClawConfig,
-    surface: params.channelId,
-  });
-  const hasControlCommand = runtime.channel.text.hasControlCommand(
-    inbound.text,
-    params.config as OpenClawConfig,
-  );
-  const commandAuthorized = true;
-  const requireMention = isGroup
-    ? runtime.channel.groups.resolveRequireMention({
-        cfg: params.config as OpenClawConfig,
-        channel: params.channelId,
-        groupId: inbound.conversation.id,
-        accountId: params.account.accountId,
-      })
-    : false;
-  const mentionDecision = runtime.channel.mentions.resolveInboundMentionDecision({
-    facts: {
-      canDetectMention: mentionRegexes.length > 0,
-      wasMentioned,
-      hasAnyMention: wasMentioned,
-    },
-    policy: {
-      isGroup,
-      requireMention,
-      allowTextCommands,
-      hasControlCommand,
-      commandAuthorized,
-    },
-  });
-  if (isGroup && mentionDecision.shouldSkip) {
-    return;
-  }
+  const wasMentioned = isGroup
+    ? runtime.channel.mentions.matchesMentionPatterns(
+        inbound.text,
+        runtime.channel.mentions.buildMentionRegexes(
+          params.config as OpenClawConfig,
+          route.agentId,
+        ),
+      )
+    : undefined;
   const storePath = runtime.channel.session.resolveStorePath(params.config.session?.store, {
     agentId: route.agentId,
   });
@@ -145,23 +118,20 @@ export async function handleQaInbound(params: {
     BodyForAgent: inbound.text,
     RawBody: inbound.text,
     CommandBody: inbound.text,
-    From: buildQaTarget({
-      chatType: inbound.conversation.kind,
-      conversationId: inbound.senderId,
-    }),
+    From: target,
     To: target,
     SessionKey: route.sessionKey,
     AccountId: route.accountId ?? params.account.accountId,
-    ChatType: isGroup ? "group" : "direct",
+    ChatType: inbound.conversation.kind === "direct" ? "direct" : "group",
+    WasMentioned: wasMentioned,
     ConversationLabel:
       inbound.threadTitle ||
       inbound.conversation.title ||
       inbound.senderName ||
       inbound.conversation.id,
-    GroupSubject:
-      inbound.conversation.kind === "channel"
-        ? inbound.threadTitle || inbound.conversation.title || inbound.conversation.id
-        : undefined,
+    GroupSubject: isGroup
+      ? inbound.threadTitle || inbound.conversation.title || inbound.conversation.id
+      : undefined,
     GroupChannel: inbound.conversation.kind === "channel" ? inbound.conversation.id : undefined,
     NativeChannelId: inbound.conversation.id,
     MessageThreadId: inbound.threadId,
@@ -177,8 +147,7 @@ export async function handleQaInbound(params: {
     Timestamp: inbound.timestamp,
     OriginatingChannel: params.channelId,
     OriginatingTo: target,
-    WasMentioned: isGroup ? mentionDecision.effectiveWasMentioned : undefined,
-    CommandAuthorized: commandAuthorized,
+    CommandAuthorized: true,
     ...mediaPayload,
   });
 

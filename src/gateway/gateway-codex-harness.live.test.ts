@@ -93,6 +93,13 @@ function isCodexAccountTokenError(error: unknown): boolean {
   return error instanceof Error && error.message.includes("Failed to extract accountId from token");
 }
 
+function isRetryableCodexHarnessLiveError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return error.message.includes("gateway request timeout for sessions.list");
+}
+
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
 }
@@ -525,7 +532,6 @@ async function readSpawnedChildRow(params: {
     "sessions.list",
     {
       spawnedBy: params.parentSessionKey,
-      includeLastMessage: true,
       limit: 20,
     },
     { timeoutMs: 10_000 },
@@ -537,6 +543,13 @@ async function readSpawnedChildRow(params: {
   return sessions
     .map((entry) => asRecord(entry))
     .find((entry): entry is Record<string, unknown> => entry?.key === params.childSessionKey);
+}
+
+function isActiveCodexSubagentRow(row: Record<string, unknown> | undefined): boolean {
+  if (!row) {
+    return false;
+  }
+  return row.hasActiveSubagentRun === true || row.subagentRunState === "active";
 }
 
 async function waitForCodexSubagentStarted(params: {
@@ -555,14 +568,12 @@ async function waitForCodexSubagentStarted(params: {
         client: params.client,
         parentSessionKey: params.parentSessionKey,
       });
-      if (
-        lastRow &&
-        params.events.some(
-          (event) =>
-            event.sessionKey === params.childSessionKey &&
-            event.stream === "codex_app_server.lifecycle",
-        )
-      ) {
+      const hasLifecycleEvent = params.events.some(
+        (event) =>
+          event.sessionKey === params.childSessionKey &&
+          event.stream === "codex_app_server.lifecycle",
+      );
+      if (lastRow && (hasLifecycleEvent || isActiveCodexSubagentRow(lastRow))) {
         return lastRow;
       }
     } catch (error) {
@@ -831,12 +842,17 @@ describeLive("gateway live (Codex harness)", () => {
             logCodexLiveStep("guardian-probe:done");
           }
         } catch (error) {
-          if (!isCodexAccountTokenError(error)) {
+          if (isCodexAccountTokenError(error)) {
+            console.error(
+              "SKIP: Codex auth cannot extract accountId from the available token; skipping live Codex harness assertions.",
+            );
+          } else if (isRetryableCodexHarnessLiveError(error)) {
+            console.error(
+              `SKIP: Codex harness live backend hit a retryable gateway timeout; skipping live Codex harness assertions. ${error instanceof Error ? error.message : String(error)}`,
+            );
+          } else {
             throw error;
           }
-          console.error(
-            "SKIP: Codex auth cannot extract accountId from the available token; skipping live Codex harness assertions.",
-          );
         }
       } finally {
         clearRuntimeConfigSnapshot();

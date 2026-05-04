@@ -26,6 +26,7 @@ export type TaskFlowRegistryMaintenanceSummary = {
 function isTerminalFlow(flow: TaskFlowRecord): boolean {
   return (
     flow.status === "succeeded" ||
+    flow.status === "blocked" ||
     flow.status === "failed" ||
     flow.status === "cancelled" ||
     flow.status === "lost"
@@ -119,6 +120,40 @@ function finalizeCancelledFlow(flow: TaskFlowRecord, now: number): boolean {
   return false;
 }
 
+function shouldRepairTerminalMirroredFlowTimestamp(flow: TaskFlowRecord): boolean {
+  if (flow.syncMode !== "task_mirrored" || !isTerminalFlow(flow)) {
+    return false;
+  }
+  if (flow.endedAt == null || flow.endedAt < flow.createdAt) {
+    return false;
+  }
+  return flow.updatedAt > flow.endedAt;
+}
+
+function repairTerminalMirroredFlowTimestamp(flow: TaskFlowRecord): boolean {
+  let current = flow;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (!shouldRepairTerminalMirroredFlowTimestamp(current)) {
+      return false;
+    }
+    const result = updateFlowRecordByIdExpectedRevision({
+      flowId: current.flowId,
+      expectedRevision: current.revision,
+      patch: {
+        updatedAt: current.endedAt,
+      },
+    });
+    if (result.applied) {
+      return true;
+    }
+    if (result.reason === "not_found" || !result.current) {
+      return false;
+    }
+    current = result.current;
+  }
+  return false;
+}
+
 export function getInspectableTaskFlowAuditSummary(): TaskFlowAuditSummary {
   return summarizeTaskFlowAuditFindings(listTaskFlowAuditFindings());
 }
@@ -129,6 +164,10 @@ export function previewTaskFlowRegistryMaintenance(): TaskFlowRegistryMaintenanc
   let pruned = 0;
   const backfilled = listLegacyVerificationBackfillCandidates().length;
   for (const flow of listTaskFlowRecords()) {
+    if (shouldRepairTerminalMirroredFlowTimestamp(flow)) {
+      reconciled += 1;
+      continue;
+    }
     if (shouldFinalizeCancelledFlow(flow)) {
       reconciled += 1;
       continue;
@@ -148,6 +187,12 @@ export async function runTaskFlowRegistryMaintenance(): Promise<TaskFlowRegistry
   for (const flow of listTaskFlowRecords()) {
     const current = getTaskFlowById(flow.flowId);
     if (!current) {
+      continue;
+    }
+    if (shouldRepairTerminalMirroredFlowTimestamp(current)) {
+      if (repairTerminalMirroredFlowTimestamp(current)) {
+        reconciled += 1;
+      }
       continue;
     }
     if (shouldFinalizeCancelledFlow(current)) {

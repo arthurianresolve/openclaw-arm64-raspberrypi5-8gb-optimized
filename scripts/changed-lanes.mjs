@@ -238,8 +238,8 @@ export function listChangedPathsFromGit(params) {
   return [
     ...new Set([
       ...rangePaths,
-      ...runGitNameOnlyDiff(["--cached", "--diff-filter=ACMR"], cwd),
-      ...runGitNameOnlyDiff(["--diff-filter=ACMR"], cwd),
+      ...runGitNameOnlyDiff(["--cached", "--diff-filter=ACMRD"], cwd),
+      ...runGitNameOnlyDiff(["--diff-filter=ACMRD"], cwd),
       ...runGitLsFiles(["--others", "--exclude-standard"], cwd),
     ]),
   ].toSorted((left, right) => left.localeCompare(right));
@@ -285,7 +285,7 @@ function gitCommitExists(ref, cwd = process.cwd()) {
 }
 
 export function listStagedChangedPaths() {
-  const output = execFileSync("git", ["diff", "--cached", "--name-only", "--diff-filter=ACMR"], {
+  const output = execFileSync("git", ["diff", "--cached", "--name-only", "--diff-filter=ACMRD"], {
     stdio: ["ignore", "pipe", "pipe"],
     encoding: "utf8",
     maxBuffer: GIT_OUTPUT_MAX_BUFFER,

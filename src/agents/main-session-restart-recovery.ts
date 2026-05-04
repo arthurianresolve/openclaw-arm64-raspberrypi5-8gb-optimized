@@ -14,7 +14,7 @@ import {
   updateSessionStore,
 } from "../config/sessions.js";
 import { callGateway } from "../gateway/call.js";
-import { readSessionMessages } from "../gateway/session-utils.fs.js";
+import { readSessionMessagesAsync } from "../gateway/session-utils.fs.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { CommandLane } from "../process/lanes.js";
 import { isAcpSessionKey, isCronSessionKey, isSubagentSessionKey } from "../routing/session-key.js";
@@ -61,7 +61,7 @@ function resolveEntryTranscriptLockPaths(params: {
     try {
       paths.add(path.resolve(`${resolvePath()}.lock`));
     } catch {
-      // Best-effort only when the stored session metadata is stale.
+      // Keep restart recovery best-effort when session metadata is stale.
     }
   };
   push(() =>
@@ -94,9 +94,26 @@ function isResumableTailMessage(message: unknown): boolean {
   return role === "user" || role === "tool" || role === "toolResult";
 }
 
-function isMainSessionResumable(messages: unknown[]): boolean {
+function isApprovalPendingToolResult(message: unknown): boolean {
+  if (!message || typeof message !== "object" || getMessageRole(message) !== "toolResult") {
+    return false;
+  }
+  const details = (message as { details?: unknown }).details;
+  if (!details || typeof details !== "object") {
+    return false;
+  }
+  return (details as { status?: unknown }).status === "approval-pending";
+}
+
+function resolveMainSessionResumeBlockReason(messages: unknown[]): string | null {
   const lastMeaningful = messages.toReversed().find(isMeaningfulTailMessage);
-  return lastMeaningful ? isResumableTailMessage(lastMeaningful) : false;
+  if (!lastMeaningful || !isResumableTailMessage(lastMeaningful)) {
+    return "transcript tail is not resumable";
+  }
+  if (isApprovalPendingToolResult(lastMeaningful)) {
+    return "transcript tail is a stale approval-pending tool result";
+  }
+  return null;
 }
 
 function buildResumeMessage(): string {
@@ -243,18 +260,28 @@ async function recoverStore(params: {
 
     let messages: unknown[];
     try {
-      messages = readSessionMessages(entry.sessionId, params.storePath, entry.sessionFile);
+      messages = await readSessionMessagesAsync(
+        entry.sessionId,
+        params.storePath,
+        entry.sessionFile,
+        {
+          mode: "recent",
+          maxMessages: 20,
+          maxBytes: 256 * 1024,
+        },
+      );
     } catch (err) {
       log.warn(`failed to read transcript for ${sessionKey}: ${String(err)}`);
       result.failed++;
       continue;
     }
 
-    if (!isMainSessionResumable(messages)) {
+    const resumeBlockReason = resolveMainSessionResumeBlockReason(messages);
+    if (resumeBlockReason) {
       await markSessionFailed({
         storePath: params.storePath,
         sessionKey,
-        reason: "transcript tail is not resumable",
+        reason: resumeBlockReason,
       });
       result.failed++;
       continue;

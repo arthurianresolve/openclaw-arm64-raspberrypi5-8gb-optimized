@@ -81,6 +81,48 @@ export async function handleQaInbound(params: {
       id: target,
     },
   });
+  const isGroup = inbound.conversation.kind !== "direct";
+  const mentionRegexes = isGroup
+    ? runtime.channel.mentions.buildMentionRegexes(params.config as OpenClawConfig, route.agentId)
+    : [];
+  const wasMentioned =
+    isGroup && mentionRegexes.length > 0
+      ? runtime.channel.mentions.matchesMentionPatterns(inbound.text, mentionRegexes)
+      : false;
+  const allowTextCommands = runtime.channel.commands.shouldHandleTextCommands({
+    cfg: params.config as OpenClawConfig,
+    surface: params.channelId,
+  });
+  const hasControlCommand = runtime.channel.text.hasControlCommand(
+    inbound.text,
+    params.config as OpenClawConfig,
+  );
+  const commandAuthorized = true;
+  const requireMention = isGroup
+    ? runtime.channel.groups.resolveRequireMention({
+        cfg: params.config as OpenClawConfig,
+        channel: params.channelId,
+        groupId: inbound.conversation.id,
+        accountId: params.account.accountId,
+      })
+    : false;
+  const mentionDecision = runtime.channel.mentions.resolveInboundMentionDecision({
+    facts: {
+      canDetectMention: mentionRegexes.length > 0,
+      wasMentioned,
+      hasAnyMention: wasMentioned,
+    },
+    policy: {
+      isGroup,
+      requireMention,
+      allowTextCommands,
+      hasControlCommand,
+      commandAuthorized,
+    },
+  });
+  if (isGroup && mentionDecision.shouldSkip) {
+    return;
+  }
   const storePath = runtime.channel.session.resolveStorePath(params.config.session?.store, {
     agentId: route.agentId,
   });
@@ -110,7 +152,7 @@ export async function handleQaInbound(params: {
     To: target,
     SessionKey: route.sessionKey,
     AccountId: route.accountId ?? params.account.accountId,
-    ChatType: inbound.conversation.kind === "direct" ? "direct" : "group",
+    ChatType: isGroup ? "group" : "direct",
     ConversationLabel:
       inbound.threadTitle ||
       inbound.conversation.title ||
@@ -135,7 +177,8 @@ export async function handleQaInbound(params: {
     Timestamp: inbound.timestamp,
     OriginatingChannel: params.channelId,
     OriginatingTo: target,
-    CommandAuthorized: true,
+    WasMentioned: isGroup ? mentionDecision.effectiveWasMentioned : undefined,
+    CommandAuthorized: commandAuthorized,
     ...mediaPayload,
   });
 

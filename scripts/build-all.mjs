@@ -22,6 +22,11 @@ export const BUILD_ALL_STEPS = [
   { label: "ui:build", kind: "pnpm", pnpmArgs: ["ui:build"] },
   { label: "build-stamp", kind: "node", args: ["scripts/build-stamp.mjs"] },
   {
+    label: "runtime-postbuild-stamp",
+    kind: "node",
+    args: ["scripts/runtime-postbuild-stamp.mjs"],
+  },
+  {
     label: "build:plugin-sdk:dts",
     kind: "pnpm",
     pnpmArgs: ["build:plugin-sdk:dts"],
@@ -101,6 +106,7 @@ export const BUILD_ALL_PROFILES = {
     "runtime-postbuild",
     "ui:build",
     "build-stamp",
+    "runtime-postbuild-stamp",
     "build:plugin-sdk:dts",
     "write-plugin-sdk-entry-dts",
     "check-plugin-sdk-exports",
@@ -111,7 +117,13 @@ export const BUILD_ALL_PROFILES = {
     "write-cli-startup-metadata",
     "write-cli-compat",
   ],
-  gatewayWatch: ["tsdown", "check-cli-bootstrap-imports", "runtime-postbuild", "build-stamp"],
+  gatewayWatch: [
+    "tsdown",
+    "check-cli-bootstrap-imports",
+    "runtime-postbuild",
+    "build-stamp",
+    "runtime-postbuild-stamp",
+  ],
 };
 
 export function resolveBuildAllSteps(profile = "full") {

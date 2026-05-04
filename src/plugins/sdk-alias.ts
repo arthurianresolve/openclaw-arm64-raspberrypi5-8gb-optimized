@@ -310,6 +310,20 @@ function shouldIncludePrivateLocalOnlyPluginSdkSubpaths() {
   return process.env.OPENCLAW_ENABLE_PRIVATE_QA_CLI === "1";
 }
 
+function resolvePrivateQaChannelApiAlias(
+  params: LoaderModuleResolveParams & { modulePath: string },
+) {
+  if (!shouldIncludePrivateLocalOnlyPluginSdkSubpaths()) {
+    return null;
+  }
+  const packageRoot = resolveLoaderPluginSdkPackageRoot(params);
+  if (!packageRoot) {
+    return null;
+  }
+  const candidate = path.join(packageRoot, "extensions", "qa-channel", "api.ts");
+  return fs.existsSync(candidate) ? candidate : null;
+}
+
 function hasPluginSdkSubpathArtifact(packageRoot: string, subpath: string) {
   const distPath = path.join(packageRoot, "dist", "plugin-sdk", `${subpath}.js`);
   if (isUsableDistPluginSdkArtifact(distPath)) {
@@ -622,9 +636,20 @@ export function buildPluginLoaderAliasMap(
     pluginSdkResolution,
   });
   const extensionApiAlias = resolveExtensionApiAlias({ modulePath, pluginSdkResolution });
+  const privateQaChannelApiAlias = resolvePrivateQaChannelApiAlias({
+    modulePath,
+    argv1,
+    moduleUrl,
+    pluginSdkResolution,
+  });
   const result: Record<string, string> = {
     ...(extensionApiAlias
       ? { "openclaw/extension-api": normalizeJitiAliasTargetPath(extensionApiAlias) }
+      : {}),
+    ...(privateQaChannelApiAlias
+      ? {
+          "@openclaw/qa-channel/api.js": normalizeJitiAliasTargetPath(privateQaChannelApiAlias),
+        }
       : {}),
     ...(pluginSdkAlias
       ? Object.fromEntries(

@@ -28,7 +28,11 @@ import { note } from "../terminal/note.js";
 import { shortenHomePath } from "../utils.js";
 
 type DoctorPrompterLike = {
-  confirmRuntimeRepair: (params: { message: string; initialValue?: boolean }) => Promise<boolean>;
+  confirmRuntimeRepair: (params: {
+    message: string;
+    initialValue?: boolean;
+    requiresInteractiveConfirmation?: boolean;
+  }) => Promise<boolean>;
   note?: typeof note;
 };
 
@@ -591,12 +595,16 @@ export async function noteStateIntegrity(
   cfg: OpenClawConfig,
   prompter: DoctorPrompterLike,
   configPath?: string,
+  params: {
+    env?: NodeJS.ProcessEnv;
+    homedir?: () => string;
+  } = {},
 ) {
   const warnings: string[] = [];
   const changes: string[] = [];
   const noteFn = prompter.note ?? note;
-  const env = process.env;
-  const homedir = () => resolveRequiredHomeDir(env, os.homedir);
+  const env = params.env ?? process.env;
+  const homedir = () => resolveRequiredHomeDir(env, params.homedir ?? os.homedir);
   const stateDir = resolveStateDir(env, homedir);
   const defaultStateDir = path.join(homedir(), ".openclaw");
   const oauthDir = resolveOAuthDir(env, stateDir);
@@ -921,6 +929,7 @@ export async function noteStateIntegrity(
       const archiveOrphans = await prompter.confirmRuntimeRepair({
         message: `Archive ${orphanCount} in ${displaySessionsDir}? This only renames them to *.deleted.<timestamp>.`,
         initialValue: false,
+        requiresInteractiveConfirmation: true,
       });
       if (archiveOrphans) {
         let archived = 0;

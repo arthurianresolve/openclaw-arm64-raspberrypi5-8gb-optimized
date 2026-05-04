@@ -224,6 +224,7 @@ export function createRuntimeTasks(params: {
   return {
     runs: createRuntimeTaskRuns(),
     flows: createRuntimeTaskFlows(),
+    managedFlows: params.legacyTaskFlow,
     flow: params.legacyTaskFlow,
   };
 }

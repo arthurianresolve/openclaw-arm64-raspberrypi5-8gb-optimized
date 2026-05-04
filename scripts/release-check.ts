@@ -16,6 +16,7 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   isBundledRuntimeDepsInstallStagePath,
+  LOCAL_BUILD_METADATA_DIST_PATHS,
   PACKAGE_DIST_INVENTORY_RELATIVE_PATH,
   writePackageDistInventory,
 } from "../src/infra/package-dist-inventory.ts";
@@ -71,11 +72,13 @@ const requiredPathGroups = [
   "scripts/postinstall-bundled-plugins.mjs",
   "dist/plugin-sdk/compat.js",
   "dist/plugin-sdk/root-alias.cjs",
+  "dist/task-registry-control.runtime.js",
   "dist/build-info.json",
   "dist/channel-catalog.json",
   "dist/control-ui/index.html",
 ];
 const forbiddenPrefixes = [
+  ...LOCAL_BUILD_METADATA_DIST_PATHS,
   "dist-runtime/",
   "dist/OpenClaw.app/",
   "dist/extensions/qa-channel/",
@@ -474,6 +477,32 @@ function runPackedBundledPluginActivationSmoke(packageRoot: string, tmpRoot: str
   }
 }
 
+function runPackedTaskRegistryControlRuntimeSmoke(packageRoot: string): void {
+  const runtimePath = join(packageRoot, "dist", "task-registry-control.runtime.js");
+  if (!existsSync(runtimePath)) {
+    throw new Error("release-check: packed task-registry control runtime is missing.");
+  }
+  const source = [
+    'const dynamicImport = Function("specifier", "return im" + "port(specifier)");',
+    "const runtime = await dynamicImport(process.argv[1]);",
+    'if (typeof runtime.getAcpSessionManager !== "function") {',
+    '  throw new Error("missing getAcpSessionManager export");',
+    "}",
+    'if (typeof runtime.killSubagentRunAdmin !== "function") {',
+    '  throw new Error("missing killSubagentRunAdmin export");',
+    "}",
+  ].join("\n");
+  execFileSync(
+    process.execPath,
+    ["--input-type=module", "--eval", source, pathToFileURL(runtimePath).href],
+    {
+      cwd: packageRoot,
+      stdio: "inherit",
+      env: createPackedCliSmokeEnv(process.env),
+    },
+  );
+}
+
 function runPackedCliSmoke(params: {
   prefixDir: string;
   cwd: string;
@@ -538,6 +567,7 @@ function runPackedBundledChannelEntrySmoke(): void {
     });
     runPackedBundledPluginPostinstall(packageRoot);
     runPackedBundledPluginActivationSmoke(packageRoot, tmpRoot);
+    runPackedTaskRegistryControlRuntimeSmoke(packageRoot);
     execFileSync(
       process.execPath,
       [

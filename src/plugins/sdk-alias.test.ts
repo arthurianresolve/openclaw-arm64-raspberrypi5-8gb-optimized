@@ -1,12 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { afterAll, describe, expect, it, vi } from "vitest";
 import {
   bundledDistPluginFile,
   bundledPluginFile,
   bundledPluginRoot,
-} from "../../test/helpers/bundled-plugin-paths.js";
+} from "openclaw/plugin-sdk/test-fixtures";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { withEnv } from "../test-utils/env.js";
 import {
   buildPluginLoaderAliasMap,
@@ -682,6 +682,29 @@ describe("plugin sdk alias helpers", () => {
     );
   });
 
+  it("adds the private qa-channel api alias when private qa is enabled", () => {
+    const fixture = createPluginSdkAliasFixture();
+    const qaChannelApiPath = path.join(fixture.root, "extensions", "qa-channel", "api.ts");
+    mkdirSafeDir(path.dirname(qaChannelApiPath));
+    fs.writeFileSync(qaChannelApiPath, "export const qaChannelApi = true;\n", "utf-8");
+    const sourcePluginEntry = writePluginEntry(
+      fixture.root,
+      bundledPluginFile("qa-lab", "src/runtime-api.ts"),
+    );
+
+    const publicAliases = withEnv({ OPENCLAW_ENABLE_PRIVATE_QA_CLI: undefined }, () =>
+      buildPluginLoaderAliasMap(sourcePluginEntry),
+    );
+    const privateAliases = withEnv({ OPENCLAW_ENABLE_PRIVATE_QA_CLI: "1" }, () =>
+      buildPluginLoaderAliasMap(sourcePluginEntry),
+    );
+
+    expect(publicAliases["@openclaw/qa-channel/api.js"]).toBeUndefined();
+    expect(fs.realpathSync(privateAliases["@openclaw/qa-channel/api.js"] ?? "")).toBe(
+      fs.realpathSync(qaChannelApiPath),
+    );
+  });
+
   it("applies explicit dist resolution to plugin-sdk subpath aliases too", () => {
     const { fixture, distRootAlias, distChannelRuntimePath } = createPluginSdkAliasTargetFixture();
     const sourcePluginEntry = writePluginEntry(
@@ -1063,7 +1086,7 @@ describe("plugin sdk alias helpers", () => {
     fs.writeFileSync(jitiBaseFile, "export {};\n", "utf-8");
     fs.writeFileSync(
       path.join(copiedSourceDir, "channel.runtime.ts"),
-      `import { resolveOutboundSendDep } from "@openclaw/plugin-sdk/infra-runtime";
+      `import { resolveOutboundSendDep } from "@openclaw/plugin-sdk/outbound-send-deps";
 
 export const syntheticRuntimeMarker = {
   resolveOutboundSendDep,
@@ -1071,7 +1094,7 @@ export const syntheticRuntimeMarker = {
 `,
       "utf-8",
     );
-    const copiedChannelRuntimeShim = path.join(copiedPluginSdkDir, "infra-runtime.ts");
+    const copiedChannelRuntimeShim = path.join(copiedPluginSdkDir, "outbound-send-deps.ts");
     fs.writeFileSync(
       copiedChannelRuntimeShim,
       `export function resolveOutboundSendDep() {
@@ -1092,8 +1115,8 @@ export const syntheticRuntimeMarker = {
 
     const withAlias = createJiti(jitiBaseUrl, {
       ...buildPluginLoaderJitiOptions({
-        "openclaw/plugin-sdk/infra-runtime": copiedChannelRuntimeShim,
-        "@openclaw/plugin-sdk/infra-runtime": copiedChannelRuntimeShim,
+        "openclaw/plugin-sdk/outbound-send-deps": copiedChannelRuntimeShim,
+        "@openclaw/plugin-sdk/outbound-send-deps": copiedChannelRuntimeShim,
       }),
       tryNative: false,
     });

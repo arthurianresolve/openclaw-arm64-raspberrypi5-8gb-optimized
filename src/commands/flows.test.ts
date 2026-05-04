@@ -9,13 +9,8 @@ import {
   resetTaskRegistryDeliveryRuntimeForTests,
   resetTaskRegistryForTests,
 } from "../tasks/task-registry.js";
-import { withTempDir } from "../test-helpers/temp-dir.js";
-import {
-  flowsAuditCommand,
-  flowsCancelCommand,
-  flowsListCommand,
-  flowsShowCommand,
-} from "./flows.js";
+import { withOpenClawTestState } from "../test-utils/openclaw-test-state.js";
+import { flowsCancelCommand, flowsListCommand, flowsShowCommand } from "./flows.js";
 
 vi.mock("../config/config.js", () => ({
   getRuntimeConfig: vi.fn(() => ({})),
@@ -33,19 +28,24 @@ function createRuntime(): RuntimeEnv {
 }
 
 async function withTaskFlowCommandStateDir(run: (root: string) => Promise<void>): Promise<void> {
-  await withTempDir({ prefix: "openclaw-flows-command-" }, async (root) => {
-    process.env.OPENCLAW_STATE_DIR = root;
-    resetTaskRegistryDeliveryRuntimeForTests();
-    resetTaskRegistryForTests({ persist: false });
-    resetTaskFlowRegistryForTests({ persist: false });
-    try {
-      await run(root);
-    } finally {
+  await withOpenClawTestState(
+    {
+      layout: "state-only",
+      prefix: "openclaw-flows-command-",
+    },
+    async (state) => {
       resetTaskRegistryDeliveryRuntimeForTests();
       resetTaskRegistryForTests({ persist: false });
       resetTaskFlowRegistryForTests({ persist: false });
-    }
-  });
+      try {
+        await run(state.stateDir);
+      } finally {
+        resetTaskRegistryDeliveryRuntimeForTests();
+        resetTaskRegistryForTests({ persist: false });
+        resetTaskFlowRegistryForTests({ persist: false });
+      }
+    },
+  );
 }
 
 describe("flows commands", () => {
@@ -90,7 +90,6 @@ describe("flows commands", () => {
 
       const payload = JSON.parse(String(vi.mocked(runtime.log).mock.calls[0]?.[0])) as {
         count: number;
-        metrics: { blocked: number; repairAttempts: number };
         status: string | null;
         flows: Array<{
           flowId: string;
@@ -101,10 +100,6 @@ describe("flows commands", () => {
 
       expect(payload).toMatchObject({
         count: 1,
-        metrics: {
-          blocked: 1,
-          repairAttempts: 0,
-        },
         status: "blocked",
         flows: [
           {
@@ -134,23 +129,6 @@ describe("flows commands", () => {
         status: "blocked",
         currentStep: "spawn_child",
         blockedSummary: "Waiting on child task output",
-        unitContextPacket: {
-          unitId: "queue-debug",
-          objective: "Investigate the flaky queue",
-          ownedPaths: ["src/queue"],
-          relevantDocs: ["docs/help/testing.md"],
-          invariants: ["Do not drop queued work"],
-          validationCommands: ["pnpm test -- queue"],
-          contextMode: "isolated-session",
-          modelHint: "light",
-          packetSource: "taskflow",
-        },
-        unitVerificationPolicy: {
-          commands: ["pnpm test -- queue"],
-          retryCount: 1,
-          autoRepair: false,
-          failMode: "stop",
-        },
         createdAt: 100,
         updatedAt: 100,
       });
@@ -178,16 +156,8 @@ describe("flows commands", () => {
       expect(output).toContain("TaskFlow:");
       expect(output).toContain(`flowId: ${flow.flowId}`);
       expect(output).toContain("status: blocked");
-      expect(output).toContain("priority: normal");
       expect(output).toContain("goal: Investigate a flaky queue");
       expect(output).toContain("currentStep: spawn_child");
-      expect(output).toContain("unitId: queue-debug");
-      expect(output).toContain("contextMode: isolated-session");
-      expect(output).toContain("modelHint: light");
-      expect(output).toContain("verifyCommands: 1");
-      expect(output).toContain("verifyRetryCount: 1");
-      expect(output).toContain("verifyAutoRepair: off");
-      expect(output).toContain("verifyFailMode: stop");
       expect(output).toContain("owner: agent:main:main");
       expect(output).toContain("state: Waiting on child task output");
       expect(output).toContain("Linked tasks:");
@@ -199,154 +169,6 @@ describe("flows commands", () => {
       expect(output).not.toContain("blockedTaskId:");
       expect(output).not.toContain("blockedSummary:");
       expect(output).not.toContain("wait:");
-    });
-  });
-
-  it("shows repair priority first in flow lists and surfaces it in text output", async () => {
-    await withTaskFlowCommandStateDir(async () => {
-      createManagedTaskFlow({
-        ownerKey: "agent:main:main",
-        controllerId: "tests/flows-command",
-        goal: "Generic queued flow",
-        status: "running",
-        createdAt: 200,
-        updatedAt: 200,
-      });
-      createManagedTaskFlow({
-        ownerKey: "agent:main:main",
-        controllerId: "tests/flows-command",
-        goal: "Repair verification failure",
-        status: "running",
-        currentStep: "verification_repair",
-        createdAt: 100,
-        updatedAt: 100,
-      });
-
-      const runtime = createRuntime();
-      await flowsListCommand({ json: false }, runtime);
-
-      const lines = vi.mocked(runtime.log).mock.calls.map(([line]) => String(line));
-      expect(lines.some((line) => line.includes("repair-priority"))).toBe(true);
-      const repairRow = lines.find((line) => line.includes("Repair verification failure"));
-      expect(repairRow).toBeDefined();
-      expect(repairRow).toContain("repair");
-      const genericRow = lines.find((line) => line.includes("Generic queued flow"));
-      expect(lines.indexOf(repairRow ?? "")).toBeLessThan(lines.indexOf(genericRow ?? ""));
-    });
-  });
-
-  it("surfaces verification summaries from flow state when the flow is not blocked or waiting", async () => {
-    await withTaskFlowCommandStateDir(async () => {
-      const flow = createManagedTaskFlow({
-        ownerKey: "agent:main:main",
-        controllerId: "tests/flows-command",
-        goal: "Review docs patch",
-        status: "succeeded",
-        stateJson: {
-          verification: {
-            status: "failed",
-            summary: "Verification failed: pnpm lint -- docs (exit 2).",
-          },
-        },
-        createdAt: 100,
-        updatedAt: 100,
-      });
-
-      const runtime = createRuntime();
-      await flowsShowCommand({ lookup: flow.flowId, json: false }, runtime);
-
-      const output = vi
-        .mocked(runtime.log)
-        .mock.calls.map(([line]) => String(line))
-        .join("\n");
-      expect(output).toContain("status: succeeded");
-      expect(output).toContain("priority: normal");
-      expect(output).toContain("state: Verification failed: pnpm lint -- docs (exit 2).");
-    });
-  });
-
-  it("shows verification history and repair linkage in audit mode", async () => {
-    await withTaskFlowCommandStateDir(async () => {
-      const flow = createManagedTaskFlow({
-        ownerKey: "agent:main:main",
-        controllerId: "tests/flows-command",
-        goal: "Repair docs verification",
-        status: "running",
-        currentStep: "verification_repair",
-        stateJson: {
-          verification: {
-            latestTaskId: "task-parent",
-            status: "failed",
-            failMode: "stop",
-            verifiedAt: 123,
-            summary: "Verification failed: pnpm lint -- docs (exit 2).",
-            commands: [
-              {
-                command: "pnpm lint -- docs",
-                passed: false,
-                exitCode: 2,
-              },
-            ],
-            remainingRepairBudget: 1,
-            repairTaskId: "task-repair",
-            resumeStepAfterRepair: "execute_unit",
-            repairAttemptCount: 2,
-            repairSuccessCount: 1,
-            repairFailureCount: 1,
-            history: [
-              {
-                taskId: "task-parent",
-                status: "failed",
-                failMode: "stop",
-                verifiedAt: 123,
-                summary: "Verification failed: pnpm lint -- docs (exit 2).",
-                commands: [
-                  {
-                    command: "pnpm lint -- docs",
-                    passed: false,
-                    exitCode: 2,
-                  },
-                ],
-              },
-            ],
-          },
-        },
-        createdAt: 100,
-        updatedAt: 100,
-      });
-
-      createRunningTaskRun({
-        runtime: "acp",
-        ownerKey: "agent:main:main",
-        scopeKind: "session",
-        parentFlowId: flow.flowId,
-        childSessionKey: "agent:main:child",
-        runId: "repair-run-1",
-        label: "Verification repair: Repair docs verification",
-        task: "Repair the unit so the verification commands pass.",
-        startedAt: 100,
-        lastEventAt: 100,
-      });
-
-      const runtime = createRuntime();
-      await flowsAuditCommand({ lookup: flow.flowId, json: false }, runtime);
-
-      const output = vi
-        .mocked(runtime.log)
-        .mock.calls.map(([line]) => String(line))
-        .join("\n");
-      expect(output).toContain("TaskFlow audit:");
-      expect(output).toContain("priority: repair");
-      expect(output).toContain("requiresRepair: yes");
-      expect(output).toContain("verification.historyCount: 1");
-      expect(output).toContain("verification.repairTaskId: task-repair");
-      expect(output).toContain("verification.resumeStepAfterRepair: execute_unit");
-      expect(output).toContain("verification.repairAttemptCount: 2");
-      expect(output).toContain("verification.repairSuccessCount: 1");
-      expect(output).toContain("verification.repairFailureCount: 1");
-      expect(output).toContain("history:");
-      expect(output).toContain("repairTasks: 1");
-      expect(output).toContain("repair-run-1");
     });
   });
 

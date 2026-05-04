@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createPatternFileHelper } from "./helpers/pattern-file.js";
 import { normalizeConfigPath, normalizeConfigPaths } from "./helpers/vitest-config-paths.js";
+import { createAgentsCoreVitestConfig } from "./vitest/vitest.agents-core.config.ts";
+import { createAgentsPiEmbeddedVitestConfig } from "./vitest/vitest.agents-pi-embedded.config.ts";
+import { createAgentsSupportVitestConfig } from "./vitest/vitest.agents-support.config.ts";
+import { createAgentsToolsVitestConfig } from "./vitest/vitest.agents-tools.config.ts";
 import { createAgentsVitestConfig } from "./vitest/vitest.agents.config.ts";
 import bundledConfig from "./vitest/vitest.bundled.config.ts";
 import { createCommandsLightVitestConfig } from "./vitest/vitest.commands-light.config.ts";
@@ -34,22 +38,26 @@ afterEach(() => {
 
 describe("projects vitest config", () => {
   it("defines the native root project list for all non-live Vitest lanes", () => {
-    expect((baseConfig as any).test?.projects).toEqual([...rootVitestProjects]);
+    expect(baseConfig.test?.projects).toEqual([...rootVitestProjects]);
   });
 
   it("disables vite env-file loading for vitest lanes", () => {
-    expect((baseConfig as any).envFile).toBe(false);
-    expect((sharedVitestConfig as any).envFile).toBe(false);
+    expect(baseConfig.envFile).toBe(false);
+    expect(sharedVitestConfig.envFile).toBe(false);
   });
 
   it("keeps root projects on their expected pool defaults", () => {
-    expect((createGatewayVitestConfig() as any).test.pool).toBe("threads");
-    expect((createAgentsVitestConfig() as any).test.pool).toBe("threads");
-    expect((createCommandsLightVitestConfig() as any).test.pool).toBe("threads");
-    expect((createCommandsVitestConfig() as any).test.pool).toBe("threads");
-    expect((createPluginSdkLightVitestConfig() as any).test.pool).toBe("threads");
-    expect((createUnitFastVitestConfig() as any).test.pool).toBe("threads");
-    expect((createContractsVitestConfig(pluginContractPatterns) as any).test.pool).toBe("forks");
+    expect(createGatewayVitestConfig().test.pool).toBe("threads");
+    expect(createAgentsVitestConfig().test.pool).toBe("threads");
+    expect(createAgentsCoreVitestConfig().test.pool).toBe("threads");
+    expect(createAgentsPiEmbeddedVitestConfig().test.pool).toBe("threads");
+    expect(createAgentsSupportVitestConfig().test.pool).toBe("threads");
+    expect(createAgentsToolsVitestConfig().test.pool).toBe("threads");
+    expect(createCommandsLightVitestConfig().test.pool).toBe("threads");
+    expect(createCommandsVitestConfig().test.pool).toBe("threads");
+    expect(createPluginSdkLightVitestConfig().test.pool).toBe("threads");
+    expect(createUnitFastVitestConfig().test.pool).toBe("threads");
+    expect(createContractsVitestConfig(pluginContractPatterns).test.pool).toBe("forks");
   });
 
   it("honors explicit worker caps in CI vitest lanes", () => {
@@ -87,9 +95,9 @@ describe("projects vitest config", () => {
 
   it("keeps contract shards on the non-isolated fork runner by default", () => {
     const config = createContractsVitestConfig(pluginContractPatterns);
-    expect((config as any).test.pool).toBe("forks");
-    expect((config as any).test.isolate).toBe(false);
-    expect(normalizeConfigPath((config as any).test.runner)).toBe("test/non-isolated-runner.ts");
+    expect(config.test.pool).toBe("forks");
+    expect(config.test.isolate).toBe(false);
+    expect(normalizeConfigPath(config.test.runner)).toBe("test/non-isolated-runner.ts");
   });
 
   it("gives contract project configs unique names", () => {
@@ -116,7 +124,7 @@ describe("projects vitest config", () => {
       "src/plugins/contracts/bundled-web-search.google.contract.test.ts",
     ]);
 
-    expect((config as any).test.include).toEqual([
+    expect(config.test.include).toEqual([
       "src/plugins/contracts/bundled-web-search.google.contract.test.ts",
     ]);
   });
@@ -135,21 +143,20 @@ describe("projects vitest config", () => {
       },
     );
 
-    expect((config as any).test.include).toEqual([
+    expect(config.test.include).toEqual([
       "src/channels/plugins/contracts/directory.registry-backed-shard-a.contract.test.ts",
     ]);
   });
 
   it("keeps the root ui lane aligned with the shared jsdom setup", () => {
     const config = createUiVitestConfig();
-    const testConfig = config.test!;
-    expect(testConfig.environment).toBe("jsdom");
-    expect(testConfig.isolate).toBe(false);
-    expect(normalizeConfigPath(testConfig.runner)).toBe("test/non-isolated-runner.ts");
-    const setupFiles = normalizeConfigPaths(testConfig.setupFiles);
+    expect(config.test.environment).toBe("jsdom");
+    expect(config.test.isolate).toBe(false);
+    expect(normalizeConfigPath(config.test.runner)).toBe("test/non-isolated-runner.ts");
+    const setupFiles = normalizeConfigPaths(config.test.setupFiles);
     expect(setupFiles).not.toContain("test/setup-openclaw-runtime.ts");
     expect(setupFiles).toContain("ui/src/test-helpers/lit-warnings.setup.ts");
-    expect((config as any).test.deps?.optimizer?.web?.enabled).toBe(true);
+    expect(config.test.deps?.optimizer?.web?.enabled).toBe(true);
   });
 
   it("keeps the unit-ui shard aligned with the shared jsdom setup", () => {
@@ -163,14 +170,14 @@ describe("projects vitest config", () => {
 
   it("keeps the unit lane on the non-isolated runner by default", () => {
     const config = createUnitVitestConfig();
-    expect((config as any).test.isolate).toBe(false);
-    expect(normalizeConfigPath((config as any).test.runner)).toBe("test/non-isolated-runner.ts");
+    expect(config.test.isolate).toBe(false);
+    expect(normalizeConfigPath(config.test.runner)).toBe("test/non-isolated-runner.ts");
   });
 
   it("keeps the unit-fast lane on shared workers without the reset-heavy runner", () => {
     const config = createUnitFastVitestConfig();
-    expect((config as any).test.isolate).toBe(false);
-    expect((config as any).test.runner).toBeUndefined();
+    expect(config.test.isolate).toBe(false);
+    expect(config.test.runner).toBeUndefined();
   });
 
   it("keeps the bundled lane on thread workers with the non-isolated runner", () => {

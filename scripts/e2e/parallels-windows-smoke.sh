@@ -616,7 +616,7 @@ EOF
 
 guest_run_agent_turn_process() {
   local env_name_q env_value_q runner_basename runner_script_path runner_url runner_url_q
-  local runner_name stdout_name stderr_name done_name
+  local runner_name stdout_name stderr_name done_name ok_name
   local start_seconds poll_deadline startup_checked state_rc log_rc done_rc
   local agent_combined done_status launcher_state
   env_name_q="$(ps_single_quote "$API_KEY_ENV")"
@@ -629,6 +629,7 @@ guest_run_agent_turn_process() {
   stdout_name="openclaw-parallels-agent-$RANDOM-$RANDOM.out.log"
   stderr_name="openclaw-parallels-agent-$RANDOM-$RANDOM.err.log"
   done_name="openclaw-parallels-agent-$RANDOM-$RANDOM.done"
+  ok_name="openclaw-parallels-agent-$RANDOM-$RANDOM.ok"
   start_seconds="$SECONDS"
   poll_deadline=$((SECONDS + TIMEOUT_AGENT_S + 60))
   startup_checked=0
@@ -637,6 +638,7 @@ guest_run_agent_turn_process() {
 param(
   [string]$StdoutPath,
   [string]$StderrPath,
+  [string]$OkPath,
   [string]$DonePath,
   [string]$EnvName,
   [string]$EnvValue
@@ -652,6 +654,21 @@ try {
   }
   $entry = Join-Path $env:APPDATA 'npm\node_modules\openclaw\openclaw.mjs'
   & $node $entry agent --local --agent main --session-id 'parallels-windows-smoke' --message 'Reply with exact ASCII text OK only.' --json > $StdoutPath 2> $StderrPath
+  $ok = '0'
+  try {
+    $raw = Get-Content -Path $StdoutPath -Raw -ErrorAction Stop
+    $json = $raw | ConvertFrom-Json -ErrorAction Stop
+    foreach ($payload in @($json.payloads)) {
+      if ($payload.text -eq 'OK') {
+        $ok = '1'
+      }
+    }
+    if ($json.meta.finalAssistantVisibleText -eq 'OK' -or $json.meta.finalAssistantRawText -eq 'OK') {
+      $ok = '1'
+    }
+  } catch {
+  }
+  Set-Content -Path $OkPath -Value $ok
   Set-Content -Path $DonePath -Value ([string]$LASTEXITCODE)
   exit $LASTEXITCODE
 } catch {
@@ -666,7 +683,8 @@ EOF
 \$stdout = Join-Path \$env:TEMP '$stdout_name'
 \$stderr = Join-Path \$env:TEMP '$stderr_name'
 \$done = Join-Path \$env:TEMP '$done_name'
-Remove-Item \$runner, \$stdout, \$stderr, \$done -Force -ErrorAction SilentlyContinue
+\$ok = Join-Path \$env:TEMP '$ok_name'
+Remove-Item \$runner, \$stdout, \$stderr, \$done, \$ok -Force -ErrorAction SilentlyContinue
 curl.exe -fsSL '${runner_url_q}' -o \$runner
 Start-Process powershell.exe -ArgumentList @(
   '-NoProfile',
@@ -678,6 +696,8 @@ Start-Process powershell.exe -ArgumentList @(
   \$stdout,
   '-StderrPath',
   \$stderr,
+  '-OkPath',
+  \$ok,
   '-DonePath',
   \$done,
   '-EnvName',
@@ -697,7 +717,7 @@ EOF
     set -e
     if [[ $log_rc -eq 0 ]] && printf '%s\n' "$agent_combined" | grep -Eq '"finalAssistant(Raw|Visible)Text":[[:space:]]*"OK"'; then
       printf '%s\n' "$agent_combined"
-      guest_powershell_poll 20 "\$runner = Join-Path \$env:TEMP '$runner_name'; \$done = Join-Path \$env:TEMP '$done_name'; Remove-Item \$runner, \$done -Force -ErrorAction SilentlyContinue"
+      guest_powershell_poll 20 "\$runner = Join-Path \$env:TEMP '$runner_name'; \$done = Join-Path \$env:TEMP '$done_name'; \$ok = Join-Path \$env:TEMP '$ok_name'; Remove-Item \$runner, \$done, \$ok -Force -ErrorAction SilentlyContinue"
       return 0
     fi
 
@@ -708,10 +728,19 @@ EOF
     done_rc=$?
     set -e
     if [[ $done_rc -eq 0 && -n "$done_status" ]]; then
+      ok_status="$(guest_powershell_poll 20 "\$ok = Join-Path \$env:TEMP '$ok_name'; if (Test-Path \$ok) { (Get-Content \$ok -Raw).Trim() }" 2>/dev/null || true)"
+      ok_status="${ok_status//$'\r'/}"
+      if [[ "$ok_status" == "1" ]]; then
+        if [[ $log_rc -eq 0 && -n "$agent_combined" ]]; then
+          printf '%s\n' "$agent_combined"
+        fi
+        guest_powershell_poll 20 "\$runner = Join-Path \$env:TEMP '$runner_name'; \$done = Join-Path \$env:TEMP '$done_name'; \$ok = Join-Path \$env:TEMP '$ok_name'; Remove-Item \$runner, \$done, \$ok -Force -ErrorAction SilentlyContinue"
+        return 0
+      fi
       if [[ $log_rc -eq 0 && -n "$agent_combined" ]]; then
         printf '%s\n' "$agent_combined"
       fi
-      guest_powershell_poll 20 "\$runner = Join-Path \$env:TEMP '$runner_name'; \$done = Join-Path \$env:TEMP '$done_name'; Remove-Item \$runner, \$done -Force -ErrorAction SilentlyContinue"
+      guest_powershell_poll 20 "\$runner = Join-Path \$env:TEMP '$runner_name'; \$done = Join-Path \$env:TEMP '$done_name'; \$ok = Join-Path \$env:TEMP '$ok_name'; Remove-Item \$runner, \$done, \$ok -Force -ErrorAction SilentlyContinue"
       warn "openclaw agent finished without OK response (exit $done_status)"
       return 1
     fi
@@ -719,7 +748,7 @@ EOF
     if [[ "$startup_checked" -eq 0 && $((SECONDS - start_seconds)) -ge 20 ]]; then
       set +e
       launcher_state="$(
-        guest_powershell_poll 20 "\$runner = Join-Path \$env:TEMP '$runner_name'; \$stdout = Join-Path \$env:TEMP '$stdout_name'; \$stderr = Join-Path \$env:TEMP '$stderr_name'; \$done = Join-Path \$env:TEMP '$done_name'; \$currentPid = \$PID; \$process = Get-CimInstance Win32_Process | Where-Object { \$_.ProcessId -ne \$currentPid -and ((\$_.CommandLine -like '*$runner_name*') -or (\$_.CommandLine -like '*openclaw.mjs*agent*parallels-windows-smoke*')) } | Select-Object -First 1; 'runner=' + (Test-Path \$runner) + ' stdout=' + (Test-Path \$stdout) + ' stderr=' + (Test-Path \$stderr) + ' done=' + (Test-Path \$done) + ' process=' + [bool]\$process"
+        guest_powershell_poll 20 "\$runner = Join-Path \$env:TEMP '$runner_name'; \$stdout = Join-Path \$env:TEMP '$stdout_name'; \$stderr = Join-Path \$env:TEMP '$stderr_name'; \$done = Join-Path \$env:TEMP '$done_name'; \$ok = Join-Path \$env:TEMP '$ok_name'; \$currentPid = \$PID; \$process = Get-CimInstance Win32_Process | Where-Object { \$_.ProcessId -ne \$currentPid -and ((\$_.CommandLine -like '*$runner_name*') -or (\$_.CommandLine -like '*openclaw.mjs*agent*parallels-windows-smoke*')) } | Select-Object -First 1; 'runner=' + (Test-Path \$runner) + ' stdout=' + (Test-Path \$stdout) + ' stderr=' + (Test-Path \$stderr) + ' done=' + (Test-Path \$done) + ' ok=' + (Test-Path \$ok) + ' process=' + [bool]\$process"
       )"
       state_rc=$?
       set -e
@@ -735,7 +764,7 @@ EOF
       if [[ $log_rc -eq 0 && -n "$agent_combined" ]]; then
         printf '%s\n' "$agent_combined"
       fi
-      guest_powershell_poll 20 "\$runner = Join-Path \$env:TEMP '$runner_name'; \$done = Join-Path \$env:TEMP '$done_name'; Remove-Item \$runner, \$done -Force -ErrorAction SilentlyContinue"
+      guest_powershell_poll 20 "\$runner = Join-Path \$env:TEMP '$runner_name'; \$done = Join-Path \$env:TEMP '$done_name'; \$ok = Join-Path \$env:TEMP '$ok_name'; Remove-Item \$runner, \$done, \$ok -Force -ErrorAction SilentlyContinue"
       warn "openclaw agent timed out after $TIMEOUT_AGENT_S seconds"
       return 1
     fi

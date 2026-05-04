@@ -2,8 +2,9 @@
 
 // Executed directly via Node.js + tsx in the release workflow.
 
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
 import {
+  appendFileSync,
   chmodSync,
   createWriteStream,
   existsSync,
@@ -19,6 +20,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve, win32 as pathWin32 } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { assertNoBundledRuntimeDepsStagingDebris } from "../src/infra/package-dist-inventory.ts";
+import { isLocalBuildMetadataDistPath } from "./lib/local-build-metadata-paths.mjs";
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const PUBLISHED_INSTALLER_BASE_URL = "https://openclaw.ai";
@@ -30,101 +32,6 @@ const SUPPORTED_SUITES = new Set([
   "packaged-upgrade",
   "dev-update",
 ]);
-
-type ParsedArgs = Record<string, string>;
-
-type RunnerMatrixParams = {
-  mode: string;
-  ref?: string;
-  ubuntuRunner?: string;
-  windowsRunner?: string;
-  macosRunner?: string;
-  varUbuntuRunner?: string;
-  varWindowsRunner?: string;
-  varMacosRunner?: string;
-};
-
-// This script intentionally uses a heterogeneous bag of lane state and inputs.
-// Keep the alias loose so the maintenance code stays readable.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyRecord = Record<string, any>;
-type ProviderMeta = (typeof providerConfig)[keyof typeof providerConfig];
-type CommandResult = {
-  exitCode: number;
-  stdout: string;
-  stderr: string;
-};
-type CommandOptions = {
-  cwd?: string;
-  env?: NodeJS.ProcessEnv;
-  logPath: string;
-  timeoutMs?: number;
-  check?: boolean;
-};
-type BuildInfo = {
-  sourceDir: string;
-  sourceSha: string;
-  candidateVersion: string;
-  candidateTgz: string;
-  candidateFileName: string;
-};
-type InstalledMetadata = {
-  version: string;
-  commit: string;
-};
-type LaneState = {
-  name: string;
-  rootDir: string;
-  prefixDir: string;
-  homeDir: string;
-  stateDir: string;
-  appDataDir: string;
-  gatewayPort: number;
-};
-type GatewayHandle = {
-  child: ChildProcess;
-  closeLog: () => Promise<void>;
-  logPath: string;
-};
-type GatewayHolder = {
-  current: GatewayHandle | null;
-};
-type PortReservation = {
-  port: number;
-  release: () => Promise<void>;
-};
-type SummaryResult = {
-  status: string;
-  error?: string;
-  installTarget?: string;
-  installVersion?: string;
-  baselineVersion?: string;
-  installedVersion?: string;
-  installedCommit?: string;
-  cliPath?: string;
-  gatewayPort?: number;
-  dashboardStatus?: string;
-  browserOverrideImportStatus?: string;
-  discordStatus?: string;
-  agentOutput?: string;
-};
-type SummaryPayload = {
-  platform: NodeJS.Platform;
-  runnerOs: string;
-  runnerLabel: string;
-  provider: string;
-  mode: string;
-  suite: string;
-  ref: string | null;
-  previousVersion: string | null;
-  sourceDir: string;
-  sourceSha: string;
-  candidateVersion: string;
-  candidateTgz: string;
-  baselineSpec: string;
-  result: SummaryResult;
-  discordRoundtrip: boolean;
-};
 
 const providerConfig = {
   openai: {
@@ -178,8 +85,8 @@ function isMainModule() {
   return resolve(invokedPath) === SCRIPT_PATH;
 }
 
-export function parseArgs(argv: string[]): ParsedArgs {
-  const parsed: ParsedArgs = {};
+export function parseArgs(argv) {
+  const parsed = {};
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (!token.startsWith("--")) {
@@ -197,14 +104,14 @@ export function parseArgs(argv: string[]): ParsedArgs {
   return parsed;
 }
 
-export function looksLikeReleaseVersionRef(ref: string | undefined) {
+export function looksLikeReleaseVersionRef(ref) {
   const trimmed = normalizeRequestedRef(ref);
   return /^v?[0-9]{4}\.[0-9]+\.[0-9]+(?:-(?:[1-9][0-9]*)|[-.](?:beta|rc)[-.]?[0-9]+)?$/iu.test(
     trimmed,
   );
 }
 
-export function normalizeRequestedRef(ref: string | undefined) {
+export function normalizeRequestedRef(ref) {
   const trimmed = ref?.trim() || "";
   if (!trimmed) {
     return "";
@@ -218,12 +125,12 @@ export function normalizeRequestedRef(ref: string | undefined) {
   return trimmed;
 }
 
-export function isImmutableReleaseRef(ref: string | undefined) {
+export function isImmutableReleaseRef(ref) {
   const trimmed = ref?.trim() || "";
   return trimmed.startsWith("refs/tags/") || looksLikeReleaseVersionRef(trimmed);
 }
 
-export function resolveRequestedSuites(mode: string, ref: string | undefined) {
+export function resolveRequestedSuites(mode, ref) {
   if (!SUPPORTED_MODES.has(mode)) {
     throw new Error(`Unsupported mode "${mode}".`);
   }
@@ -240,15 +147,15 @@ export function resolveRequestedSuites(mode: string, ref: string | undefined) {
   return suites;
 }
 
-export function resolveRunnerMatrix(params: RunnerMatrixParams) {
-  const pick = (...values: Array<string | undefined>) =>
+export function resolveRunnerMatrix(params) {
+  const pick = (...values) =>
     values.find((value) => typeof value === "string" && value.trim().length > 0)?.trim();
   const suites = resolveRequestedSuites(params.mode, params.ref);
   const runners = [
     {
       os_id: "ubuntu",
       display_name: "Linux",
-      runner: pick(params.ubuntuRunner, params.varUbuntuRunner, "ubuntu-latest"),
+      runner: pick(params.ubuntuRunner, params.varUbuntuRunner, "blacksmith-8vcpu-ubuntu-2404"),
       artifact_name: "linux",
     },
     {
@@ -303,7 +210,7 @@ export function readRunnerOverrideEnv(env = process.env) {
   };
 }
 
-function formatSuiteLabel(suite: string) {
+function formatSuiteLabel(suite) {
   if (suite === "packaged-fresh") {
     return "packaged fresh";
   }
@@ -316,7 +223,7 @@ function formatSuiteLabel(suite: string) {
   return "dev update";
 }
 
-async function main(argv: string[]) {
+async function main(argv) {
   const args = parseArgs(argv);
 
   if (args["resolve-matrix"] === "true") {
@@ -383,13 +290,13 @@ async function main(argv: string[]) {
     throw new Error(`Unsupported provider "${provider}".`);
   }
 
-  const selectedProvider = providerConfig[provider as keyof typeof providerConfig];
+  const selectedProvider = providerConfig[provider];
   const providerSecretValue = process.env[selectedProvider.secretEnv]?.trim();
   if (!providerSecretValue) {
     throw new Error(`Missing ${selectedProvider.secretEnv}.`);
   }
 
-  const summary: SummaryPayload = {
+  const summary = {
     platform: process.platform,
     runnerOs: process.env.OPENCLAW_RELEASE_CHECK_OS ?? "",
     runnerLabel: process.env.OPENCLAW_RELEASE_CHECK_RUNNER ?? "",
@@ -484,7 +391,7 @@ async function main(argv: string[]) {
   }
 }
 
-async function prepareCandidate(params: AnyRecord): Promise<BuildInfo> {
+async function prepareCandidate(params) {
   logPhase("prepare", "resolve-source-sha");
   const packageJson = readPackageJson(params.sourceDir);
   const hasUiBuildScript = packageJsonHasScript(packageJson, "ui:build");
@@ -562,15 +469,18 @@ async function prepareCandidate(params: AnyRecord): Promise<BuildInfo> {
   };
 }
 
-function normalizeRelativePath(value: string) {
+function normalizeRelativePath(value) {
   return value.replace(/\\/gu, "/");
 }
 
-function isPackagedDistPath(relativePath: string) {
+function isPackagedDistPath(relativePath) {
   if (!relativePath.startsWith("dist/")) {
     return false;
   }
   if (relativePath === PACKAGE_DIST_INVENTORY_RELATIVE_PATH) {
+    return false;
+  }
+  if (isLocalBuildMetadataDistPath(relativePath)) {
     return false;
   }
   if (relativePath.endsWith(".map")) {
@@ -585,7 +495,7 @@ function isPackagedDistPath(relativePath: string) {
   return true;
 }
 
-export async function writePackageDistInventoryForCandidate(params: AnyRecord): Promise<void> {
+export async function writePackageDistInventoryForCandidate(params) {
   await assertNoBundledRuntimeDepsStagingDebris(params.sourceDir);
   const dryRun = await runCommand(
     npmCommand(),
@@ -605,17 +515,17 @@ export async function writePackageDistInventoryForCandidate(params: AnyRecord): 
     );
   }
   const inventory = files
-    .flatMap((entry: AnyRecord) => {
+    .flatMap((entry) => {
       const relativePath = normalizeRelativePath(String(entry?.path ?? "").trim());
       return isPackagedDistPath(relativePath) ? [relativePath] : [];
     })
-    .toSorted((left: string, right: string) => left.localeCompare(right));
+    .toSorted((left, right) => left.localeCompare(right));
   const inventoryPath = join(params.sourceDir, PACKAGE_DIST_INVENTORY_RELATIVE_PATH);
   mkdirSync(dirname(inventoryPath), { recursive: true });
   writeFileSync(inventoryPath, `${JSON.stringify(inventory, null, 2)}\n`, "utf8");
 }
 
-function readProvidedCandidate(params: AnyRecord): BuildInfo {
+function readProvidedCandidate(params) {
   if (!params.candidateTgz) {
     throw new Error("Missing required --candidate-tgz argument when --source-dir is not provided.");
   }
@@ -639,9 +549,9 @@ function readProvidedCandidate(params: AnyRecord): BuildInfo {
   };
 }
 
-async function runFreshLane(params: AnyRecord): Promise<SummaryResult> {
+async function runFreshLane(params) {
   const lane = createLaneState("fresh");
-  const cleanup: Array<() => Promise<void> | void> = [];
+  const cleanup = [];
   try {
     const env = buildLaneEnv(lane, params.providerConfig, params.providerSecretValue);
     logLanePhase(lane, "install-candidate");
@@ -731,7 +641,7 @@ async function runFreshLane(params: AnyRecord): Promise<SummaryResult> {
   }
 }
 
-async function runUpgradeLane(params: AnyRecord): Promise<SummaryResult> {
+async function runUpgradeLane(params) {
   if (!params.baselineTgz && !params.baselineSpec) {
     throw new Error("Missing required --baseline-tgz argument for upgrade mode.");
   }
@@ -739,7 +649,7 @@ async function runUpgradeLane(params: AnyRecord): Promise<SummaryResult> {
     throw new Error("Missing candidate package URL for upgrade mode.");
   }
   const lane = createLaneState("upgrade");
-  const cleanup: Array<() => Promise<void> | void> = [];
+  const cleanup = [];
   try {
     const env = buildLaneEnv(lane, params.providerConfig, params.providerSecretValue);
     logLanePhase(lane, "install-baseline");
@@ -866,12 +776,12 @@ async function runUpgradeLane(params: AnyRecord): Promise<SummaryResult> {
   }
 }
 
-async function runInstallerFreshSuite(params: AnyRecord): Promise<SummaryResult> {
+async function runInstallerFreshSuite(params) {
   const lane = createLaneState("installer-fresh");
-  const cleanup: Array<() => Promise<void> | void> = [];
+  const cleanup = [];
   const usesManagedGateway = shouldUseManagedGatewayService();
   const useManagedGatewayAfterInstall = shouldUseManagedGatewayForInstallerRuntime();
-  const manualGateway: GatewayHolder = { current: null };
+  const manualGateway = { current: null };
   try {
     const env = buildInstallerEnv(lane, params.providerConfig, params.providerSecretValue);
     // Drive the public installer against the exact candidate artifact built from the requested ref.
@@ -1027,9 +937,9 @@ async function runInstallerFreshSuite(params: AnyRecord): Promise<SummaryResult>
   }
 }
 
-async function runDevUpdateSuite(params: AnyRecord): Promise<SummaryResult> {
+async function runDevUpdateSuite(params) {
   const lane = createLaneState("dev-update");
-  const cleanup: Array<() => Promise<void> | void> = [];
+  const cleanup = [];
   const installTarget = await resolveInstallerTargetVersion({
     baselineSpec: params.baselineSpec,
     logsDir: params.logsDir,
@@ -1047,7 +957,7 @@ async function runDevUpdateSuite(params: AnyRecord): Promise<SummaryResult> {
     );
   }
   const verificationRef = resolveDevUpdateVerificationRef(params.ref, params.sourceSha);
-  const manualGateway: GatewayHolder = { current: null };
+  const manualGateway = { current: null };
   try {
     const env = buildInstallerEnv(lane, params.providerConfig, params.providerSecretValue);
     const installerUrl = resolvePublishedInstallerUrl();
@@ -1195,7 +1105,7 @@ async function runDevUpdateSuite(params: AnyRecord): Promise<SummaryResult> {
   }
 }
 
-function createLaneState(name: string): LaneState {
+function createLaneState(name) {
   const rootDir = mkdtempSync(join(tmpdir(), `openclaw-${name}-`));
   const prefixDir = join(rootDir, "prefix");
   const homeDir = join(rootDir, "home");
@@ -1220,11 +1130,7 @@ function createLaneState(name: string): LaneState {
   };
 }
 
-function buildLaneEnv(
-  lane: LaneState,
-  providerMeta: ProviderMeta,
-  providerSecretValue: string,
-): NodeJS.ProcessEnv {
+function buildLaneEnv(lane, providerMeta, providerSecretValue) {
   ensureLocalNpmShim(lane);
   return {
     ...process.env,
@@ -1243,11 +1149,7 @@ function buildLaneEnv(
   };
 }
 
-function buildInstallerEnv(
-  lane: LaneState,
-  providerMeta: ProviderMeta,
-  providerSecretValue: string,
-): NodeJS.ProcessEnv {
+function buildInstallerEnv(lane, providerMeta, providerSecretValue) {
   const localAppData = join(lane.homeDir, "AppData", "Local");
   mkdirSync(localAppData, { recursive: true });
   return {
@@ -1284,27 +1186,27 @@ export function shouldStopManagedGatewayBeforeManualFallback(platform = process.
   return shouldUseManagedGatewayService(platform);
 }
 
-function shouldRestoreBundledPluginRuntimeDeps(_params?: { lane: LaneState }) {
+function shouldRestoreBundledPluginRuntimeDeps() {
   return true;
 }
 
-function looksLikeCommitSha(ref: string) {
+function looksLikeCommitSha(ref) {
   return /^[0-9a-f]{7,40}$/iu.test(ref.trim());
 }
 
-function resolveExpectedDevUpdateRef(ref: string | undefined) {
+function resolveExpectedDevUpdateRef(ref) {
   const trimmed = normalizeRequestedRef(ref) || "main";
   return trimmed || "main";
 }
 
-export function resolveDevUpdateVerificationRef(ref: string | undefined, sourceSha: string) {
+export function resolveDevUpdateVerificationRef(ref, sourceSha) {
   if (resolveExpectedDevUpdateRef(ref) === "main" && looksLikeCommitSha(sourceSha ?? "")) {
     return sourceSha.trim();
   }
   return resolveExpectedDevUpdateRef(ref);
 }
 
-export function shouldRunMainChannelDevUpdate(ref: string | undefined) {
+export function shouldRunMainChannelDevUpdate(ref) {
   if (isImmutableReleaseRef(ref)) {
     return false;
   }
@@ -1315,13 +1217,13 @@ export function shouldSkipInstallerDaemonHealthCheck(platform = process.platform
   return platform === "win32";
 }
 
-export function buildRealUpdateEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+export function buildRealUpdateEnv(env) {
   const updateEnv = { ...env };
   delete updateEnv.OPENCLAW_DISABLE_BUNDLED_PLUGIN_POSTINSTALL;
   return updateEnv;
 }
 
-export function resolveExplicitBaselineVersion(baselineSpec: string) {
+export function resolveExplicitBaselineVersion(baselineSpec) {
   const trimmed = baselineSpec.trim();
   if (!trimmed || trimmed === "openclaw@latest") {
     return "";
@@ -1332,7 +1234,7 @@ export function resolveExplicitBaselineVersion(baselineSpec: string) {
   return trimmed;
 }
 
-async function resolveInstallerTargetVersion(params: AnyRecord) {
+async function resolveInstallerTargetVersion(params) {
   const resolvedVersion = resolveExplicitBaselineVersion(params.baselineSpec);
   if (resolvedVersion) {
     return resolvedVersion;
@@ -1348,19 +1250,19 @@ async function resolveInstallerTargetVersion(params: AnyRecord) {
   return latestVersion;
 }
 
-function powerShellSingleQuote(value: string) {
+function powerShellSingleQuote(value) {
   return value.replace(/'/gu, "''");
 }
 
-function readPackageJson(packageRoot: string): AnyRecord {
-  return JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")) as AnyRecord;
+function readPackageJson(packageRoot) {
+  return JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8"));
 }
 
-function packageJsonHasScript(packageJson: AnyRecord, scriptName: string) {
+function packageJsonHasScript(packageJson, scriptName) {
   return typeof packageJson?.scripts?.[scriptName] === "string";
 }
 
-export function packageHasScript(packageRoot: string, scriptName: string) {
+export function packageHasScript(packageRoot, scriptName) {
   try {
     return packageJsonHasScript(readPackageJson(packageRoot), scriptName);
   } catch {
@@ -1368,28 +1270,28 @@ export function packageHasScript(packageRoot: string, scriptName: string) {
   }
 }
 
-function parseMarkerLine(output: string, marker: string) {
-  return output
+function parseMarkerLine(output, marker) {
+  return `${output}`
     .split(/\r?\n/gu)
     .find((line) => line.startsWith(marker))
     ?.slice(marker.length)
     .trim();
 }
 
-export function normalizeWindowsInstalledCliPath(cliPath: string | undefined) {
+export function normalizeWindowsInstalledCliPath(cliPath) {
   return normalizeWindowsCommandShimPath(cliPath);
 }
 
-export function normalizeWindowsCommandShimPath(commandPath: string | undefined) {
+export function normalizeWindowsCommandShimPath(commandPath) {
   if (typeof commandPath !== "string") {
     return commandPath;
   }
   return commandPath.replace(/\.ps1$/iu, ".cmd");
 }
 
-export function resolveInstalledPrefixDirFromCliPath(cliPath: string, platform = process.platform) {
+export function resolveInstalledPrefixDirFromCliPath(cliPath, platform = process.platform) {
   const resolvedCliPath =
-    platform === "win32" ? normalizeWindowsInstalledCliPath(cliPath) : (cliPath ?? "");
+    platform === "win32" ? normalizeWindowsInstalledCliPath(cliPath) : String(cliPath ?? "");
   if (!resolvedCliPath?.trim()) {
     throw new Error("Missing installed CLI path.");
   }
@@ -1399,15 +1301,15 @@ export function resolveInstalledPrefixDirFromCliPath(cliPath: string, platform =
   return dirname(dirname(resolvedCliPath));
 }
 
-function readInstalledMetadataFromCliPath(cliPath: string, platform = process.platform) {
+function readInstalledMetadataFromCliPath(cliPath, platform = process.platform) {
   return readInstalledMetadata(resolveInstalledPrefixDirFromCliPath(cliPath, platform));
 }
 
-function resolveInstalledCliInvocation(cliPath: string, platform = process.platform) {
+function resolveInstalledCliInvocation(cliPath, platform = process.platform) {
   if (platform !== "win32") {
     return { command: cliPath, argsPrefix: [], shell: false };
   }
-  const normalizedCliPath = normalizeWindowsInstalledCliPath(cliPath) ?? cliPath;
+  const normalizedCliPath = normalizeWindowsInstalledCliPath(cliPath);
   if (!/\.cmd$/iu.test(normalizedCliPath)) {
     return { command: normalizedCliPath, argsPrefix: [], shell: false };
   }
@@ -1424,11 +1326,11 @@ function resolveInstalledCliInvocation(cliPath: string, platform = process.platf
   return { command: normalizedCliPath, argsPrefix: [], shell: true };
 }
 
-async function runPosixShellScript(script: string, options: CommandOptions) {
+async function runPosixShellScript(script, options) {
   return runCommand("/bin/bash", ["-lc", script], options);
 }
 
-async function runPowerShellScript(script: string, options: CommandOptions) {
+async function runPowerShellScript(script, options) {
   return runCommand(
     "powershell.exe",
     ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
@@ -1436,7 +1338,7 @@ async function runPowerShellScript(script: string, options: CommandOptions) {
   );
 }
 
-async function runInstallerSmoke(params: AnyRecord) {
+async function runInstallerSmoke(params) {
   if (process.platform === "win32") {
     const script = `
 $response = Invoke-WebRequest -UseBasicParsing '${powerShellSingleQuote(params.installerUrl)}'
@@ -1467,9 +1369,7 @@ if ($content -is [byte[]]) {
   });
 }
 
-export function buildWindowsPathBootstrapScript(
-  options: { includeCurrentProcessPath?: boolean } = {},
-) {
+export function buildWindowsPathBootstrapScript(options = {}) {
   const includeCurrentProcessPath = options.includeCurrentProcessPath !== false;
   const pathCandidates = includeCurrentProcessPath
     ? "@($userPath, $machinePath, $env:Path)"
@@ -1492,7 +1392,7 @@ $env:Path = [string]::Join(';', $segments)
 `.trim();
 }
 
-export function buildWindowsFreshShellVersionCheckScript(params: { expectedNeedle?: string } = {}) {
+export function buildWindowsFreshShellVersionCheckScript(params = {}) {
   const expectedNeedle = powerShellSingleQuote(params.expectedNeedle ?? "");
   return `
 ${buildWindowsPathBootstrapScript()}
@@ -1577,7 +1477,7 @@ throw 'Neither pnpm, corepack, nor npm is discoverable from the reconstructed Wi
 `.trim();
 }
 
-async function verifyFreshShellCommand(params: AnyRecord) {
+async function verifyFreshShellCommand(params) {
   if (process.platform === "win32") {
     const script = buildWindowsFreshShellVersionCheckScript({
       expectedNeedle: params.expectedNeedle,
@@ -1626,7 +1526,7 @@ async function verifyFreshShellCommand(params: AnyRecord) {
   return { cliPath, versionOutput };
 }
 
-async function runInstalledCli(params: AnyRecord): Promise<CommandResult> {
+async function runInstalledCli(params) {
   const invocation = resolveInstalledCliInvocation(params.cliPath);
   return runCommand(invocation.command, [...invocation.argsPrefix, ...params.args], {
     cwd: params.cwd,
@@ -1637,7 +1537,7 @@ async function runInstalledCli(params: AnyRecord): Promise<CommandResult> {
   });
 }
 
-async function readInstalledUpdateStatus(params: AnyRecord): Promise<CommandResult> {
+async function readInstalledUpdateStatus(params) {
   return runInstalledCli({
     cliPath: params.cliPath,
     args: ["update", "status", "--json"],
@@ -1648,7 +1548,7 @@ async function readInstalledUpdateStatus(params: AnyRecord): Promise<CommandResu
   });
 }
 
-async function ensureDevUpdateGitInstall(params: AnyRecord) {
+async function ensureDevUpdateGitInstall(params) {
   const updateStatus = await readInstalledUpdateStatus({
     cliPath: params.cliPath,
     cwd: params.lane.homeDir,
@@ -1662,7 +1562,7 @@ async function ensureDevUpdateGitInstall(params: AnyRecord) {
   return { cliPath: params.cliPath };
 }
 
-async function runOnboardWithInstalledCli(params: AnyRecord) {
+async function runOnboardWithInstalledCli(params) {
   await withAllocatedGatewayPort(params.lane, async () => {
     const args = buildReleaseOnboardArgs({
       authChoice: params.providerConfig.authChoice,
@@ -1681,12 +1581,7 @@ async function runOnboardWithInstalledCli(params: AnyRecord) {
   });
 }
 
-export function buildReleaseOnboardArgs(params: {
-  authChoice: string;
-  gatewayPort: number;
-  installDaemon?: boolean;
-  skipHealth?: boolean;
-}) {
+export function buildReleaseOnboardArgs(params) {
   const args = [
     "onboard",
     "--non-interactive",
@@ -1714,11 +1609,11 @@ export function buildReleaseOnboardArgs(params: {
   return args;
 }
 
-async function startManualGatewayFromInstalledCli(params: AnyRecord): Promise<GatewayHandle> {
+async function startManualGatewayFromInstalledCli(params) {
   mkdirSync(dirname(params.logPath), { recursive: true });
   const gatewayLog = createWriteStream(params.logPath, { flags: "a" });
   const invocation = resolveInstalledCliInvocation(params.cliPath);
-  const child: ChildProcess = spawn(
+  const child = spawn(
     invocation.command,
     [
       ...invocation.argsPrefix,
@@ -1738,10 +1633,10 @@ async function startManualGatewayFromInstalledCli(params: AnyRecord): Promise<Ga
       windowsHide: true,
     },
   );
-  child.stdout?.on("data", (chunk: Buffer | string) => {
+  child.stdout?.on("data", (chunk) => {
     gatewayLog.write(chunk);
   });
-  child.stderr?.on("data", (chunk: Buffer | string) => {
+  child.stderr?.on("data", (chunk) => {
     gatewayLog.write(chunk);
   });
   let logClosed = false;
@@ -1750,7 +1645,7 @@ async function startManualGatewayFromInstalledCli(params: AnyRecord): Promise<Ga
       return;
     }
     logClosed = true;
-    await new Promise<void>((resolvePromise) => {
+    await new Promise((resolvePromise) => {
       gatewayLog.once("error", () => resolvePromise());
       gatewayLog.end(() => resolvePromise());
     });
@@ -1764,7 +1659,7 @@ async function startManualGatewayFromInstalledCli(params: AnyRecord): Promise<Ga
   return { child, closeLog, logPath: params.logPath };
 }
 
-async function resolveInstalledGatewayStatusArgs(params: AnyRecord) {
+async function resolveInstalledGatewayStatusArgs(params) {
   const requireRpc = params.requireRpc !== false;
   const help = await runInstalledCli({
     cliPath: params.cliPath,
@@ -1790,17 +1685,17 @@ async function resolveInstalledGatewayStatusArgs(params: AnyRecord) {
   return ["gateway", "status"];
 }
 
-export async function canConnectToLoopbackPort(port: number, timeoutMs = 1_000) {
+export async function canConnectToLoopbackPort(port, timeoutMs = 1_000) {
   if (!Number.isInteger(port) || port <= 0) {
     return false;
   }
-  return await new Promise<boolean>((resolvePromise) => {
+  return await new Promise((resolvePromise) => {
     let settled = false;
     const socket = createNetConnection({
       host: "127.0.0.1",
       port,
     });
-    const settle = (value: boolean) => {
+    const settle = (value) => {
       if (settled) {
         return;
       }
@@ -1815,7 +1710,7 @@ export async function canConnectToLoopbackPort(port: number, timeoutMs = 1_000) 
   });
 }
 
-async function waitForInstalledGateway(params: AnyRecord) {
+async function waitForInstalledGateway(params) {
   const statusArgs = await resolveInstalledGatewayStatusArgs({
     cliPath: params.cliPath,
     cwd: params.lane.homeDir,
@@ -1841,7 +1736,7 @@ async function waitForInstalledGateway(params: AnyRecord) {
   throw new Error(`Gateway did not become ready on port ${params.lane.gatewayPort}.`);
 }
 
-async function waitForInstalledGatewayToStop(params: AnyRecord) {
+async function waitForInstalledGatewayToStop(params) {
   const statusArgs = await resolveInstalledGatewayStatusArgs({
     cliPath: params.cliPath,
     cwd: params.lane.homeDir,
@@ -1871,7 +1766,7 @@ async function waitForInstalledGatewayToStop(params: AnyRecord) {
   );
 }
 
-async function ensureManagedGatewayReady(params: AnyRecord) {
+async function ensureManagedGatewayReady(params) {
   try {
     await waitForInstalledGateway(params);
     return;
@@ -1889,7 +1784,7 @@ async function ensureManagedGatewayReady(params: AnyRecord) {
   await waitForInstalledGateway(params);
 }
 
-async function runInstalledModelsSet(params: AnyRecord) {
+async function runInstalledModelsSet(params) {
   await runInstalledCli({
     cliPath: params.cliPath,
     args: ["models", "set", params.providerConfig.model],
@@ -1908,7 +1803,7 @@ async function runInstalledModelsSet(params: AnyRecord) {
   });
 }
 
-async function runInstalledAgentTurn(params: AnyRecord): Promise<CommandResult> {
+async function runInstalledAgentTurn(params) {
   const sessionId = `cross-os-release-check-${params.label}-${Date.now()}`;
   const result = await runInstalledCli({
     cliPath: params.cliPath,
@@ -1933,7 +1828,7 @@ async function runInstalledAgentTurn(params: AnyRecord): Promise<CommandResult> 
   return result;
 }
 
-export function verifyDevUpdateStatus(stdout: string, options: { ref?: string } = {}) {
+export function verifyDevUpdateStatus(stdout, options = {}) {
   let payload = null;
   try {
     payload = JSON.parse(stdout);
@@ -1973,7 +1868,7 @@ export function verifyDevUpdateStatus(stdout: string, options: { ref?: string } 
   }
 }
 
-async function verifyWindowsDevUpdateToolchain(params: AnyRecord) {
+async function verifyWindowsDevUpdateToolchain(params) {
   const script = buildWindowsDevUpdateToolchainCheckScript();
   const result = await runPowerShellScript(script, {
     cwd: params.lane.homeDir,
@@ -1988,7 +1883,7 @@ async function verifyWindowsDevUpdateToolchain(params: AnyRecord) {
   }
 }
 
-export function buildDiscordSmokeGuildsConfig(guildId: string, channelId: string) {
+export function buildDiscordSmokeGuildsConfig(guildId, channelId) {
   return {
     [guildId]: {
       channels: {
@@ -2001,7 +1896,7 @@ export function buildDiscordSmokeGuildsConfig(guildId: string, channelId: string
   };
 }
 
-async function configureDiscordSmoke(params: AnyRecord) {
+async function configureDiscordSmoke(params) {
   const guildsJson = JSON.stringify(
     buildDiscordSmokeGuildsConfig(params.guildId, params.channelId),
   );
@@ -2087,7 +1982,7 @@ async function configureDiscordSmoke(params: AnyRecord) {
   });
 }
 
-async function waitForDiscordMessage(params: AnyRecord) {
+async function waitForDiscordMessage(params) {
   const deadline = Date.now() + 3 * 60 * 1000;
   while (Date.now() < deadline) {
     const response = await fetch(
@@ -2111,7 +2006,7 @@ async function waitForDiscordMessage(params: AnyRecord) {
   throw new Error(`Discord host-side visibility check timed out for ${params.needle}.`);
 }
 
-async function postDiscordMessage(params: AnyRecord): Promise<string | null> {
+async function postDiscordMessage(params) {
   const response = await fetch(
     `https://discord.com/api/v10/channels/${params.channelId}/messages`,
     {
@@ -2137,7 +2032,7 @@ async function postDiscordMessage(params: AnyRecord): Promise<string | null> {
   }
 }
 
-async function deleteDiscordMessage(params: AnyRecord) {
+async function deleteDiscordMessage(params) {
   if (!params.messageId) {
     return;
   }
@@ -2152,7 +2047,7 @@ async function deleteDiscordMessage(params: AnyRecord) {
   ).catch(() => undefined);
 }
 
-async function waitForInstalledDiscordReadback(params: AnyRecord) {
+async function waitForInstalledDiscordReadback(params) {
   const deadline = Date.now() + 3 * 60 * 1000;
   while (Date.now() < deadline) {
     const response = await runInstalledCli({
@@ -2182,7 +2077,7 @@ async function waitForInstalledDiscordReadback(params: AnyRecord) {
   throw new Error(`Discord guest readback timed out for ${params.needle}.`);
 }
 
-async function maybeRunDiscordRoundtrip(params: AnyRecord) {
+async function maybeRunDiscordRoundtrip(params) {
   const token =
     process.env.OPENCLAW_DISCORD_SMOKE_BOT_TOKEN?.trim() ||
     process.env.DISCORD_BOT_TOKEN?.trim() ||
@@ -2262,7 +2157,7 @@ async function maybeRunDiscordRoundtrip(params: AnyRecord) {
   }
 }
 
-async function installTarballPackage(params: AnyRecord) {
+async function installTarballPackage(params) {
   await installPackageSpec({
     lane: params.lane,
     env: params.env,
@@ -2282,7 +2177,7 @@ async function installTarballPackage(params: AnyRecord) {
   }
 }
 
-async function installPackageSpec(params: AnyRecord) {
+async function installPackageSpec(params) {
   const installEnv = {
     ...params.env,
     npm_config_global: "true",
@@ -2322,7 +2217,7 @@ function updateStepTimeoutSeconds() {
   return process.platform === "win32" ? 1800 : 1200;
 }
 
-async function runBundledPluginPostinstall(params: AnyRecord) {
+async function runBundledPluginPostinstall(params) {
   const packageRoot = installedPackageRoot(params.lane.prefixDir);
   const scriptPath = join(packageRoot, "scripts", "postinstall-bundled-plugins.mjs");
   if (!existsSync(scriptPath)) {
@@ -2350,7 +2245,7 @@ export function shouldRunWindowsInstalledBrowserOverrideImportSmoke(platform = p
 }
 
 export function buildInstalledBrowserOverrideImportProbeScript(
-  runtimeModuleSpecifier = "openclaw/plugin-sdk/browser-node-runtime",
+  runtimeModuleSpecifier = "openclaw/plugin-sdk/plugin-runtime",
 ) {
   return `
 import { existsSync } from "node:fs";
@@ -2407,7 +2302,7 @@ export async function stopBrowserControlService() {
 `.trim();
 }
 
-async function runInstalledBrowserOverrideImportSmoke(params: AnyRecord) {
+async function runInstalledBrowserOverrideImportSmoke(params) {
   if (!shouldRunWindowsInstalledBrowserOverrideImportSmoke()) {
     return "skipped";
   }
@@ -2419,7 +2314,7 @@ async function runInstalledBrowserOverrideImportSmoke(params: AnyRecord) {
   const startedPath = join(probeDir, "started.txt");
   const stoppedPath = join(probeDir, "stopped.txt");
   const packageRoot = installedPackageRoot(params.prefixDir);
-  const runtimeModulePath = join(packageRoot, "dist", "plugin-sdk", "browser-node-runtime.js");
+  const runtimeModulePath = join(packageRoot, "dist", "plugin-sdk", "plugin-runtime.js");
   if (!existsSync(runtimeModulePath)) {
     throw new Error(`Installed browser runtime module not found: ${runtimeModulePath}`);
   }
@@ -2450,7 +2345,7 @@ async function runInstalledBrowserOverrideImportSmoke(params: AnyRecord) {
   return "pass";
 }
 
-function ensureLocalNpmShim(lane: LaneState) {
+function ensureLocalNpmShim(lane) {
   const shimPath = npmShimPath(lane.prefixDir);
   if (existsSync(shimPath)) {
     return;
@@ -2476,7 +2371,7 @@ function ensureLocalNpmShim(lane: LaneState) {
   chmodSync(shimPath, 0o755);
 }
 
-async function runOnboard(params: AnyRecord) {
+async function runOnboard(params) {
   await withAllocatedGatewayPort(params.lane, async () => {
     await runOpenClaw({
       lane: params.lane,
@@ -2492,7 +2387,7 @@ async function runOnboard(params: AnyRecord) {
   });
 }
 
-async function exerciseManagedGatewayLifecycle(params: AnyRecord) {
+async function exerciseManagedGatewayLifecycle(params) {
   logLanePhase(params.lane, "gateway-ready");
   await ensureManagedGatewayReady({
     lane: params.lane,
@@ -2544,7 +2439,7 @@ async function exerciseManagedGatewayLifecycle(params: AnyRecord) {
   });
 }
 
-async function startGateway(params: AnyRecord): Promise<GatewayHandle> {
+async function startGateway(params) {
   const gatewayLog = createWriteStream(params.logPath, { flags: "a" });
   const child = spawn(
     process.execPath,
@@ -2577,7 +2472,7 @@ async function startGateway(params: AnyRecord): Promise<GatewayHandle> {
       return;
     }
     logClosed = true;
-    await new Promise<void>((resolvePromise) => {
+    await new Promise((resolvePromise) => {
       gatewayLog.once("error", () => resolvePromise());
       gatewayLog.end(() => resolvePromise());
     });
@@ -2591,7 +2486,7 @@ async function startGateway(params: AnyRecord): Promise<GatewayHandle> {
   return { child, closeLog, logPath: params.logPath };
 }
 
-async function waitForGateway(params: AnyRecord) {
+async function waitForGateway(params) {
   const statusArgs = await resolveGatewayStatusArgs(params.lane, params.env, params.logPath);
   const deadline = Date.now() + gatewayReadyDeadlineMs();
   while (Date.now() < deadline) {
@@ -2623,7 +2518,7 @@ function gatewayReadyDeadlineMs() {
     : CROSS_OS_GATEWAY_READY_TIMEOUT_MS;
 }
 
-async function resolveGatewayStatusArgs(lane: LaneState, env: NodeJS.ProcessEnv, logPath: string) {
+async function resolveGatewayStatusArgs(lane, env, logPath) {
   const help = await runOpenClaw({
     lane,
     env,
@@ -2644,7 +2539,7 @@ async function resolveGatewayStatusArgs(lane: LaneState, env: NodeJS.ProcessEnv,
   return ["gateway", "status"];
 }
 
-async function runModelsSet(params: AnyRecord) {
+async function runModelsSet(params) {
   await runOpenClaw({
     lane: params.lane,
     env: params.env,
@@ -2661,31 +2556,55 @@ async function runModelsSet(params: AnyRecord) {
   });
 }
 
-async function runAgentTurn(params: AnyRecord): Promise<CommandResult> {
-  const sessionId = `cross-os-release-check-${params.label}-${Date.now()}`;
-  const result = await runOpenClaw({
-    lane: params.lane,
-    env: params.env,
-    args: [
-      "agent",
-      "--agent",
-      "main",
-      "--session-id",
-      sessionId,
-      "--message",
-      "Reply with exact ASCII text OK only.",
-      "--json",
-    ],
-    logPath: params.logPath,
-    timeoutMs: 10 * 60 * 1000,
-  });
-  if (!agentOutputHasExpectedOkMarker(result.stdout, { logPath: params.logPath })) {
-    throw new Error("Agent output did not contain the expected OK marker.");
+async function runAgentTurn(params) {
+  let lastError;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const sessionId = `cross-os-release-check-${params.label}-${Date.now()}-${attempt}`;
+    try {
+      const result = await runOpenClaw({
+        lane: params.lane,
+        env: params.env,
+        args: [
+          "agent",
+          "--agent",
+          "main",
+          "--session-id",
+          sessionId,
+          "--message",
+          "Reply with exact ASCII text OK only.",
+          "--json",
+        ],
+        logPath: params.logPath,
+        timeoutMs: 10 * 60 * 1000,
+      });
+      if (!agentOutputHasExpectedOkMarker(result.stdout, { logPath: params.logPath })) {
+        throw new Error("Agent output did not contain the expected OK marker.");
+      }
+      return result;
+    } catch (error) {
+      lastError = error;
+      if (attempt >= 2 || !shouldRetryCrossOsAgentTurnError(error)) {
+        throw error;
+      }
+      appendFileSync(
+        params.logPath,
+        `\n[release-checks] retrying agent turn after bundled runtime deps staging failure: ${
+          error instanceof Error ? error.message : String(error)
+        }\n`,
+      );
+    }
   }
-  return result;
+  throw lastError;
 }
 
-export function agentOutputHasExpectedOkMarker(stdout: string, options: { logPath?: string } = {}) {
+export function shouldRetryCrossOsAgentTurnError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /failed to (?:install|stage) bundled runtime deps|failed to stage bundled runtime deps after/u.test(
+    message,
+  );
+}
+
+export function agentOutputHasExpectedOkMarker(stdout, options = {}) {
   const payloadTexts = parseAgentPayloadTexts(stdout);
   if (payloadTexts.some((text) => text.trim() === "OK")) {
     return true;
@@ -2701,7 +2620,7 @@ export function agentOutputHasExpectedOkMarker(stdout: string, options: { logPat
   }
 }
 
-function parseAgentPayloadTexts(stdout: string): string[] {
+function parseAgentPayloadTexts(stdout) {
   try {
     const payload = JSON.parse(stdout);
     const directTexts = [
@@ -2733,7 +2652,7 @@ function parseAgentPayloadTexts(stdout: string): string[] {
   }
 }
 
-async function runDashboardSmoke(params: AnyRecord) {
+async function runDashboardSmoke(params) {
   const dashboardUrl = `http://127.0.0.1:${params.lane.gatewayPort}/`;
   const logStream = createWriteStream(params.logPath, { flags: "a" });
   const deadline = Date.now() + CROSS_OS_DASHBOARD_SMOKE_TIMEOUT_MS;
@@ -2773,7 +2692,7 @@ async function runDashboardSmoke(params: AnyRecord) {
   throw new Error(`Dashboard HTML did not become ready at ${dashboardUrl}.`);
 }
 
-async function stopGateway(gateway: GatewayHandle | null | undefined) {
+async function stopGateway(gateway) {
   try {
     if (!gateway?.child?.pid) {
       return;
@@ -2805,13 +2724,13 @@ async function stopGateway(gateway: GatewayHandle | null | undefined) {
   }
 }
 
-async function waitForChildExit(child: ChildProcess, timeoutMs: number) {
+async function waitForChildExit(child, timeoutMs) {
   if (child.exitCode !== null) {
     return true;
   }
-  return new Promise<boolean>((resolvePromise) => {
+  return new Promise((resolvePromise) => {
     let settled = false;
-    const finish = (didExit: boolean) => {
+    const finish = (didExit) => {
       if (settled) {
         return;
       }
@@ -2840,7 +2759,7 @@ async function waitForChildExit(child: ChildProcess, timeoutMs: number) {
   });
 }
 
-async function runCleanup(cleanupFns: Array<() => Promise<void> | void>) {
+async function runCleanup(cleanupFns) {
   for (const cleanupFn of cleanupFns.toReversed()) {
     try {
       await cleanupFn();
@@ -2850,7 +2769,7 @@ async function runCleanup(cleanupFns: Array<() => Promise<void> | void>) {
   }
 }
 
-async function runOpenClaw(params: AnyRecord): Promise<CommandResult> {
+async function runOpenClaw(params) {
   return runCommand(process.execPath, [installedEntryPath(params.lane.prefixDir), ...params.args], {
     cwd: params.lane.homeDir,
     env: params.env,
@@ -2860,7 +2779,7 @@ async function runOpenClaw(params: AnyRecord): Promise<CommandResult> {
   });
 }
 
-function readInstalledPackageManifest(prefixDir: string) {
+function readInstalledPackageManifest(prefixDir) {
   const packageRoot = installedPackageRoot(prefixDir);
   const packageJsonPath = join(packageRoot, "package.json");
   if (!existsSync(packageJsonPath)) {
@@ -2872,12 +2791,12 @@ function readInstalledPackageManifest(prefixDir: string) {
   return { packageJson, packageRoot };
 }
 
-export function readInstalledVersion(prefixDir: string) {
+export function readInstalledVersion(prefixDir) {
   const { packageJson } = readInstalledPackageManifest(prefixDir);
   return typeof packageJson.version === "string" ? packageJson.version.trim() : "";
 }
 
-function readInstalledMetadata(prefixDir: string): InstalledMetadata {
+function readInstalledMetadata(prefixDir) {
   const { packageJson, packageRoot } = readInstalledPackageManifest(prefixDir);
   const buildInfoPath = join(packageRoot, "dist", "build-info.json");
   if (!existsSync(buildInfoPath)) {
@@ -2892,7 +2811,7 @@ function readInstalledMetadata(prefixDir: string): InstalledMetadata {
   };
 }
 
-function verifyInstalledCandidate(installed: InstalledMetadata, build: BuildInfo) {
+function verifyInstalledCandidate(installed, build) {
   if (installed.version !== build.candidateVersion) {
     throw new Error(
       `Installed version mismatch. Expected ${build.candidateVersion}, found ${installed.version || "<missing>"}.`,
@@ -2905,21 +2824,21 @@ function verifyInstalledCandidate(installed: InstalledMetadata, build: BuildInfo
   }
 }
 
-function installedPackageRoot(prefixDir: string) {
+function installedPackageRoot(prefixDir) {
   return process.platform === "win32"
     ? join(prefixDir, "node_modules", "openclaw")
     : join(prefixDir, "lib", "node_modules", "openclaw");
 }
 
-function installedEntryPath(prefixDir: string) {
+function installedEntryPath(prefixDir) {
   return join(installedPackageRoot(prefixDir), "openclaw.mjs");
 }
 
-function npmShimPath(prefixDir: string) {
+function npmShimPath(prefixDir) {
   return process.platform === "win32" ? join(prefixDir, "npm.cmd") : join(prefixDir, "bin", "npm");
 }
 
-function binDirForPrefix(prefixDir: string) {
+function binDirForPrefix(prefixDir) {
   return process.platform === "win32" ? prefixDir : join(prefixDir, "bin");
 }
 
@@ -2935,12 +2854,8 @@ function gitCommand() {
   return process.platform === "win32" ? "git.exe" : "git";
 }
 
-async function runCommand(
-  command: string,
-  args: string[],
-  options: CommandOptions,
-): Promise<CommandResult> {
-  return new Promise<CommandResult>((resolvePromise, rejectPromise) => {
+async function runCommand(command, args, options) {
+  return new Promise((resolvePromise, rejectPromise) => {
     const useWindowsShell = process.platform === "win32" && /\.(cmd|bat)$/iu.test(command);
     const child = spawn(command, args, {
       cwd: options.cwd,
@@ -2964,7 +2879,7 @@ async function runCommand(
       }
     };
 
-    const finalize = (callback: () => void) => {
+    const finalize = (callback) => {
       if (settled) {
         return;
       }
@@ -2993,7 +2908,7 @@ async function runCommand(
       child.kill(process.platform === "win32" ? undefined : "SIGKILL");
     };
 
-    let killWaitTimer: NodeJS.Timeout | null = null;
+    let killWaitTimer = null;
     const timer =
       options.timeoutMs && Number.isFinite(options.timeoutMs)
         ? setTimeout(() => {
@@ -3056,10 +2971,10 @@ async function runCommand(
   });
 }
 
-async function startStaticFileServer(params: { filePath: string; logPath: string }) {
+async function startStaticFileServer(params) {
   mkdirSync(dirname(params.logPath), { recursive: true });
   const logStream = createWriteStream(params.logPath, { flags: "a" });
-  const fileName = params.filePath.split(/[/\\]/u).at(-1) ?? "artifact";
+  const fileName = String(params.filePath.split(/[/\\]/u).at(-1) ?? "artifact");
   const fileBytes = readFileSync(params.filePath);
   const server = createServer((request, response) => {
     logStream.write(`${new Date().toISOString()} ${request.method} ${request.url}\n`);
@@ -3073,9 +2988,9 @@ async function startStaticFileServer(params: { filePath: string; logPath: string
     response.setHeader("content-length", String(fileBytes.length));
     response.end(fileBytes);
   });
-  await new Promise<void>((resolvePromise, rejectPromise) => {
+  await new Promise((resolvePromise, rejectPromise) => {
     server.once("error", rejectPromise);
-    server.listen(0, "127.0.0.1", () => resolvePromise());
+    server.listen(0, "127.0.0.1", resolvePromise);
   });
   const address = server.address();
   if (!address || typeof address === "string") {
@@ -3085,7 +3000,7 @@ async function startStaticFileServer(params: { filePath: string; logPath: string
   return {
     url: `http://127.0.0.1:${port}/${fileName}`,
     close: () =>
-      new Promise<void>((resolvePromise, rejectPromise) => {
+      new Promise((resolvePromise, rejectPromise) => {
         server.close((error) => {
           logStream.end();
           if (error) {
@@ -3098,7 +3013,7 @@ async function startStaticFileServer(params: { filePath: string; logPath: string
   };
 }
 
-export function resolveStaticFileContentType(filePath: string) {
+export function resolveStaticFileContentType(filePath) {
   if (filePath.endsWith(".sh") || filePath.endsWith(".ps1")) {
     return "text/plain; charset=utf-8";
   }
@@ -3112,7 +3027,7 @@ export function resolvePublishedInstallerUrl(platform = process.platform) {
   return `${PUBLISHED_INSTALLER_BASE_URL}/install.sh`;
 }
 
-function writeSummary(baseDir: string, summaryPayload: SummaryPayload) {
+function writeSummary(baseDir, summaryPayload) {
   const summaryJsonPath = join(baseDir, "summary.json");
   const summaryMarkdownPath = join(baseDir, "summary.md");
   writeFileSync(summaryJsonPath, `${JSON.stringify(summaryPayload, null, 2)}\n`, "utf8");
@@ -3143,7 +3058,7 @@ function writeSummary(baseDir: string, summaryPayload: SummaryPayload) {
   writeFileSync(summaryMarkdownPath, `${lines.join("\n")}\n`, "utf8");
 }
 
-function writeCandidateManifest(baseDir: string, build: BuildInfo) {
+function writeCandidateManifest(baseDir, build) {
   const manifestPath = join(baseDir, "candidate.json");
   writeFileSync(
     manifestPath,
@@ -3170,7 +3085,7 @@ function platformLabel() {
   return "Linux Release Checks";
 }
 
-function requireArg(argsMap: ParsedArgs, key: string) {
+function requireArg(argsMap, key) {
   const value = argsMap[key]?.trim();
   if (!value) {
     throw new Error(`Missing required --${key} argument.`);
@@ -3178,7 +3093,7 @@ function requireArg(argsMap: ParsedArgs, key: string) {
   return value;
 }
 
-function resolveCommandPath(command: string) {
+function resolveCommandPath(command) {
   const pathValue = process.env.PATH ?? "";
   const pathEntries = pathValue.split(process.platform === "win32" ? ";" : ":").filter(Boolean);
   const candidates =
@@ -3196,19 +3111,19 @@ function resolveCommandPath(command: string) {
   return null;
 }
 
-function shellEscapeForSh(value: string) {
+function shellEscapeForSh(value) {
   return value.replace(/'/gu, `'"'"'`);
 }
 
-function logPhase(scope: string, phase: string) {
+function logPhase(scope, phase) {
   process.stdout.write(`[release-checks] ${scope}: ${phase}\n`);
 }
 
-function logLanePhase(lane: LaneState, phase: string) {
+function logLanePhase(lane, phase) {
   logPhase(`lane.${lane.name}`, phase);
 }
 
-function trimForSummary(value: string) {
+function trimForSummary(value) {
   const trimmed = value.trim();
   if (trimmed.length <= 600) {
     return trimmed;
@@ -3216,19 +3131,19 @@ function trimForSummary(value: string) {
   return `${trimmed.slice(0, 600)}...`;
 }
 
-function formatError(error: unknown) {
+function formatError(error) {
   if (error instanceof Error) {
     return error.stack || error.message;
   }
   return String(error);
 }
 
-function sleep(ms: number) {
-  return new Promise<void>((resolvePromise) => setTimeout(resolvePromise, ms));
+function sleep(ms) {
+  return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 }
 
-async function withAllocatedGatewayPort<T>(lane: LaneState, callback: () => Promise<T>) {
-  let lastError: unknown = null;
+async function withAllocatedGatewayPort(lane, callback) {
+  let lastError = null;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const reservation = await reservePort();
     lane.gatewayPort = reservation.port;
@@ -3246,20 +3161,20 @@ async function withAllocatedGatewayPort<T>(lane: LaneState, callback: () => Prom
   throw lastError ?? new Error("Failed to allocate a gateway port.");
 }
 
-function reservePort(): Promise<PortReservation> {
-  return new Promise<PortReservation>((resolvePromise, rejectPromise) => {
+function reservePort() {
+  return new Promise((resolvePromise, rejectPromise) => {
     const server = createNetServer();
     server.listen(0, "127.0.0.1", () => {
       const address = server.address();
       if (!address || typeof address === "string") {
-        server.close(() => undefined);
+        server.close();
         rejectPromise(new Error("Failed to allocate a TCP port."));
         return;
       }
       resolvePromise({
         port: address.port,
         release: () =>
-          new Promise<void>((releaseResolve, releaseReject) => {
+          new Promise((releaseResolve, releaseReject) => {
             server.close((error) => {
               if (error) {
                 releaseReject(error);
@@ -3274,7 +3189,7 @@ function reservePort(): Promise<PortReservation> {
   });
 }
 
-function isAddressInUseError(error: unknown) {
+function isAddressInUseError(error) {
   const message = formatError(error);
   return message.includes("EADDRINUSE") || /address.+in use/iu.test(message);
 }

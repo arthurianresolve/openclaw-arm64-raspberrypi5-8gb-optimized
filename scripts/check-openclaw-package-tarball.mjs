@@ -4,6 +4,9 @@
 // prebuilt package artifact with dist inventory, not a source checkout.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { LOCAL_BUILD_METADATA_DIST_PATHS } from "./lib/local-build-metadata-paths.mjs";
 
 function usage() {
   return "Usage: node scripts/check-openclaw-package-tarball.mjs <openclaw.tgz>";
@@ -38,7 +41,20 @@ const normalized = entries.map((entry) => entry.replace(/^package\//u, ""));
 const entrySet = new Set(normalized);
 const errors = [];
 const warnings = [];
+const unsafeEntries = normalized.filter(
+  (entry) => entry.startsWith("/") || entry.split("/").includes(".."),
+);
+const DIST_JS_IMPORT_SPECIFIER_PATTERN =
+  /\b(?:import|export)\s+(?:(?:[^'"()]*?\s+from\s+)|)["'](?<staticSpecifier>[^"']+)["']|\bimport\s*\(\s*["'](?<dynamicSpecifier>[^"']+)["']\s*\)/gu;
+const DIST_IMPORT_REFERENCE_ENTRYPOINTS = [
+  "dist/entry.js",
+  "dist/cli/run-main.js",
+  "dist/index.js",
+  "dist/index.mjs",
+];
 const LEGACY_PACKAGE_ACCEPTANCE_COMPAT_MAX = { year: 2026, month: 4, day: 25 };
+const LEGACY_LOCAL_BUILD_METADATA_COMPAT_MAX = { year: 2026, month: 4, day: 26 };
+const FORBIDDEN_LOCAL_BUILD_METADATA_FILES = new Set(LOCAL_BUILD_METADATA_DIST_PATHS);
 
 const LEGACY_OMITTED_PRIVATE_QA_INVENTORY_PREFIXES = [
   "dist/extensions/qa-channel/",
@@ -95,6 +111,11 @@ function isLegacyPackageAcceptanceCompatVersion(version) {
   return parsed ? compareCalver(parsed, LEGACY_PACKAGE_ACCEPTANCE_COMPAT_MAX) <= 0 : false;
 }
 
+function isLegacyLocalBuildMetadataCompatVersion(version) {
+  const parsed = parseCalver(version);
+  return parsed ? compareCalver(parsed, LEGACY_LOCAL_BUILD_METADATA_COMPAT_MAX) <= 0 : false;
+}
+
 function readTarEntry(entryPath) {
   const candidates = [entryPath, `package/${entryPath}`];
   for (const candidate of candidates) {
@@ -109,10 +130,73 @@ function readTarEntry(entryPath) {
   return "";
 }
 
-for (const entry of normalized) {
-  if (entry.startsWith("/") || entry.split("/").includes("..")) {
-    errors.push(`unsafe tar entry: ${entry}`);
+function isRelativeModuleSpecifier(value) {
+  return value.startsWith("./") || value.startsWith("../");
+}
+
+function normalizeModuleSpecifierTarget(value) {
+  return value.split(/[?#]/u, 1)[0] ?? value;
+}
+
+function normalizeTarPath(value) {
+  return value.replace(/\\/gu, "/");
+}
+
+function resolveTarImportTarget(importer, specifier) {
+  const normalizedSpecifier = normalizeModuleSpecifierTarget(specifier);
+  const base = normalizeTarPath(
+    new URL(normalizedSpecifier, `file:///${importer}`).pathname.replace(/^\//u, ""),
+  );
+  const candidates = [
+    base,
+    `${base}.js`,
+    `${base}.mjs`,
+    `${base}.cjs`,
+    `${base}/index.js`,
+    `${base}/index.mjs`,
+    `${base}/index.cjs`,
+  ];
+  return candidates.find((candidate) => entrySet.has(candidate)) ?? null;
+}
+
+function collectTarImportReferenceErrors() {
+  if (unsafeEntries.length > 0) {
+    return [];
   }
+  const extractRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-package-check-"));
+  const importErrors = [];
+  try {
+    const extract = spawnSync("tar", ["-xzf", tarball, "-C", extractRoot], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    if (extract.status !== 0) {
+      return [
+        `tar extraction failed for import reference check: ${extract.stderr || extract.status}`,
+      ];
+    }
+
+    for (const entry of DIST_IMPORT_REFERENCE_ENTRYPOINTS.filter((entry) => entrySet.has(entry))) {
+      const source = fs.readFileSync(path.join(extractRoot, "package", entry), "utf8");
+      for (const match of source.matchAll(DIST_JS_IMPORT_SPECIFIER_PATTERN)) {
+        const specifier = match.groups?.staticSpecifier ?? match.groups?.dynamicSpecifier ?? "";
+        if (!isRelativeModuleSpecifier(specifier)) {
+          continue;
+        }
+        if (resolveTarImportTarget(entry, specifier)) {
+          continue;
+        }
+        importErrors.push(`missing packaged dist import target ${specifier} from ${entry}`);
+      }
+    }
+  } finally {
+    fs.rmSync(extractRoot, { recursive: true, force: true });
+  }
+  return importErrors.toSorted((left, right) => left.localeCompare(right));
+}
+
+for (const entry of unsafeEntries) {
+  errors.push(`unsafe tar entry: ${entry}`);
 }
 
 if (!entrySet.has("package.json")) {
@@ -121,13 +205,29 @@ if (!entrySet.has("package.json")) {
 if (!normalized.some((entry) => entry.startsWith("dist/"))) {
   errors.push("missing dist/ entries");
 }
+let packageVersion = "";
+if (entrySet.has("package.json")) {
+  try {
+    const packageJson = JSON.parse(readTarEntry("package.json"));
+    packageVersion = typeof packageJson.version === "string" ? packageJson.version : "";
+  } catch {
+    packageVersion = "";
+  }
+}
+for (const forbiddenEntry of FORBIDDEN_LOCAL_BUILD_METADATA_FILES) {
+  if (entrySet.has(forbiddenEntry)) {
+    if (isLegacyLocalBuildMetadataCompatVersion(packageVersion)) {
+      warnings.push(`legacy package includes local build metadata tar entry ${forbiddenEntry}`);
+      continue;
+    }
+    errors.push(`forbidden local build metadata tar entry ${forbiddenEntry}`);
+  }
+}
 if (!entrySet.has("dist/postinstall-inventory.json")) {
   errors.push("missing dist/postinstall-inventory.json");
 }
 if (entrySet.has("dist/postinstall-inventory.json")) {
   try {
-    const packageJson = JSON.parse(readTarEntry("package.json"));
-    const packageVersion = typeof packageJson.version === "string" ? packageJson.version : "";
     const allowLegacyPrivateQaInventoryOmissions =
       isLegacyPackageAcceptanceCompatVersion(packageVersion);
     const inventory = JSON.parse(readTarEntry("dist/postinstall-inventory.json"));
@@ -158,6 +258,7 @@ if (entrySet.has("dist/postinstall-inventory.json")) {
     );
   }
 }
+errors.push(...collectTarImportReferenceErrors());
 
 if (errors.length > 0) {
   fail(`OpenClaw package tarball integrity failed:\n${errors.join("\n")}`);

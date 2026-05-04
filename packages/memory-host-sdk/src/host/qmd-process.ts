@@ -1,8 +1,5 @@
 import { spawn } from "node:child_process";
-import {
-  materializeWindowsSpawnProgram,
-  resolveWindowsSpawnProgram,
-} from "../../../../src/plugin-sdk/windows-spawn.js";
+import { materializeWindowsSpawnProgram, resolveWindowsSpawnProgram } from "./windows-spawn.js";
 
 export type CliSpawnInvocation = {
   command: string;
@@ -14,6 +11,7 @@ export type CliSpawnInvocation = {
 export type QmdBinaryAvailability = {
   available: boolean;
   error?: string;
+  version?: string;
 };
 
 export function resolveCliSpawnInvocation(params: {
@@ -43,7 +41,7 @@ export async function checkQmdBinaryAvailability(params: {
   try {
     spawnInvocation = resolveCliSpawnInvocation({
       command: params.command,
-      args: [],
+      args: ["--version"],
       env: params.env,
       packageName: "qmd",
     });
@@ -54,6 +52,8 @@ export async function checkQmdBinaryAvailability(params: {
   return await new Promise((resolve) => {
     let settled = false;
     let didSpawn = false;
+    let stdout = "";
+    let stderr = "";
     const finish = (result: QmdBinaryAvailability) => {
       if (settled) {
         return;
@@ -70,7 +70,7 @@ export async function checkQmdBinaryAvailability(params: {
       cwd: params.cwd ?? process.cwd(),
       shell: spawnInvocation.shell,
       windowsHide: spawnInvocation.windowsHide,
-      stdio: "ignore",
+      stdio: ["ignore", "pipe", "pipe"],
     });
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
@@ -80,19 +80,30 @@ export async function checkQmdBinaryAvailability(params: {
       });
     }, params.timeoutMs ?? 2_000);
 
+    child.stdout?.on("data", (data) => {
+      stdout += data.toString("utf8");
+    });
+    child.stderr?.on("data", (data) => {
+      stderr += data.toString("utf8");
+    });
     child.once("error", (err) => {
       finish({ available: false, error: formatQmdAvailabilityError(err) });
     });
     child.once("spawn", () => {
       didSpawn = true;
-      child.kill();
-      finish({ available: true });
     });
-    child.once("close", () => {
+    child.once("close", (code) => {
       if (!didSpawn) {
         return;
       }
-      finish({ available: true });
+      if (code === 0) {
+        finish({ available: true, version: extractQmdVersion(stdout, stderr) });
+        return;
+      }
+      finish({
+        available: false,
+        error: formatQmdAvailabilityError(stderr.trim() || stdout.trim() || `exit code ${code}`),
+      });
     });
   });
 }
@@ -181,4 +192,10 @@ function formatQmdAvailabilityError(err: unknown): string {
     return err.message;
   }
   return String(err);
+}
+
+function extractQmdVersion(stdout: string, stderr: string): string | undefined {
+  const combined = `${stdout}\n${stderr}`.trim();
+  const match = /v?([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)/.exec(combined);
+  return match?.[1];
 }

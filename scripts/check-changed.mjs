@@ -56,6 +56,7 @@ export function createChangedCheckPlan(result, options = {}) {
 
   add("conflict markers", ["check:no-conflict-markers"]);
   add("changelog attributions", ["check:changelog-attributions"]);
+  add("guarded extension wildcard re-exports", ["lint:extensions:no-guarded-wildcard-reexports"]);
   add("plugin-sdk wildcard re-exports", ["lint:extensions:no-plugin-sdk-wildcard-reexports"]);
 
   if (result.docsOnly) {
@@ -92,6 +93,7 @@ export function createChangedCheckPlan(result, options = {}) {
   }
 
   if (runAll) {
+    add("runtime sidecar loader guard", ["check:runtime-sidecar-loaders"]);
     addTypecheck("typecheck all", ["tsgo:all"]);
     addLint("lint", ["lint"]);
     add("runtime import cycles", ["check:import-cycles"]);
@@ -135,6 +137,7 @@ export function createChangedCheckPlan(result, options = {}) {
   }
 
   if (lanes.core || lanes.extensions) {
+    add("runtime sidecar loader guard", ["check:runtime-sidecar-loaders"]);
     add("runtime import cycles", ["check:import-cycles"]);
   }
   if (lanes.core) {

@@ -43,7 +43,6 @@ let package = Package(
             ],
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency"),
-                .enableExperimentalFeature("SwiftTesting"),
             ]),
         .testTarget(
             name: "swabbleTests",

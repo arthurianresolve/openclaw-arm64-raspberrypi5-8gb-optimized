@@ -90,10 +90,8 @@ the maintainer-only release runbook.
 
 ## Release preflight
 
-- Run `pnpm check:types:extended` before release preflight so the broader
-  TypeScript gate stays green outside the faster local `pnpm check` path. This
-  lane covers tooling, root tests, QA Convex, and the extra src/ui/package test
-  shards in addition to the required prod/test paths.
+- Run `pnpm check:test-types` before release preflight so test TypeScript stays
+  covered outside the faster local `pnpm check` gate
 - Run `pnpm check:architecture` before release preflight so the broader import
   cycle and architecture boundary checks are green outside the faster local gate
 - Run `pnpm build && pnpm ui:build` before `pnpm release:check` so the expected
@@ -185,10 +183,7 @@ Validation` or from the `main`/release workflow ref so workflow logic and
   `OPENCLAW_QA_TELEGRAM_*` env credentials directly.
 - Maintainers can run the same post-publish check from GitHub Actions via the
   manual `NPM Telegram Beta E2E` workflow. It is intentionally manual-only and
-  does not run on every merge. For pre-publish Telegram-only proof, run the
-  same workflow with `source=ref` and `package_ref=<branch-or-sha>` so CI packs
-  the candidate tarball before exercising Telegram. For exact registry proof
-  after publish, keep `source=npm` and `package_spec=openclaw@<version>`.
+  does not run on every merge.
 - Maintainer release automation now uses preflight-then-promote:
   - real npm publish must pass a successful npm `preflight_run_id`
   - the real npm publish must be dispatched from the same `main` or
@@ -242,6 +237,7 @@ gh workflow run full-release-validation.yml \
   -f ref=release/YYYY.M.D \
   -f provider=openai \
   -f mode=both \
+  -f release_profile=full \
   -f evidence_package_spec=openclaw@YYYY.M.D-beta.N
 ```
 
@@ -253,14 +249,24 @@ install smoke, cross-OS release checks, live/E2E Docker release-path coverage,
 Package Acceptance with Telegram package QA, QA Lab parity, live Matrix, and
 live Telegram. A full run is only acceptable when the `Full Release Validation`
 summary shows `normal_ci` and `release_checks` as successful, and any optional
-`npm_telegram` child is either successful or intentionally skipped. A skipped
-`npm_telegram` child only means no exact published npm package was supplied;
-the pre-publish tarball-backed Telegram package proof still runs inside
-`OpenClaw Release Checks` through Package Acceptance.
+`npm_telegram` child is either successful or intentionally skipped. The final
+verifier summary includes slowest-job tables for each child run, so the release
+manager can see the current critical path without downloading logs.
 Child workflows are dispatched from the trusted ref that runs `Full Release
 Validation`, normally `--ref main`, even when the target `ref` points at an
 older release branch or tag. There is no separate Full Release Validation
 workflow-ref input; choose the trusted harness by choosing the workflow run ref.
+
+Use `release_profile` to select live/provider breadth:
+
+- `minimum`: fastest release-critical OpenAI/core live and Docker path
+- `stable`: minimum plus stable provider/backend coverage for release approval
+- `full`: stable plus broad advisory provider/media coverage
+
+`OpenClaw Release Checks` uses the trusted workflow ref to resolve the target
+ref once as `release-package-under-test` and reuses that artifact in both
+release-path Docker checks and Package Acceptance. This keeps all
+package-facing boxes on the same bytes and avoids repeated package builds.
 
 Use these variants depending on release stage:
 
@@ -270,7 +276,8 @@ gh workflow run full-release-validation.yml \
   --ref main \
   -f ref=release/YYYY.M.D \
   -f provider=openai \
-  -f mode=both
+  -f mode=both \
+  -f release_profile=stable
 
 # Validate an exact pushed commit.
 gh workflow run full-release-validation.yml \
@@ -290,27 +297,6 @@ gh workflow run full-release-validation.yml \
   -f npm_telegram_provider_mode=mock-openai
 ```
 
-For focused Telegram package proof before publishing, use the standalone
-`NPM Telegram Beta E2E` workflow with the same package candidate shapes as
-Package Acceptance:
-
-```bash
-# Pack and test a release branch or exact SHA through Telegram.
-gh workflow run npm-telegram-beta-e2e.yml \
-  --ref main \
-  -f source=ref \
-  -f package_ref=release/YYYY.M.D \
-  -f harness_ref=main \
-  -f provider_mode=mock-openai
-
-# Exact published package proof after beta/stable publish.
-gh workflow run npm-telegram-beta-e2e.yml \
-  --ref main \
-  -f source=npm \
-  -f package_spec=openclaw@YYYY.M.D-beta.N \
-  -f provider_mode=mock-openai
-```
-
 Do not use the full umbrella as the first rerun after a focused fix. If one box
 fails, use the failed child workflow, job, Docker lane, package profile, model
 provider, or QA lane for the next proof. Run the full umbrella again only when
@@ -318,6 +304,12 @@ the fix changed shared release orchestration or made earlier all-box evidence
 stale. The umbrella's final verifier re-checks the recorded child workflow run
 ids, so after a child workflow is rerun successfully, rerun only the failed
 `Verify full validation` parent job.
+
+For bounded recovery, pass `rerun_group` to the umbrella. `all` is the real
+release-candidate run, `ci` runs only the normal CI child, `release-checks` runs
+every release box, and the narrower release groups are `install-smoke`,
+`cross-os`, `live-e2e`, `package`, `qa`, `qa-parity`, `qa-live`, and
+`npm-telegram` when the standalone package Telegram lane is supplied.
 
 ### Vitest
 
@@ -354,11 +346,14 @@ Release Docker coverage includes:
 
 - full install smoke with the slow Bun global install smoke enabled
 - repository E2E lanes
-- release-path Docker chunks: `core`, `package-update`, `plugins-runtime`, and
-  `bundled-channels`
-- OpenWebUI coverage inside the `plugins-runtime` chunk when requested
-- split bundled-channel dependency lanes in their own `bundled-channels` chunk
-  instead of the serial all-in-one bundled-channel lane
+- release-path Docker chunks: `core`, `package-update-openai`,
+  `package-update-anthropic`, `package-update-core`, `plugins-runtime-core`,
+  `plugins-runtime-install-a`, `plugins-runtime-install-b`,
+  `bundled-channels-core`, `bundled-channels-update-a`,
+  `bundled-channels-update-b`, and `bundled-channels-contracts`
+- OpenWebUI coverage inside the `plugins-runtime-core` chunk when requested
+- split bundled-channel dependency lanes across channel-smoke, update-target,
+  and setup/runtime contract chunks instead of one large bundled-channel job
 - split bundled plugin install/uninstall lanes
   `bundled-plugin-install-uninstall-0` through
   `bundled-plugin-install-uninstall-7`
@@ -428,8 +423,10 @@ to npm: private QA inventory entries missing from the tarball, missing
 `gateway install --wrapper`, missing patch files in the tarball-derived git
 fixture, missing persisted `update.channel`, legacy plugin install-record
 locations, missing marketplace install-record persistence, and config metadata
-migration during `plugins update`. Packages after `2026.4.25` must satisfy the
-modern package contracts; those same gaps fail release validation.
+migration during `plugins update`. The published `2026.4.26` package may warn
+for local build metadata stamp files that were already shipped. Later packages
+must satisfy the modern package contracts; those same gaps fail release
+validation.
 
 Use broader Package Acceptance profiles when the release question is about an
 actual installable package:

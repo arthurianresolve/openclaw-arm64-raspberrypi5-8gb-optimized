@@ -156,6 +156,10 @@ LABEL org.opencontainers.image.source="https://github.com/openclaw/openclaw" \
 WORKDIR /app
 
 # Install runtime system utilities missing from bookworm-slim.
+# `ca-certificates` ships in `bookworm` (full) but not in `bookworm-slim`,
+# so it must be installed explicitly here. Without it `/etc/ssl/certs/`
+# stays empty and every HTTPS outbound dies at TLS handshake with
+# `error setting certificate file`.
 RUN --mount=type=cache,id=openclaw-bookworm-apt-cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=openclaw-bookworm-apt-lists,target=/var/lib/apt,sharing=locked \
     apt-get update && \
@@ -254,10 +258,12 @@ RUN --mount=type=cache,id=openclaw-bookworm-apt-cache,target=/var/cache/apt,shar
 RUN ln -sf /app/openclaw.mjs /usr/local/bin/openclaw \
  && chmod 755 /app/openclaw.mjs
 
-# Pre-create the default state dir so first-run Docker named volumes mounted
-# here inherit node ownership instead of starting as root-owned state.
+# Pre-create the default state and runtime-deps dirs so first-run Docker named
+# volumes mounted here inherit node ownership instead of root-owned state.
 RUN install -d -m 0700 -o node -g node /home/node/.openclaw && \
-    stat -c '%U:%G %a' /home/node/.openclaw | grep -qx 'node:node 700'
+    install -d -m 0700 -o node -g node /var/lib/openclaw/plugin-runtime-deps && \
+    stat -c '%U:%G %a' /home/node/.openclaw | grep -qx 'node:node 700' && \
+    stat -c '%U:%G %a' /var/lib/openclaw/plugin-runtime-deps | grep -qx 'node:node 700'
 
 ENV NODE_ENV=production
 

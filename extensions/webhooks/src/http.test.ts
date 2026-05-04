@@ -1,43 +1,17 @@
 import { EventEmitter } from "node:events";
 import type { IncomingMessage } from "node:http";
+import { createRuntimeTaskFlow } from "openclaw/plugin-sdk/plugin-test-runtime";
+import { createMockServerResponse } from "openclaw/plugin-sdk/test-env";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { listTasksForFlowId } from "../../../src/tasks/runtime-internal.js";
-import { completeTaskRunByRunId } from "../../../src/tasks/task-executor.js";
-import {
-  resetTaskVerificationRuntimeForTests,
-  setTaskVerificationRuntimeForTests,
-} from "../../../src/tasks/task-verification-runtime.js";
-import { createMockServerResponse } from "../../../test/helpers/plugins/mock-http-response.js";
-import { createRuntimeTaskFlow } from "../../../test/helpers/plugins/runtime-taskflow.js";
 import type { OpenClawConfig } from "../runtime-api.js";
 import { createTaskFlowWebhookRequestHandler, type TaskFlowWebhookTarget } from "./http.js";
 
 const hoisted = vi.hoisted(() => {
-  const sendMessageMock = vi.fn();
-  const cancelSessionMock = vi.fn();
-  const killSubagentRunAdminMock = vi.fn();
   const resolveConfiguredSecretInputStringMock = vi.fn();
   return {
-    sendMessageMock,
-    cancelSessionMock,
-    killSubagentRunAdminMock,
     resolveConfiguredSecretInputStringMock,
   };
 });
-
-vi.mock("../../../src/tasks/task-registry-delivery-runtime.js", () => ({
-  sendMessage: hoisted.sendMessageMock,
-}));
-
-vi.mock("../../../src/acp/control-plane/manager.js", () => ({
-  getAcpSessionManager: () => ({
-    cancelSession: hoisted.cancelSessionMock,
-  }),
-}));
-
-vi.mock("../../../src/agents/subagent-control.js", () => ({
-  killSubagentRunAdmin: (params: unknown) => hoisted.killSubagentRunAdminMock(params),
-}));
 
 vi.mock("../runtime-api.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../runtime-api.js")>();
@@ -147,7 +121,6 @@ function parseJsonBody(res: { body?: string | Buffer | null }) {
 
 afterEach(() => {
   vi.clearAllMocks();
-  resetTaskVerificationRuntimeForTests();
 });
 
 describe("createTaskFlowWebhookRequestHandler", () => {
@@ -241,102 +214,10 @@ describe("createTaskFlowWebhookRequestHandler", () => {
       syncMode: "managed",
       controllerId: "webhooks/zapier",
       goal: "Review inbound queue",
-      priority: "normal",
     });
     expect(parsed.result.flow.ownerKey).toBeUndefined();
     expect(parsed.result.flow.requesterOrigin).toBeUndefined();
     expect(target.taskFlow.get(parsed.result.flow.flowId)?.flowId).toBe(parsed.result.flow.flowId);
-  });
-
-  it("surfaces repair priority and verification metadata in webhook flow views", async () => {
-    const { handler, target, secret } = createHandler();
-    const res = await dispatchJsonRequest({
-      handler,
-      path: target.path,
-      secret,
-      body: {
-        action: "create_flow",
-        goal: "Repair docs verification",
-        currentStep: "verification_repair",
-        stateJson: {
-          verification: {
-            status: "failed",
-            summary: "Verification failed: pnpm lint -- docs (exit 2).",
-          },
-        },
-      },
-    });
-
-    expect(res.statusCode).toBe(200);
-    const parsed = parseJsonBody(res);
-    expect(parsed.ok).toBe(true);
-    expect(parsed.result.flow).toMatchObject({
-      goal: "Repair docs verification",
-      currentStep: "verification_repair",
-      priority: "repair",
-      requiresRepair: true,
-      verification: {
-        status: "failed",
-        summary: "Verification failed: pnpm lint -- docs (exit 2).",
-      },
-    });
-  });
-
-  it("returns machine-facing flow metrics from list_flows", async () => {
-    const { handler, target, secret } = createHandler();
-    target.taskFlow.createManaged({
-      controllerId: "webhooks/zapier",
-      goal: "Verified flow",
-      stateJson: {
-        verification: {
-          status: "passed",
-          summary: "Verification passed.",
-          commands: [],
-          repairAttemptCount: 1,
-          repairSuccessCount: 1,
-          repairFailureCount: 0,
-        },
-      },
-    });
-    target.taskFlow.createManaged({
-      controllerId: "webhooks/zapier",
-      goal: "Repair flow",
-      currentStep: "verification_repair",
-      stateJson: {
-        verification: {
-          status: "failed",
-          summary: "Verification failed.",
-          commands: [],
-          repairAttemptCount: 2,
-          repairSuccessCount: 1,
-          repairFailureCount: 1,
-        },
-      },
-    });
-
-    const res = await dispatchJsonRequest({
-      handler,
-      path: target.path,
-      secret,
-      body: {
-        action: "list_flows",
-      },
-    });
-
-    expect(res.statusCode).toBe(200);
-    expect(parseJsonBody(res)).toMatchObject({
-      ok: true,
-      result: {
-        metrics: {
-          total: 2,
-          repairPriority: 1,
-          verificationTracked: 2,
-          repairAttempts: 3,
-          repairSuccesses: 2,
-          repairFailures: 1,
-        },
-      },
-    });
   });
 
   it("runs child tasks and scrubs task ownership fields from responses", async () => {
@@ -372,151 +253,6 @@ describe("createTaskFlowWebhookRequestHandler", () => {
     });
     expect(parsed.result.task.ownerKey).toBeUndefined();
     expect(parsed.result.task.requesterSessionKey).toBeUndefined();
-  });
-
-  it("rejects generic child work while a flow is in verification repair mode", async () => {
-    const { handler, target, secret } = createHandler();
-    const flow = target.taskFlow.createManaged({
-      controllerId: "webhooks/zapier",
-      goal: "Repair docs verification",
-      currentStep: "verification_repair",
-    });
-    const res = await dispatchJsonRequest({
-      handler,
-      path: target.path,
-      secret,
-      body: {
-        action: "run_task",
-        flowId: flow.flowId,
-        runtime: "acp",
-        childSessionKey: "agent:main:subagent:child",
-        task: "Start unrelated work",
-      },
-    });
-
-    expect(res.statusCode).toBe(409);
-    expect(parseJsonBody(res)).toMatchObject({
-      ok: false,
-      code: "repair_in_progress",
-      error:
-        "Flow is in verification repair mode; generic child work is suppressed until repair completes.",
-      result: {
-        created: false,
-        found: true,
-      },
-    });
-  });
-
-  it("re-enters normal dispatch after an automatic verification repair succeeds", async () => {
-    const { handler, target, secret } = createHandler();
-    const commandResults = [
-      { passed: false, exitCode: 2, signal: null },
-      { passed: true, exitCode: 0, signal: null },
-    ];
-    setTaskVerificationRuntimeForTests({
-      runCommand: ({ command }) => {
-        const next = commandResults.shift();
-        if (!next) {
-          throw new Error(`unexpected verification command: ${command}`);
-        }
-        return next;
-      },
-    });
-
-    const flow = target.taskFlow.createManaged({
-      controllerId: "webhooks/zapier",
-      goal: "Repair docs verification",
-      status: "running",
-      currentStep: "execute_unit",
-      unitVerificationPolicy: {
-        commands: ["pnpm lint -- docs"],
-        retryCount: 1,
-        autoRepair: true,
-        failMode: "stop",
-      },
-    });
-    const firstRun = await dispatchJsonRequest({
-      handler,
-      path: target.path,
-      secret,
-      body: {
-        action: "run_task",
-        flowId: flow.flowId,
-        runtime: "acp",
-        childSessionKey: "agent:main:subagent:child",
-        runId: "run-parent",
-        task: "Patch docs verification",
-        status: "running",
-        startedAt: 10,
-        lastEventAt: 10,
-      },
-    });
-    expect(firstRun.statusCode).toBe(200);
-
-    completeTaskRunByRunId({
-      runId: "run-parent",
-      endedAt: 20,
-      terminalSummary: "Initial attempt complete",
-    });
-
-    const repairTask = listTasksForFlowId(flow.flowId).find((task) =>
-      (task.label ?? "").startsWith("Verification repair:"),
-    );
-    expect(repairTask).toMatchObject({
-      status: "queued",
-      runId: "run-parent:verification-repair:0",
-    });
-
-    const blocked = await dispatchJsonRequest({
-      handler,
-      path: target.path,
-      secret,
-      body: {
-        action: "run_task",
-        flowId: flow.flowId,
-        runtime: "acp",
-        childSessionKey: "agent:main:subagent:other",
-        runId: "run-generic-during-repair",
-        task: "Start unrelated work",
-      },
-    });
-    expect(blocked.statusCode).toBe(409);
-    expect(parseJsonBody(blocked)).toMatchObject({
-      ok: false,
-      code: "repair_in_progress",
-    });
-
-    completeTaskRunByRunId({
-      runId: repairTask?.runId ?? "",
-      endedAt: 30,
-      terminalSummary: "Repair complete",
-    });
-
-    const resumed = await dispatchJsonRequest({
-      handler,
-      path: target.path,
-      secret,
-      body: {
-        action: "run_task",
-        flowId: flow.flowId,
-        runtime: "acp",
-        childSessionKey: "agent:main:subagent:resumed",
-        runId: "run-after-repair",
-        task: "Resume normal work",
-      },
-    });
-    expect(resumed.statusCode).toBe(200);
-    expect(parseJsonBody(resumed)).toMatchObject({
-      ok: true,
-      result: {
-        created: true,
-        flow: {
-          flowId: flow.flowId,
-          currentStep: "execute_unit",
-          priority: "normal",
-        },
-      },
-    });
   });
 
   it("returns 404 for missing flow mutations", async () => {

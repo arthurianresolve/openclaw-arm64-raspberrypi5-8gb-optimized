@@ -7,6 +7,7 @@ import { normalizeLowercaseStringOrEmpty } from "../shared/string-coerce.js";
 import { pathExists } from "../utils.js";
 import {
   collectPackageDistInventory,
+  collectPackageDistImportReferenceErrors,
   PACKAGE_DIST_INVENTORY_RELATIVE_PATH,
   readPackageDistInventoryIfPresent,
 } from "./package-dist-inventory.js";
@@ -155,15 +156,17 @@ async function collectInstalledPackageDistErrors(params: {
       missingMessage: (relativePath) => `missing packaged dist file ${relativePath}`,
       unexpectedMessage: (relativePath) => `unexpected packaged dist file ${relativePath}`,
     });
+    const importErrors = await collectPackageDistImportReferenceErrors(params.packageRoot);
     const inventorySet = new Set(inventoryFiles);
     const supplementalCriticalPaths = criticalPaths.filter(
       (relativePath) => !inventorySet.has(relativePath),
     );
     if (supplementalCriticalPaths.length === 0) {
-      return inventoryErrors;
+      return [...inventoryErrors, ...importErrors];
     }
     return [
       ...inventoryErrors,
+      ...importErrors,
       ...(await collectInstalledPathErrors({
         packageRoot: params.packageRoot,
         expectedFiles: supplementalCriticalPaths,

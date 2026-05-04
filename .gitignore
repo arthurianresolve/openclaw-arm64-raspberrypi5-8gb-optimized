@@ -102,16 +102,8 @@ USER.md
 .agents/skills/*
 !.agents/skills/blacksmith-testbox/
 !.agents/skills/blacksmith-testbox/**
-!.agents/skills/excaliclaw-maintainer/
-!.agents/skills/excaliclaw-maintainer/**
-!.agents/skills/excaliclaw-agent-harness-review/
-!.agents/skills/excaliclaw-agent-harness-review/**
-!.agents/skills/excaliclaw-product-spec/
-!.agents/skills/excaliclaw-product-spec/**
-!.agents/skills/excaliclaw-spec-driven-implementation/
-!.agents/skills/excaliclaw-spec-driven-implementation/**
-!.agents/skills/excaliclaw-tech-spec/
-!.agents/skills/excaliclaw-tech-spec/**
+!.agents/skills/gitcrawl/
+!.agents/skills/gitcrawl/**
 !.agents/skills/openclaw-ghsa-maintainer/
 !.agents/skills/openclaw-ghsa-maintainer/**
 !.agents/skills/openclaw-parallels-smoke/
@@ -193,7 +185,6 @@ changelog/fragments/
 test/fixtures/openclaw-vitest-unit-report.json
 analysis/
 .artifacts/qa-e2e/
-qa/.cache/
 extensions/qa-lab/web/dist/
 
 # Generated bundled plugin runtime dependency manifests

@@ -108,7 +108,7 @@ export async function emitResetCommandHooks(params: {
   sessionEntry?: HandleCommandsParams["sessionEntry"];
   previousSessionEntry?: HandleCommandsParams["previousSessionEntry"];
   workspaceDir: string;
-}): Promise<void> {
+}): Promise<{ routedReply: boolean }> {
   const hookEvent = createInternalHookEvent("command", params.action, params.sessionKey ?? "", {
     sessionEntry: params.sessionEntry,
     previousSessionEntry: params.previousSessionEntry,
@@ -120,6 +120,7 @@ export async function emitResetCommandHooks(params: {
   await triggerInternalHook(hookEvent);
   params.command.resetHookTriggered = true;
 
+  let routedReply = false;
   if (hookEvent.messages.length > 0) {
     const channel = params.ctx.OriginatingChannel || params.command.channel;
     const to = params.ctx.OriginatingTo || params.command.from || params.command.to;
@@ -138,6 +139,7 @@ export async function emitResetCommandHooks(params: {
         threadId: params.ctx.MessageThreadId,
         cfg: params.cfg,
       });
+      routedReply = true;
     }
   }
 
@@ -164,4 +166,5 @@ export async function emitResetCommandHooks(params: {
       }
     })();
   }
+  return { routedReply };
 }

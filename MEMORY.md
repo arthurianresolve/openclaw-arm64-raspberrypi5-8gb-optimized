@@ -1,6 +1,6 @@
 # Excaliclaw Memory
 
-Updated: 2026-05-03
+Updated: 2026-05-04
 
 ## Decisions
 
@@ -24,6 +24,7 @@ Updated: 2026-05-03
 
 - On the Raspberry Pi 8 GB / Raspberry Pi OS Trixie host, run heavy checks sequentially.
 - For `oxlint` on the Raspberry Pi 5 8 GB host, use the shard runner's sequential file-chunking path with the 4 GB Node heap cap. Treat that tuning as arm64/Raspberry Pi 5 8 GB specific unless a later benchmark proves it safe to widen.
+- For `pnpm test` on the Raspberry Pi 5 8 GB host, prefer `OPENCLAW_TEST_PROFILE=pi5-8gb` or `pnpm test:perf:arm64`; the profile serializes shards, defaults Vitest to one worker, keeps local-check policy enabled, and surfaces profile/timing data through plan or benchmark JSON.
 - Do not run multiple independent `pnpm test` or `tsgo` jobs in parallel in one worktree.
 - Default strict compile proof:
   - `OPENCLAW_TSGO_HEAVY_CHECK_LOCK_HELD=1 pnpm tsgo:core`
@@ -53,6 +54,8 @@ Updated: 2026-05-03
 - Prompt-corpus fetch controls were fixed before push.
 - Vitest direct runs now use PTY fallback and wait for `close`.
 - PTY output is sanitized and carriage-return progress updates are rendered logically.
+- On the Raspberry Pi 5 8 GB host, the shared `extensions` Vitest project needs a 300000ms per-test timeout for `extensions/codex/src/app-server/run-attempt.test.ts`, and the sequential full-suite `pnpm test` path needs a 420000ms no-output watchdog budget.
+- Arm64/Pi validation speedups should favor deterministic scheduling over concurrency: sequential full-suite runs now reuse `.artifacts/vitest-shard-timings.json` longest-first, with static wrapper weights as fallback, and `--benchmark-json` records shard durations and no-output retries.
 - The key upstream ports were session skill hydration, restart-lock recovery, `SecretRef` auth-rotation detection, plugin audit debris filtering, and fallback trust marking.
 - A stale heavy-check lock once hit an `EPERM` liveness edge; the helper now reclaims it and logs the reclaim.
 - Added `docs/concepts/agentic-architecture.md` and docs nav entry. The page captures orchestration, context, harnesses, advanced feature engineering, command and prompt adoption, debugging, validation, upstream/downstream port review, external references considered, and agentic pattern applicability.

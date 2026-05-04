@@ -1625,6 +1625,7 @@
     "test:parallels:macos": "bash scripts/e2e/parallels-macos-smoke.sh",
     "test:parallels:npm-update": "bash scripts/e2e/parallels-npm-update-smoke.sh",
     "test:parallels:windows": "bash scripts/e2e/parallels-windows-smoke.sh",
+    "test:perf:arm64": "OPENCLAW_TEST_PROFILE=pi5-8gb node scripts/test-projects.mjs --benchmark-json",
     "test:perf:budget": "node scripts/test-perf-budget.mjs",
     "test:perf:changed:bench": "node scripts/bench-test-changed.mjs",
     "test:perf:groups": "node scripts/test-group-report.mjs",

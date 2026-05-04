@@ -35,6 +35,7 @@ Use this skill for `arthurianresolve/excaliclaw`.
 
 - On the Raspberry Pi host, run heavy checks sequentially.
 - For `oxlint`, prefer the sequential shard runner with the 4 GB heap cap and small file batches on the Raspberry Pi 5 8 GB host; treat that tuning as arm64-specific unless a later benchmark proves otherwise.
+- For `pnpm test` on the Raspberry Pi 5 8 GB host, prefer `OPENCLAW_TEST_PROFILE=pi5-8gb` or `pnpm test:perf:arm64`; the profile serializes shards, defaults Vitest to one worker, keeps local-check policy enabled, and reports profile/timing data through plan or benchmark JSON.
 - Do not launch multiple independent `pnpm test` or `tsgo` jobs in parallel in the same worktree.
 - Use these compile checks first:
   - `OPENCLAW_TSGO_HEAVY_CHECK_LOCK_HELD=1 pnpm tsgo:core`
@@ -72,6 +73,8 @@ Use this skill for `arthurianresolve/excaliclaw`.
 - Prompt-corpus cache integrity and fetch-control fixes were already ported.
 - Vitest direct runs use PTY fallback when useful and wait for `close`.
 - PTY output is sanitized and carriage-return progress updates are rendered logically.
+- On the Raspberry Pi 5 8 GB host, the shared `extensions` Vitest project needs a 300000ms per-test timeout for `extensions/codex/src/app-server/run-attempt.test.ts`, and the sequential full-suite `pnpm test` path needs a 420000ms no-output watchdog budget.
+- Arm64/Pi validation speedups should favor deterministic scheduling over added concurrency: sequential full-suite runs reuse `.artifacts/vitest-shard-timings.json` longest-first, with static wrapper weights as fallback, and `--benchmark-json` records shard durations and no-output retries.
 - The key upstream ports here were session skill hydration, restart-lock recovery, `SecretRef` auth-rotation detection, plugin audit debris filtering, and fallback trust marking.
 - A stale heavy-check lock once stalled on `EPERM`; the helper now reclaims it and logs the reclaim.
 - `docs/concepts/agentic-architecture.md` now captures orchestration, context, harnesses, advanced feature engineering, command and prompt adoption, debugging, validation, upstream/downstream port review, external references considered, and agentic pattern applicability.

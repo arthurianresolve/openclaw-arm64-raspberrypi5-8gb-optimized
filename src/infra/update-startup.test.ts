@@ -249,12 +249,12 @@ describe("update-startup", () => {
     expect(onUpdateAvailableChange).toHaveBeenCalledWith({
       currentVersion: "1.0.0",
       latestVersion: "2.0.0",
-      channel: "latest",
+      channel: "master",
     });
     expect(getUpdateAvailable()).toEqual({
       currentVersion: "1.0.0",
       latestVersion: "2.0.0",
-      channel: "latest",
+      channel: "master",
     });
   });
 

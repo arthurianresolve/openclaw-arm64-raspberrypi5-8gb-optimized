@@ -239,6 +239,9 @@ function mergeVerificationState(params: {
       ? { remainingRepairBudget: params.remainingRepairBudget }
       : {}),
     ...(params.repairTaskId ? { repairTaskId: params.repairTaskId } : {}),
+    ...(!params.repairTaskId && params.previousVerificationState?.repairTaskId
+      ? { repairTaskId: params.previousVerificationState.repairTaskId }
+      : {}),
     ...(params.resumeStepAfterRepair
       ? { resumeStepAfterRepair: params.resumeStepAfterRepair }
       : params.previousVerificationState?.resumeStepAfterRepair

@@ -151,6 +151,7 @@ export function createScopedVitestConfig(
     fileParallelism?: boolean;
     pool?: "forks" | "threads";
     passWithNoTests?: boolean;
+    testTimeout?: number;
     excludeUnitFastTests?: boolean;
     setupFiles?: string[];
     useNonIsolatedRunner?: boolean;
@@ -205,6 +206,7 @@ export function createScopedVitestConfig(
       ...(options?.fileParallelism === undefined
         ? {}
         : { fileParallelism: options.fileParallelism }),
+      ...(options?.testTimeout === undefined ? {} : { testTimeout: options.testTimeout }),
       ...(scopedGroupOrder === undefined
         ? {}
         : {

@@ -2,13 +2,18 @@ import fs from "node:fs";
 import { performance } from "node:perf_hooks";
 import { formatMs } from "./lib/check-timing-summary.mjs";
 import { acquireLocalHeavyCheckLockSync } from "./lib/local-heavy-check-runtime.mjs";
+import { buildVitestBenchmarkJson } from "./lib/vitest-benchmark-json.mjs";
 import {
+  detectVitestHostInfo,
   isCiLikeEnv,
   resolveLocalFullSuiteProfile,
   resolveLocalVitestEnv,
 } from "./lib/vitest-local-scheduling.mjs";
 import { buildVitestPlanJson } from "./lib/vitest-plan-json.mjs";
-import { createVitestRunSpecsFromPlans } from "./lib/vitest-run-specs.mjs";
+import {
+  createVitestRunSpecsFromPlans,
+  VITEST_NO_OUTPUT_TIMEOUT_ENV_KEY,
+} from "./lib/vitest-run-specs.mjs";
 import {
   createShardTimingSample,
   readShardTimings,
@@ -40,6 +45,18 @@ let releaseLock = () => {};
 let lockReleased = false;
 
 const FULL_SUITE_CONFIG_WEIGHT = new Map([
+  ["test/vitest/vitest.full-extensions.config.ts", 240],
+  ["test/vitest/vitest.full-core-runtime.config.ts", 230],
+  ["test/vitest/vitest.full-core-support-boundary.config.ts", 225],
+  ["test/vitest/vitest.full-agentic.config.ts", 220],
+  ["test/vitest/vitest.full-core-unit-fast.config.ts", 215],
+  ["test/vitest/vitest.full-auto-reply.config.ts", 210],
+  ["test/vitest/vitest.full-bundled.config.ts", 170],
+  ["test/vitest/vitest.full-gateway.config.ts", 170],
+  ["test/vitest/vitest.full-contracts.config.ts", 90],
+  ["test/vitest/vitest.full-ui.config.ts", 65],
+  ["test/vitest/vitest.full-tooling.config.ts", 40],
+  ["test/vitest/vitest.full-daemon.config.ts", 36],
   ["test/vitest/vitest.gateway.config.ts", 180],
   ["test/vitest/vitest.gateway-server.config.ts", 180],
   ["test/vitest/vitest.gateway-core.config.ts", 179],
@@ -101,6 +118,10 @@ const FULL_SUITE_CONFIG_WEIGHT = new Map([
   ["test/vitest/vitest.extension-msteams.config.ts", 4],
 ]);
 const PLAN_JSON_ARG = "--plan-json";
+const BENCHMARK_JSON_ARG = "--benchmark-json";
+// Raspberry Pi 5 8 GB full-suite runs need longer quiet windows than the shared
+// 3 minute default, especially once the largest shards are serialized.
+const FULL_SUITE_VITEST_NO_OUTPUT_TIMEOUT_MS = "420000";
 
 const releaseLockOnce = () => {
   if (lockReleased) {
@@ -168,12 +189,31 @@ function applyDefaultParallelVitestWorkerBudget(specs, env) {
   }));
 }
 
+function applyFullSuiteVitestNoOutputTimeout(specs) {
+  return specs.map((spec) => {
+    if (spec.watchMode || Object.hasOwn(spec.env ?? {}, VITEST_NO_OUTPUT_TIMEOUT_ENV_KEY)) {
+      return spec;
+    }
+    return {
+      ...spec,
+      env: {
+        ...spec.env,
+        [VITEST_NO_OUTPUT_TIMEOUT_ENV_KEY]: FULL_SUITE_VITEST_NO_OUTPUT_TIMEOUT_MS,
+      },
+    };
+  });
+}
+
 async function runLoggedVitestSpec(spec) {
   console.error(`[test] starting ${spec.config}`);
   const startedAt = performance.now();
+  let noOutputTimeoutRetries = 0;
+  let retriedAfterNoOutputTimeout = false;
   let result = await runVitestSpec(spec);
   if (result.noOutputTimedOut && !spec.watchMode && shouldRetryVitestNoOutputTimeout(spec.env)) {
     console.error(`[test] retrying ${spec.config} after no-output timeout`);
+    noOutputTimeoutRetries += 1;
+    retriedAfterNoOutputTimeout = true;
     result = await runVitestSpec(spec);
   }
   const durationMs = performance.now() - startedAt;
@@ -184,6 +224,9 @@ async function runLoggedVitestSpec(spec) {
       code: result.code || 143,
       signal: null,
       timing: null,
+      durationMs,
+      noOutputTimeoutRetries,
+      retriedAfterNoOutputTimeout,
     };
   }
   if (result.signal) {
@@ -194,6 +237,9 @@ async function runLoggedVitestSpec(spec) {
   }
   return {
     ...result,
+    durationMs,
+    noOutputTimeoutRetries,
+    retriedAfterNoOutputTimeout,
     timing: createShardTimingSample(spec, durationMs),
   };
 }
@@ -218,7 +264,6 @@ function interleaveSlowAndFastSpecs(sortedSpecs) {
 }
 
 function orderFullSuiteSpecsForParallelRun(specs, shardTimings = new Map()) {
-  const hasMatchingShardTiming = specs.some((spec) => shardTimings.has(spec.config));
   const sortedSpecs = specs.toSorted((a, b) => {
     const weightDelta =
       resolveConfigSortWeight(b.config, shardTimings) -
@@ -228,7 +273,30 @@ function orderFullSuiteSpecsForParallelRun(specs, shardTimings = new Map()) {
     }
     return a.config.localeCompare(b.config);
   });
+  const hasMatchingShardTiming = specs.some((spec) => shardTimings.has(spec.config));
   return hasMatchingShardTiming ? interleaveSlowAndFastSpecs(sortedSpecs) : sortedSpecs;
+}
+
+function orderFullSuiteSpecsForSequentialRun(specs, shardTimings = new Map()) {
+  return specs.toSorted((a, b) => {
+    const weightDelta =
+      resolveConfigSortWeight(b.config, shardTimings) -
+      resolveConfigSortWeight(a.config, shardTimings);
+    if (weightDelta !== 0) {
+      return weightDelta;
+    }
+    return a.config.localeCompare(b.config);
+  });
+}
+
+function createBenchmarkRecord(spec, result) {
+  return {
+    config: spec.config,
+    durationMs: result.durationMs,
+    exitCode: result.code,
+    noOutputTimeoutRetries: result.noOutputTimeoutRetries,
+    retriedAfterNoOutputTimeout: result.retriedAfterNoOutputTimeout,
+  };
 }
 
 function isFullExtensionsProjectRun(specs) {
@@ -248,6 +316,7 @@ async function runVitestSpecsParallel(specs, concurrency) {
   let nextIndex = 0;
   let exitCode = 0;
   const timings = [];
+  const benchmarkRecords = [];
 
   const runWorker = async () => {
     for (;;) {
@@ -264,6 +333,7 @@ async function runVitestSpecsParallel(specs, concurrency) {
       if (result.code !== 0) {
         exitCode = exitCode || result.code;
       }
+      benchmarkRecords.push(createBenchmarkRecord(spec, result));
       if (result.timing) {
         timings.push(result.timing);
       }
@@ -271,15 +341,17 @@ async function runVitestSpecsParallel(specs, concurrency) {
   };
 
   await Promise.all(Array.from({ length: concurrency }, () => runWorker()));
-  return { exitCode, timings };
+  return { exitCode, timings, benchmarkRecords };
 }
 
 async function main() {
   const suiteStartedAt = performance.now();
   const rawArgs = process.argv.slice(2);
   const planJson = rawArgs.includes(PLAN_JSON_ARG);
-  const args = rawArgs.filter((arg) => arg !== PLAN_JSON_ARG);
+  const benchmarkJson = rawArgs.includes(BENCHMARK_JSON_ARG);
+  const args = rawArgs.filter((arg) => arg !== PLAN_JSON_ARG && arg !== BENCHMARK_JSON_ARG);
   const baseEnv = resolveLocalVitestEnv(process.env);
+  const hostInfo = detectVitestHostInfo();
   const { targetArgs } = parseTestProjectsArgs(args, process.cwd());
   const changedTargetArgs =
     targetArgs.length === 0
@@ -294,8 +366,15 @@ async function main() {
           baseEnv,
           cwd: process.cwd(),
         });
+  const isSequentialFullSuiteRun =
+    targetArgs.length === 0 &&
+    changedTargetArgs === null &&
+    !rawRunSpecs.some((spec) => spec.watchMode);
+  const adjustedRawRunSpecs = isSequentialFullSuiteRun
+    ? applyFullSuiteVitestNoOutputTimeout(rawRunSpecs)
+    : rawRunSpecs;
   const runSpecs = applyDefaultMultiSpecVitestCachePaths(
-    applyDefaultVitestNoOutputTimeout(rawRunSpecs, { env: baseEnv }),
+    applyDefaultVitestNoOutputTimeout(adjustedRawRunSpecs, { env: baseEnv }),
     { cwd: process.cwd(), env: baseEnv },
   );
 
@@ -314,16 +393,21 @@ async function main() {
     }
     console.error("[test] no changed test targets; skipping Vitest.");
     printTestSummary("skipped", 0, performance.now() - suiteStartedAt);
+    if (benchmarkJson) {
+      printBenchmarkJson({
+        args,
+        baseEnv,
+        concurrency: 1,
+        durationMs: performance.now() - suiteStartedAt,
+        hostInfo,
+        isFullSuiteRun: false,
+        isParallelShardRun: false,
+        records: [],
+        status: "skipped",
+      });
+    }
     return;
   }
-
-  releaseLock = shouldAcquireLocalHeavyCheckLock(runSpecs, baseEnv)
-    ? acquireLocalHeavyCheckLockSync({
-        cwd: process.cwd(),
-        env: baseEnv,
-        toolName: "test",
-      })
-    : () => {};
 
   const isFullSuiteRun =
     targetArgs.length === 0 &&
@@ -335,6 +419,14 @@ async function main() {
     !runSpecs.some((spec) => spec.watchMode);
   const isParallelShardRun =
     isFullSuiteRun || isFullExtensionsProjectRun(runSpecs) || isExplicitParallelMultiConfigRun;
+  const concurrency = isParallelShardRun
+    ? resolveParallelFullSuiteConcurrency(runSpecs.length, baseEnv)
+    : 1;
+  const shardTimings = isParallelShardRun ? readShardTimings(process.cwd(), baseEnv) : new Map();
+  const sequentialSpecs =
+    isParallelShardRun && concurrency === 1
+      ? orderFullSuiteSpecsForSequentialRun(runSpecs, shardTimings)
+      : runSpecs;
   if (planJson) {
     printRunPlanJson({
       args,
@@ -342,16 +434,21 @@ async function main() {
       changedTargetArgs,
       isFullSuiteRun,
       isParallelShardRun,
-      runSpecs,
+      runSpecs: sequentialSpecs,
       targetArgs,
     });
     return;
   }
+  releaseLock = shouldAcquireLocalHeavyCheckLock(runSpecs, baseEnv)
+    ? acquireLocalHeavyCheckLockSync({
+        cwd: process.cwd(),
+        env: baseEnv,
+        toolName: "test",
+      })
+    : () => {};
   if (isParallelShardRun) {
-    const concurrency = resolveParallelFullSuiteConcurrency(runSpecs.length, baseEnv);
     if (concurrency > 1) {
       const localFullSuiteProfile = resolveLocalFullSuiteProfile(baseEnv);
-      const shardTimings = readShardTimings(process.cwd(), baseEnv);
       const parallelSpecs = applyDefaultParallelVitestWorkerBudget(
         applyParallelVitestCachePaths(orderFullSuiteSpecsForParallelRun(runSpecs, shardTimings), {
           cwd: process.cwd(),
@@ -372,10 +469,11 @@ async function main() {
       console.error(
         `[test] running ${parallelSpecs.length} Vitest shards with parallelism ${concurrency}`,
       );
-      const { exitCode: parallelExitCode, timings } = await runVitestSpecsParallel(
-        parallelSpecs,
-        concurrency,
-      );
+      const {
+        benchmarkRecords,
+        exitCode: parallelExitCode,
+        timings,
+      } = await runVitestSpecsParallel(parallelSpecs, concurrency);
       writeShardTimings(timings, process.cwd(), baseEnv);
       printTestSummary(
         parallelExitCode === 0 ? "passed" : "failed",
@@ -384,6 +482,19 @@ async function main() {
         "Vitest summaries above are per-shard, not aggregate totals.",
       );
       releaseLockOnce();
+      if (benchmarkJson) {
+        printBenchmarkJson({
+          args,
+          baseEnv,
+          concurrency,
+          durationMs: performance.now() - suiteStartedAt,
+          hostInfo,
+          isFullSuiteRun,
+          isParallelShardRun,
+          records: benchmarkRecords,
+          status: parallelExitCode === 0 ? "passed" : "failed",
+        });
+      }
       if (parallelExitCode !== 0) {
         process.exit(parallelExitCode);
       }
@@ -393,11 +504,13 @@ async function main() {
 
   let exitCode = 0;
   const timings = [];
-  for (const spec of runSpecs) {
+  const benchmarkRecords = [];
+  for (const spec of sequentialSpecs) {
     const result = await runLoggedVitestSpec(spec);
     if (!result) {
       return;
     }
+    benchmarkRecords.push(createBenchmarkRecord(spec, result));
     if (result.timing) {
       timings.push(result.timing);
     }
@@ -406,6 +519,19 @@ async function main() {
       if (spec.continueOnFailure !== true) {
         printTestSummary("failed", timings.length, performance.now() - suiteStartedAt);
         releaseLockOnce();
+        if (benchmarkJson) {
+          printBenchmarkJson({
+            args,
+            baseEnv,
+            concurrency,
+            durationMs: performance.now() - suiteStartedAt,
+            hostInfo,
+            isFullSuiteRun,
+            isParallelShardRun,
+            records: benchmarkRecords,
+            status: "failed",
+          });
+        }
         process.exit(result.code);
       }
     }
@@ -418,6 +544,19 @@ async function main() {
   );
 
   releaseLockOnce();
+  if (benchmarkJson) {
+    printBenchmarkJson({
+      args,
+      baseEnv,
+      concurrency,
+      durationMs: performance.now() - suiteStartedAt,
+      hostInfo,
+      isFullSuiteRun,
+      isParallelShardRun,
+      records: benchmarkRecords,
+      status: exitCode === 0 ? "passed" : "failed",
+    });
+  }
   if (exitCode !== 0) {
     process.exit(exitCode);
   }
@@ -436,6 +575,11 @@ function printRunPlanJson(params) {
     resolveParallelFullSuiteConcurrency,
     shouldAcquireLocalHeavyCheckLock,
   });
+  process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
+}
+
+function printBenchmarkJson(params) {
+  const output = buildVitestBenchmarkJson(params);
   process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
 }
 

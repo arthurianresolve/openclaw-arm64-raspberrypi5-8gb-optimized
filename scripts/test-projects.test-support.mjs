@@ -248,6 +248,7 @@ const TOOLING_SOURCE_TEST_TARGETS = new Map([
   ["scripts/check-changed.mjs", ["test/scripts/changed-lanes.test.ts"]],
   ["scripts/lib/live-docker-stage.sh", ["test/scripts/live-docker-stage.test.ts"]],
   ["scripts/lib/vitest-local-scheduling.mjs", ["test/scripts/vitest-local-scheduling.test.ts"]],
+  ["scripts/lib/vitest-benchmark-json.mjs", ["test/scripts/test-projects.test.ts"]],
   [
     "scripts/lib/vitest-runtime.mjs",
     [

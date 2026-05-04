@@ -32,6 +32,31 @@ describe("vitest local full-suite profile", () => {
     });
   });
 
+  it("applies Raspberry Pi 5 8GB defaults without overwriting explicit worker budgets", () => {
+    expect(resolveLocalVitestEnv({ OPENCLAW_TEST_PROFILE: "pi5-8gb", PATH: "/usr/bin" })).toEqual({
+      OPENCLAW_LOCAL_CHECK: "1",
+      OPENCLAW_TEST_PROFILE: "pi5-8gb",
+      OPENCLAW_TEST_PROJECTS_SERIAL: "1",
+      OPENCLAW_VITEST_MAX_WORKERS: "1",
+      PATH: "/usr/bin",
+    });
+
+    expect(
+      resolveLocalVitestEnv({
+        OPENCLAW_TEST_PROFILE: "pi5-8gb",
+        OPENCLAW_TEST_PROJECTS_SERIAL: "0",
+        OPENCLAW_TEST_WORKERS: "2",
+        PATH: "/usr/bin",
+      }),
+    ).toEqual({
+      OPENCLAW_LOCAL_CHECK: "1",
+      OPENCLAW_TEST_PROFILE: "pi5-8gb",
+      OPENCLAW_TEST_PROJECTS_SERIAL: "0",
+      OPENCLAW_TEST_WORKERS: "2",
+      PATH: "/usr/bin",
+    });
+  });
+
   it("selects the large local profile on roomy hosts that are not throttled", () => {
     const env = {};
     const hostInfo = {

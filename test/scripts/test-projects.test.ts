@@ -1,6 +1,7 @@
 import path from "node:path";
 import fg from "fast-glob";
 import { describe, expect, it } from "vitest";
+import { buildVitestBenchmarkJson } from "../../scripts/lib/vitest-benchmark-json.mjs";
 import { buildVitestPlanJson } from "../../scripts/lib/vitest-plan-json.mjs";
 import {
   DEFAULT_TEST_PROJECTS_VITEST_NO_OUTPUT_TIMEOUT_MS,
@@ -1356,6 +1357,7 @@ describe("scripts/test-projects plan-json", () => {
 
     expect(parsed.status).toBe("planned");
     expect(parsed.heavyCheckLock).toBe(false);
+    expect(parsed.profile).toBeNull();
     expect(parsed.specs).toEqual([
       expect.objectContaining({
         config: "test/vitest/vitest.tooling.config.ts",
@@ -1364,6 +1366,86 @@ describe("scripts/test-projects plan-json", () => {
         env: expect.objectContaining({
           OPENCLAW_VITEST_INCLUDE_FILE: "<generated>",
         }),
+      }),
+    ]);
+  });
+
+  it("exposes the active local test profile", () => {
+    const parsed = buildVitestPlanJson({
+      args: [],
+      baseEnv: { OPENCLAW_TEST_PROFILE: "pi5-8gb" },
+      changedTargetArgs: null,
+      isFullSuiteRun: true,
+      isParallelShardRun: true,
+      resolveParallelFullSuiteConcurrency,
+      runSpecs: [],
+      shouldAcquireLocalHeavyCheckLock,
+      targetArgs: [],
+    });
+
+    expect(parsed.profile).toBe("pi5-8gb");
+  });
+});
+
+describe("scripts/test-projects benchmark-json", () => {
+  it("summarizes shard timings, retries, and profile details", () => {
+    const parsed = buildVitestBenchmarkJson({
+      args: [],
+      baseEnv: {
+        OPENCLAW_TEST_PROFILE: "pi5-8gb",
+        OPENCLAW_TEST_PROJECTS_SERIAL: "1",
+        OPENCLAW_VITEST_MAX_WORKERS: "1",
+      },
+      concurrency: 1,
+      durationMs: 1234.56,
+      hostInfo: {
+        cpuCount: 4,
+        freeMemoryBytes: 3.5 * 1024 ** 3,
+        loadAverage1m: 1.234,
+        totalMemoryBytes: 8 * 1024 ** 3,
+      },
+      isFullSuiteRun: true,
+      isParallelShardRun: true,
+      records: [
+        {
+          config: "test/vitest/vitest.full-extensions.config.ts",
+          durationMs: 1200.4,
+          exitCode: 0,
+          noOutputTimeoutRetries: 1,
+          retriedAfterNoOutputTimeout: true,
+        },
+      ],
+      status: "passed",
+    });
+
+    expect(parsed).toEqual(
+      expect.objectContaining({
+        concurrency: 1,
+        durationMs: 1235,
+        failures: 0,
+        profile: "pi5-8gb",
+        shardCount: 1,
+        timeoutRetries: 1,
+      }),
+    );
+    expect(parsed.host).toEqual(
+      expect.objectContaining({
+        cpuCount: 4,
+        loadAverage1m: 1.23,
+      }),
+    );
+    expect(parsed.workers).toEqual(
+      expect.objectContaining({
+        OPENCLAW_TEST_PROJECTS_SERIAL: "1",
+        OPENCLAW_VITEST_MAX_WORKERS: "1",
+      }),
+    );
+    expect(parsed.specs).toEqual([
+      expect.objectContaining({
+        config: "test/vitest/vitest.full-extensions.config.ts",
+        durationMs: 1200,
+        noOutputTimeoutRetries: 1,
+        retriedAfterNoOutputTimeout: true,
       }),
     ]);
   });

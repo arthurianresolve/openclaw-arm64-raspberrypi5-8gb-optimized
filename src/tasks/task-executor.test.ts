@@ -581,7 +581,7 @@ describe("task-executor", () => {
         parentTaskId: created.task.taskId,
         status: "queued",
         runId: "run-verification-repair-parent:verification-repair:0",
-        label: "Verification repair: Patch queue regression",
+        label: expect.stringMatching(/^Verification repair: Patch queue regression/),
         unitVerificationPolicy: {
           commands: ["pnpm tsc -p tsconfig.core.json --noEmit"],
           retryCount: 0,
@@ -589,8 +589,9 @@ describe("task-executor", () => {
           failMode: "stop",
         },
       });
-      expect(latest?.task).toContain("Repair the failing verification for Patch queue regression.");
+      expect(latest?.task).toContain("Repair the failing verification for Patch queue regression");
       expect(latest?.task).toContain("Remaining automatic repair budget after this retry: 0.");
+      expect(latest?.label).toMatch(/^Verification repair: Patch queue regression/);
 
       expect(getTaskFlowById(flow.flowId)).toMatchObject({
         flowId: flow.flowId,

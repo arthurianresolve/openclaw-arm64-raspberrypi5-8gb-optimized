@@ -11,6 +11,7 @@ export function buildVitestPlanJson(params) {
     args: params.args,
     changedTargetArgs: params.changedTargetArgs,
     targetArgs: params.targetArgs,
+    profile: params.baseEnv.OPENCLAW_TEST_PROFILE ?? null,
     fullSuite: params.isFullSuiteRun,
     parallelShardRun: params.isParallelShardRun,
     concurrency,

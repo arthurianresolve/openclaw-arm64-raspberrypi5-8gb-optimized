@@ -97,10 +97,19 @@ WhatsApp runs through the gateway's web channel (Baileys Web). It starts automat
 ```json5
 {
   web: {
+    enabled: true,
+    heartbeatSeconds: 60,
     whatsapp: {
       keepAliveIntervalMs: 25000,
       connectTimeoutMs: 60000,
       defaultQueryTimeoutMs: 60000,
+    },
+    reconnect: {
+      initialMs: 2000,
+      maxMs: 120000,
+      factor: 1.4,
+      jitter: 0.2,
+      maxAttempts: 0,
     },
   },
   channels: {
@@ -116,17 +125,6 @@ WhatsApp runs through the gateway's web channel (Baileys Web). It starts automat
       },
       groupPolicy: "allowlist",
       groupAllowFrom: ["+15551234567"],
-    },
-  },
-  web: {
-    enabled: true,
-    heartbeatSeconds: 60,
-    reconnect: {
-      initialMs: 2000,
-      maxMs: 120000,
-      factor: 1.4,
-      jitter: 0.2,
-      maxAttempts: 0,
     },
   },
 }
@@ -274,7 +272,7 @@ WhatsApp runs through the gateway's web channel (Baileys Web). It starts automat
       historyLimit: 20,
       textChunkLimit: 2000,
       chunkMode: "length", // length | newline
-      streaming: "off", // off | partial | block | progress (progress maps to partial on Discord)
+      streaming: "off", // off | partial | block | progress
       maxLinesPerMessage: 17,
       ui: {
         components: {
@@ -484,7 +482,7 @@ WhatsApp runs through the gateway's web channel (Baileys Web). It starts automat
 
 **Thread session isolation:** `thread.historyScope` is per-thread (default) or shared across channel. `thread.inheritParent` copies parent channel transcript to new threads.
 
-- Slack native streaming plus the Slack assistant-style "is typing..." thread status require a reply thread target. Top-level DMs stay off-thread by default, so they use `typingReaction` or normal delivery instead of the thread-style preview.
+- Slack native streaming plus the Slack assistant-style "is typing..." thread status require a reply thread target. Top-level DMs stay off-thread by default, so they can still stream through Slack draft post-and-edit previews instead of showing the thread-style native stream/status preview.
 - `typingReaction` adds a temporary reaction to the inbound Slack message while a reply is running, then removes it on completion. Use a Slack emoji shortcode such as `"hourglass_flowing_sand"`.
 - `channels.slack.execApprovals`: Slack-native exec approval delivery and approver authorization. Same schema as Discord: `enabled` (`true`/`false`/`"auto"`), `approvers` (Slack user IDs), `agentFilter`, `sessionFilter`, and `target` (`"dm"`, `"channel"`, or `"both"`).
 
@@ -884,7 +882,7 @@ Include your own number in `allowFrom` to enable self-chat mode (ignores native 
 - Text commands must be **standalone** messages with leading `/`.
 - `native: "auto"` turns on native commands for Discord/Telegram, leaves Slack off.
 - `nativeSkills: "auto"` turns on native skill commands for Discord/Telegram, leaves Slack off.
-- Override per channel: `channels.discord.commands.native` (bool or `"auto"`). `false` clears previously registered commands.
+- Override per channel: `channels.discord.commands.native` (bool or `"auto"`). For Discord, `false` skips native command registration and cleanup during startup.
 - Override native skill registration per channel with `channels.<provider>.commands.nativeSkills`.
 - `channels.telegram.customCommands` adds extra Telegram bot menu entries.
 - `bash: true` enables `! <cmd>` for host shell. Requires `tools.elevated.enabled` and sender in `tools.elevated.allowFrom.<channel>`.

@@ -3,17 +3,16 @@ import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { booleanFlag, parseFlagArgs, stringFlag } from "./lib/arg-utils.mjs";
 
 const GIT_OUTPUT_MAX_BUFFER = 64 * 1024 * 1024;
-const DEFAULT_CHANGED_BASE = "origin/main";
-const DEFAULT_CHANGED_BASE_FALLBACKS = [DEFAULT_CHANGED_BASE, "origin/master"];
 
 const DOCS_PATH_RE = /^(?:docs\/|README\.md$|AGENTS\.md$|.*\.mdx?$)/u;
 const APP_PATH_RE = /^(?:apps\/|Swabble\/|appcast\.xml$)/u;
 const EXTENSION_PATH_RE = /^extensions\/[^/]+(?:\/|$)/u;
 const CORE_PATH_RE = /^(?:src\/|ui\/|packages\/)/u;
 const TOOLING_PATH_RE =
-  /^(?:scripts\/|test\/vitest\/|\.github\/|\.agents\/skills\/|git-hooks\/|vitest(?:\..+)?\.config\.ts$|tsconfig.*\.json$|\.gitignore$|\.oxlint.*|\.oxfmt.*)/u;
+  /^(?:scripts\/|test\/vitest\/|\.github\/|\.vscode\/|config\/|deploy\/|git-hooks\/|Dockerfile\.sandbox(?:-(?:browser|common))?$|Makefile$|docker-setup\.sh$|setup-podman\.sh$|openclaw\.podman\.env$|skills\/pyproject\.toml$|vitest(?:\..+)?\.config\.ts$|tsconfig.*\.json$|\.dockerignore$|\.gitignore$|\.jscpd\.json$|\.npmignore$|\.pre-commit-config\.yaml$|\.swiftformat$|\.swiftlint\.yml$|\.oxlint.*|\.oxfmt.*)/u;
 const ROOT_GLOBAL_PATH_RE =
   /^(?:package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|tsdown\.config\.ts$|vitest\.config\.ts$)/u;
+const LEGACY_ROOT_ASSET_PATH_RE = /^assets\//u;
 const LIVE_DOCKER_TOOLING_PATH_RE =
   /^(?:scripts\/test-docker-all\.mjs|scripts\/test-docker-all\.sh|scripts\/lib\/live-docker-auth\.sh|scripts\/test-live-(?:acp-bind|cli-backend|codex-harness|gateway-models|models)-docker\.sh|src\/gateway\/gateway-acp-bind\.live\.test\.ts|src\/gateway\/live-agent-probes\.test\.ts)$/u;
 const LIVE_DOCKER_PACKAGE_SCRIPT_RE = /^test:docker:live-[\w:-]+$/u;
@@ -179,7 +178,7 @@ export function detectChangedLanes(changedPaths, options = {}) {
       continue;
     }
 
-    if (changedPath.startsWith("test/")) {
+    if (changedPath.startsWith("test/") || changedPath.startsWith("test-fixtures/")) {
       lanes.tooling = true;
       reasons.push(`${changedPath}: root test/support surface`);
       continue;
@@ -188,6 +187,12 @@ export function detectChangedLanes(changedPaths, options = {}) {
     if (TOOLING_PATH_RE.test(changedPath)) {
       lanes.tooling = true;
       reasons.push(`${changedPath}: tooling surface`);
+      continue;
+    }
+
+    if (LEGACY_ROOT_ASSET_PATH_RE.test(changedPath)) {
+      lanes.tooling = true;
+      reasons.push(`${changedPath}: legacy root asset cleanup`);
       continue;
     }
 
@@ -225,9 +230,9 @@ export function detectChangedLanesForPaths(params) {
  * @returns {string[]}
  */
 export function listChangedPathsFromGit(params) {
-  const cwd = params.cwd ?? process.cwd();
-  const base = params.base || resolveDefaultChangedBase(cwd);
+  const base = params.base;
   const head = params.head ?? "HEAD";
+  const cwd = params.cwd ?? process.cwd();
   if (!base) {
     return [];
   }
@@ -263,25 +268,6 @@ function runGitLsFiles(extraArgs, cwd = process.cwd()) {
     maxBuffer: GIT_OUTPUT_MAX_BUFFER,
   });
   return output.split("\n").map(normalizeChangedPath).filter(Boolean);
-}
-
-export function resolveDefaultChangedBase(cwd = process.cwd()) {
-  return (
-    DEFAULT_CHANGED_BASE_FALLBACKS.find((candidate) => gitCommitExists(candidate, cwd)) ??
-    DEFAULT_CHANGED_BASE
-  );
-}
-
-function gitCommitExists(ref, cwd = process.cwd()) {
-  try {
-    execFileSync("git", ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], {
-      cwd,
-      stdio: "ignore",
-    });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export function listStagedChangedPaths() {
@@ -430,7 +416,7 @@ function toSnakeCase(value) {
 
 function parseArgs(argv) {
   const args = {
-    base: null,
+    base: "origin/main",
     head: "HEAD",
     staged: false,
     json: false,
@@ -491,16 +477,15 @@ function printHuman(result) {
 
 if (isDirectRun()) {
   const args = parseArgs(process.argv.slice(2));
-  const base = args.base ?? resolveDefaultChangedBase();
   const paths =
     args.paths.length > 0
       ? args.paths
       : args.staged
         ? listStagedChangedPaths()
-        : listChangedPathsFromGit({ base, head: args.head });
+        : listChangedPathsFromGit({ base: args.base, head: args.head });
   const result = detectChangedLanesForPaths({
     paths,
-    base,
+    base: args.base,
     head: args.head,
     staged: args.staged,
   });

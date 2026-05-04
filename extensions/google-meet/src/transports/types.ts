@@ -24,7 +24,8 @@ type GoogleMeetSpeechBlockedReason =
   | GoogleMeetManualActionReason
   | "not-in-call"
   | "browser-unverified"
-  | "audio-bridge-unavailable";
+  | "audio-bridge-unavailable"
+  | "meet-microphone-muted";
 
 export type GoogleMeetChromeHealth = {
   inCall?: boolean;
@@ -41,6 +42,24 @@ export type GoogleMeetChromeHealth = {
     at?: string;
     speaker?: string;
     text: string;
+  }>;
+  realtimeTranscriptLines?: number;
+  lastRealtimeTranscriptAt?: string;
+  lastRealtimeTranscriptRole?: "user" | "assistant";
+  lastRealtimeTranscriptText?: string;
+  recentRealtimeTranscript?: Array<{
+    at: string;
+    role: "user" | "assistant";
+    text: string;
+  }>;
+  lastRealtimeEventAt?: string;
+  lastRealtimeEventType?: string;
+  lastRealtimeEventDetail?: string;
+  recentRealtimeEvents?: Array<{
+    at: string;
+    direction: "client" | "server";
+    type: string;
+    detail?: string;
   }>;
   manualActionRequired?: boolean;
   manualActionReason?: GoogleMeetManualActionReason;

@@ -85,6 +85,14 @@ function shouldUseCompatPreflight(path: ReadonlyArray<string>, value: unknown): 
     return true;
   }
   if (
+    last === "progress" &&
+    path.length >= 3 &&
+    path[path.length - 2] === "streaming" &&
+    path[0] === "channels"
+  ) {
+    return true;
+  }
+  if (
     joined === "talk.voiceId" ||
     joined === "talk.voiceAliases" ||
     joined === "talk.modelId" ||

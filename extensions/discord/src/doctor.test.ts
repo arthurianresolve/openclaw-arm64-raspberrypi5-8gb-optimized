@@ -75,6 +75,44 @@ describe("discord doctor", () => {
     ]);
   });
 
+  it("normalizes legacy discord streaming progress config", () => {
+    const normalize = discordDoctor.normalizeCompatibilityConfig;
+    expect(normalize).toBeDefined();
+    if (!normalize) {
+      return;
+    }
+
+    const result = normalize({
+      cfg: {
+        channels: {
+          discord: {
+            streaming: {
+              mode: "partial",
+              progress: {
+                label: "Working",
+                maxLines: 3,
+                toolProgress: false,
+              },
+            },
+          },
+        },
+      } as never,
+    });
+
+    expect(result.config.channels?.discord).toEqual({
+      streaming: {
+        mode: "partial",
+        preview: {
+          toolProgress: false,
+        },
+      },
+    });
+    expect(result.changes).toEqual([
+      "Moved channels.discord.streaming.progress.toolProgress → channels.discord.streaming.preview.toolProgress.",
+      "Removed channels.discord.streaming.progress legacy object.",
+    ]);
+  });
+
   it("moves account voice.tts.edge into providers.microsoft", () => {
     const normalize = discordDoctor.normalizeCompatibilityConfig;
     expect(normalize).toBeDefined();

@@ -269,6 +269,40 @@ describe("collectRootDependencyOwnershipCheckErrors", () => {
     expect(collectRootDependencyOwnershipCheckErrors(records)).toEqual([]);
   });
 
+  it("rejects Feishu SDK at root because Feishu is externalized from the core package", () => {
+    const repoRoot = makeTempRepo();
+    writeRepoFile(
+      repoRoot,
+      "package.json",
+      JSON.stringify({
+        dependencies: { "@larksuiteoapi/node-sdk": "^1.62.1" },
+      }),
+    );
+    writeRepoFile(
+      repoRoot,
+      "extensions/feishu/package.json",
+      JSON.stringify({ dependencies: { "@larksuiteoapi/node-sdk": "^1.62.1" } }),
+    );
+    writeRepoFile(
+      repoRoot,
+      "extensions/feishu/src/client.ts",
+      'import * as Lark from "@larksuiteoapi/node-sdk";\n',
+    );
+
+    const records = collectRootDependencyOwnershipAudit({ repoRoot, scanRoots: ["extensions"] });
+
+    expect(records).toMatchObject([
+      {
+        category: "extension_only_localizable",
+        depName: "@larksuiteoapi/node-sdk",
+        sections: ["extensions"],
+      },
+    ]);
+    expect(collectRootDependencyOwnershipCheckErrors(records)).toEqual([
+      expect.stringContaining("root dependency '@larksuiteoapi/node-sdk' is extension-owned"),
+    ]);
+  });
+
   it("allows runtime deps for bundled plugins that are still packaged in core", () => {
     const repoRoot = makeTempRepo();
     writeRepoFile(

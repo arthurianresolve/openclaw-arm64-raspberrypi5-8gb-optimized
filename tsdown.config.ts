@@ -3,6 +3,7 @@ import path from "node:path";
 import { defineConfig, type UserConfig } from "tsdown";
 import {
   collectBundledPluginBuildEntries,
+  collectRootPackageExcludedExtensionDirs,
   NON_PACKAGED_BUNDLED_PLUGIN_DIRS,
 } from "./scripts/lib/bundled-plugin-build-entries.mjs";
 import { buildPluginSdkEntrySources } from "./scripts/lib/plugin-sdk-entries.mjs";
@@ -160,6 +161,7 @@ const bundledPluginFile = (pluginId: string, relativePath: string) =>
   `${bundledPluginRoot(pluginId)}/${relativePath}`;
 const explicitNeverBundleDependencies = [
   "@lancedb/lancedb",
+  "@larksuiteoapi/node-sdk",
   "@matrix-org/matrix-sdk-crypto-nodejs",
   "matrix-js-sdk",
   "qrcode-terminal",
@@ -258,8 +260,11 @@ function buildDockerE2eHarnessEntries(): Record<string, string> {
 
 const coreDistEntries = buildCoreDistEntries();
 const dockerE2eHarnessEntries = buildDockerE2eHarnessEntries();
+const rootPackageExcludedExtensionDirs = collectRootPackageExcludedExtensionDirs();
 const rootBundledPluginBuildEntries = bundledPluginBuildEntries.filter(
-  ({ id }) => shouldBuildPrivateQaEntries || !NON_PACKAGED_BUNDLED_PLUGIN_DIRS.has(id),
+  ({ id }) =>
+    (shouldBuildPrivateQaEntries || !NON_PACKAGED_BUNDLED_PLUGIN_DIRS.has(id)) &&
+    !rootPackageExcludedExtensionDirs.has(id),
 );
 
 function buildUnifiedDistEntries(): Record<string, string> {

@@ -53,6 +53,8 @@ export function normalizeLegacyStreamingAliases(
   } & LegacyStreamingAliasOptions,
 ): CompatMutationResult {
   const beforeStreaming = params.entry.streaming;
+  const beforeStreamingRecord = asObjectRecord(beforeStreaming);
+  const legacyProgress = asObjectRecord(beforeStreamingRecord?.progress);
   const hadLegacyStreamMode = params.entry.streamMode !== undefined;
   const hasLegacyFlatFields =
     params.entry.chunkMode !== undefined ||
@@ -64,6 +66,7 @@ export function normalizeLegacyStreamingAliases(
     hadLegacyStreamMode ||
     typeof beforeStreaming === "boolean" ||
     typeof beforeStreaming === "string" ||
+    legacyProgress !== null ||
     hasLegacyFlatFields;
   if (!shouldNormalize) {
     return { entry: params.entry, changed: false };
@@ -127,6 +130,17 @@ export function normalizeLegacyStreamingAliases(
     params.changes.push(
       `Moved ${params.pathPrefix}.draftChunk → ${params.pathPrefix}.streaming.preview.chunk.`,
     );
+    changed = true;
+  }
+  if (legacyProgress) {
+    if (preview.toolProgress === undefined && typeof legacyProgress.toolProgress === "boolean") {
+      preview.toolProgress = legacyProgress.toolProgress;
+      params.changes.push(
+        `Moved ${params.pathPrefix}.streaming.progress.toolProgress → ${params.pathPrefix}.streaming.preview.toolProgress.`,
+      );
+    }
+    delete streaming.progress;
+    params.changes.push(`Removed ${params.pathPrefix}.streaming.progress legacy object.`);
     changed = true;
   }
   if (updated.blockStreamingCoalesce !== undefined && block.coalesce === undefined) {
@@ -281,6 +295,7 @@ export function hasLegacyStreamingAliases(
     entry.streamMode !== undefined ||
     typeof entry.streaming === "boolean" ||
     typeof entry.streaming === "string" ||
+    asObjectRecord(entry.streaming)?.progress !== undefined ||
     entry.chunkMode !== undefined ||
     entry.blockStreaming !== undefined ||
     entry.blockStreamingCoalesce !== undefined ||

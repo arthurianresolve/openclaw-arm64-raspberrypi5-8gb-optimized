@@ -1374,7 +1374,13 @@ describe("codex command", () => {
     const sessionFile = path.join(tempDir, "session.jsonl");
     await fs.writeFile(
       `${sessionFile}.codex-app-server.json`,
-      JSON.stringify({ schemaVersion: 1, threadId: "thread-123", cwd: "/repo" }),
+      JSON.stringify({
+        schemaVersion: 1,
+        threadId: "thread-123",
+        cwd: "/repo",
+        authProfileId: "openai-codex:work",
+        modelProvider: "openai",
+      }),
     );
     const startCodexConversationThread = vi.fn(async () => ({
       kind: "codex-app-server-session" as const,
@@ -1416,11 +1422,13 @@ describe("codex command", () => {
     });
     expect(startCodexConversationThread).toHaveBeenCalledWith({
       pluginConfig: undefined,
+      config: {},
       sessionFile,
       workspaceDir: "/repo",
       threadId: "thread-123",
       model: "gpt-5.4",
       modelProvider: "openai",
+      authProfileId: "openai-codex:work",
     });
     expect(requestConversationBinding).toHaveBeenCalledWith({
       summary: "Codex app-server thread thread-123 in /repo",

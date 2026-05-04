@@ -157,6 +157,53 @@ function readTarEntry(entryPath) {
   return "";
 }
 
+function collectRootPackageExcludedExtensionDirs(packageJson) {
+  /** @type {Set<string>} */
+  const excluded = new Set();
+  for (const entry of packageJson.files ?? []) {
+    if (typeof entry !== "string") {
+      continue;
+    }
+    const match = /^!dist\/extensions\/([^/]+)\/\*\*$/u.exec(entry);
+    if (match?.[1]) {
+      excluded.add(match[1]);
+    }
+  }
+  return excluded;
+}
+
+function collectExternalizedPluginRootChunkErrors(packageJson) {
+  const excludedExtensionDirs = collectRootPackageExcludedExtensionDirs(packageJson);
+  if (excludedExtensionDirs.size === 0) {
+    return [];
+  }
+  /** @type {Map<string, string[]>} */
+  const leaked = new Map();
+  for (const entry of normalized) {
+    if (
+      !entry.startsWith("dist/") ||
+      entry.startsWith("dist/extensions/") ||
+      !/\.(?:cjs|js|mjs)$/u.test(entry)
+    ) {
+      continue;
+    }
+    const source = readTarEntry(entry);
+    for (const pluginId of excludedExtensionDirs) {
+      if (source.includes(`//#region extensions/${pluginId}/`)) {
+        const files = leaked.get(pluginId) ?? [];
+        files.push(entry);
+        leaked.set(pluginId, files);
+      }
+    }
+  }
+  return [...leaked.entries()]
+    .map(([pluginId, files]) => {
+      const fileList = [...new Set(files)].toSorted((left, right) => left.localeCompare(right));
+      return `root dist contains code from externalized plugin '${pluginId}' in ${fileList.join(", ")}; excluded plugins must not be compiled into root package chunks.`;
+    })
+    .toSorted((left, right) => left.localeCompare(right));
+}
+
 for (const entry of normalized) {
   if (entry.startsWith("/") || entry.split("/").includes("..")) {
     errors.push(`unsafe tar entry: ${entry}`);
@@ -180,14 +227,16 @@ for (const requiredPrefix of REQUIRED_TARBALL_ENTRY_PREFIXES) {
   }
 }
 let packageVersion = "";
+let packageJson = {};
 if (entrySet.has("package.json")) {
   try {
-    const packageJson = JSON.parse(readTarEntry("package.json"));
+    packageJson = JSON.parse(readTarEntry("package.json"));
     packageVersion = typeof packageJson.version === "string" ? packageJson.version : "";
   } catch {
     packageVersion = "";
   }
 }
+errors.push(...collectExternalizedPluginRootChunkErrors(packageJson));
 for (const forbiddenEntry of FORBIDDEN_LOCAL_BUILD_METADATA_FILES) {
   if (entrySet.has(forbiddenEntry)) {
     if (isLegacyLocalBuildMetadataCompatVersion(packageVersion)) {

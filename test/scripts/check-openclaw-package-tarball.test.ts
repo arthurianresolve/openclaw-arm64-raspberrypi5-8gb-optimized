@@ -12,13 +12,20 @@ function withTarball(
   files: Record<string, string>,
   testBody: (tarball: string) => void,
   version = "0.0.0",
-  options: { includeControlUi?: boolean } = {},
+  options: { includeControlUi?: boolean; packageFiles?: string[] } = {},
 ) {
   const root = mkdtempSync(join(tmpdir(), "openclaw-package-tarball-test-"));
   try {
     const packageRoot = join(root, "package");
     mkdirSync(join(packageRoot, "dist"), { recursive: true });
-    writeFileSync(join(packageRoot, "package.json"), JSON.stringify({ name: "openclaw", version }));
+    writeFileSync(
+      join(packageRoot, "package.json"),
+      JSON.stringify({
+        name: "openclaw",
+        version,
+        ...(options.packageFiles ? { files: options.packageFiles } : {}),
+      }),
+    );
     writeFileSync(
       join(packageRoot, "dist", "postinstall-inventory.json"),
       JSON.stringify(inventory),
@@ -143,6 +150,26 @@ describe("check-openclaw-package-tarball", () => {
         );
       },
       "2026.4.27",
+    );
+  });
+
+  it("rejects root dist chunks compiled from externalized plugins", () => {
+    withTarball(
+      ["dist/index.js", "dist/feishu-client.js"],
+      {
+        "dist/index.js": 'await import("./feishu-client.js");\n',
+        "dist/feishu-client.js": "//#region extensions/feishu/src/client.ts\nexport {};\n",
+      },
+      (tarball) => {
+        const result = spawnSync("node", [CHECK_SCRIPT, tarball], { encoding: "utf8" });
+
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain(
+          "root dist contains code from externalized plugin 'feishu' in dist/feishu-client.js",
+        );
+      },
+      "2026.4.27",
+      { packageFiles: ["dist/", "!dist/extensions/feishu/**"] },
     );
   });
 

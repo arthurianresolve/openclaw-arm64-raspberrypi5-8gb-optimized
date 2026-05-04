@@ -15,7 +15,7 @@ describe("run-tsgo sparse guard", () => {
     const cwd = createTempDir("openclaw-run-tsgo-");
 
     expect(
-      (getSparseTsgoGuardError as any)(["-p", "tsconfig.extensions.json"], {
+      getSparseTsgoGuardError(["-p", "tsconfig.extensions.json"], {
         cwd,
         isSparseCheckoutEnabled: () => true,
       }),
@@ -26,7 +26,7 @@ describe("run-tsgo sparse guard", () => {
     const cwd = createTempDir("openclaw-run-tsgo-");
 
     expect(
-      (getSparseTsgoGuardError as any)(["-p", "tsconfig.core.test.json"], {
+      getSparseTsgoGuardError(["-p", "test/tsconfig/tsconfig.core.test.json"], {
         cwd,
         isSparseCheckoutEnabled: () => false,
       }),
@@ -37,7 +37,7 @@ describe("run-tsgo sparse guard", () => {
     const cwd = createTempDir("openclaw-run-tsgo-");
 
     expect(
-      (getSparseTsgoGuardError as any)(["-p", "tsconfig.core.test.json", "--showConfig"], {
+      getSparseTsgoGuardError(["-p", "test/tsconfig/tsconfig.core.test.json", "--showConfig"], {
         cwd,
         isSparseCheckoutEnabled: () => true,
       }),
@@ -62,7 +62,7 @@ describe("run-tsgo sparse guard", () => {
     }
 
     expect(
-      (getSparseTsgoGuardError as any)(["-p", "tsconfig.core.test.non-agents.json"], {
+      getSparseTsgoGuardError(["-p", "test/tsconfig/tsconfig.core.test.non-agents.json"], {
         cwd,
         isSparseCheckoutEnabled: () => true,
         sparseCheckoutPatterns: ["/packages/", "/ui/src/"],
@@ -87,7 +87,7 @@ describe("run-tsgo sparse guard", () => {
     }
 
     expect(
-      (getSparseTsgoGuardError as any)(["-p", "tsconfig.core.test.json"], {
+      getSparseTsgoGuardError(["-p", "test/tsconfig/tsconfig.core.test.json"], {
         cwd,
         isSparseCheckoutEnabled: () => true,
         sparseCheckoutPatterns: [
@@ -113,7 +113,7 @@ describe("run-tsgo sparse guard", () => {
     fs.writeFileSync(uiToolDisplay, "", "utf8");
 
     expect(
-      (getSparseTsgoGuardError as any)(["-p", "tsconfig.core.json"], {
+      getSparseTsgoGuardError(["-p", "tsconfig.core.json"], {
         cwd,
         isSparseCheckoutEnabled: () => true,
       }),
@@ -128,7 +128,7 @@ describe("run-tsgo sparse guard", () => {
     const cwd = createTempDir("openclaw-run-tsgo-");
 
     expect(
-      (getSparseTsgoGuardError as any)(["-p", "tsconfig.core.test.json"], {
+      getSparseTsgoGuardError(["-p", "test/tsconfig/tsconfig.core.test.json"], {
         cwd,
         isSparseCheckoutEnabled: () => true,
       }),

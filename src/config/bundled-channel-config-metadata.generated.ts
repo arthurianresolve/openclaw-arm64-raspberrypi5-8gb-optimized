@@ -933,6 +933,37 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
               },
               additionalProperties: false,
             },
+            progress: {
+              type: "object",
+              properties: {
+                label: {
+                  anyOf: [
+                    {
+                      type: "string",
+                    },
+                    {
+                      type: "boolean",
+                      const: false,
+                    },
+                  ],
+                },
+                labels: {
+                  type: "array",
+                  items: {
+                    type: "string",
+                  },
+                },
+                maxLines: {
+                  type: "integer",
+                  exclusiveMinimum: 0,
+                  maximum: 9007199254740991,
+                },
+                toolProgress: {
+                  type: "boolean",
+                },
+              },
+              additionalProperties: false,
+            },
             block: {
               type: "object",
               properties: {
@@ -2336,6 +2367,37 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
                     },
                     additionalProperties: false,
                   },
+                  progress: {
+                    type: "object",
+                    properties: {
+                      label: {
+                        anyOf: [
+                          {
+                            type: "string",
+                          },
+                          {
+                            type: "boolean",
+                            const: false,
+                          },
+                        ],
+                      },
+                      labels: {
+                        type: "array",
+                        items: {
+                          type: "string",
+                        },
+                      },
+                      maxLines: {
+                        type: "integer",
+                        exclusiveMinimum: 0,
+                        maximum: 9007199254740991,
+                      },
+                      toolProgress: {
+                        type: "boolean",
+                      },
+                    },
+                    additionalProperties: false,
+                  },
                   block: {
                     type: "object",
                     properties: {
@@ -3517,11 +3579,11 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
       },
       streaming: {
         label: "Discord Streaming Mode",
-        help: 'Unified Discord stream preview mode: "off" | "partial" | "block" | "progress". "progress" maps to "partial" on Discord. Legacy boolean/streamMode keys are auto-mapped.',
+        help: 'Unified Discord stream preview mode: "off" | "partial" | "block" | "progress". "progress" keeps a single editable progress draft until final delivery. Legacy boolean/streamMode keys are auto-mapped.',
       },
       "streaming.mode": {
         label: "Discord Streaming Mode",
-        help: 'Canonical Discord preview mode: "off" | "partial" | "block" | "progress". "progress" maps to "partial" on Discord.',
+        help: 'Canonical Discord preview mode: "off" | "partial" | "block" | "progress".',
       },
       "streaming.chunkMode": {
         label: "Discord Chunk Mode",
@@ -3550,6 +3612,22 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
       "streaming.preview.toolProgress": {
         label: "Discord Draft Tool Progress",
         help: "Show tool/progress activity in the live draft preview message (default: true). Set false to keep tool updates as separate messages.",
+      },
+      "streaming.progress.label": {
+        label: "Discord Progress Label",
+        help: 'Initial progress draft title. Use "auto" for built-in single-word labels, a custom string, or false to hide the title.',
+      },
+      "streaming.progress.labels": {
+        label: "Discord Progress Label Pool",
+        help: 'Candidate labels for streaming.progress.label="auto". Leave unset to use OpenClaw built-in progress labels.',
+      },
+      "streaming.progress.maxLines": {
+        label: "Discord Progress Max Lines",
+        help: "Maximum number of compact progress lines to keep below the draft label (default: 8).",
+      },
+      "streaming.progress.toolProgress": {
+        label: "Discord Progress Tool Lines",
+        help: "Show compact tool/progress lines in progress draft mode (default: true). Set false to keep only the label until final delivery.",
       },
       "retry.attempts": {
         label: "Discord Retry Attempts",
@@ -4171,6 +4249,9 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
         chunkMode: {
           type: "string",
           enum: ["length", "newline"],
+        },
+        blockStreaming: {
+          type: "boolean",
         },
         blockStreamingCoalesce: {
           type: "object",
@@ -4799,6 +4880,9 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
               chunkMode: {
                 type: "string",
                 enum: ["length", "newline"],
+              },
+              blockStreaming: {
+                type: "boolean",
               },
               blockStreamingCoalesce: {
                 type: "object",
@@ -7510,7 +7594,7 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
           anyOf: [
             {
               type: "string",
-              enum: ["partial", "quiet", "off"],
+              enum: ["partial", "quiet", "progress", "off"],
             },
             {
               type: "boolean",
@@ -7520,7 +7604,38 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
               properties: {
                 mode: {
                   type: "string",
-                  enum: ["partial", "quiet", "off"],
+                  enum: ["partial", "quiet", "progress", "off"],
+                },
+                progress: {
+                  type: "object",
+                  properties: {
+                    label: {
+                      anyOf: [
+                        {
+                          type: "string",
+                        },
+                        {
+                          type: "boolean",
+                          const: false,
+                        },
+                      ],
+                    },
+                    labels: {
+                      type: "array",
+                      items: {
+                        type: "string",
+                      },
+                    },
+                    maxLines: {
+                      type: "integer",
+                      exclusiveMinimum: 0,
+                      maximum: 9007199254740991,
+                    },
+                    toolProgress: {
+                      type: "boolean",
+                    },
+                  },
+                  additionalProperties: false,
                 },
                 preview: {
                   type: "object",
@@ -7900,6 +8015,24 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
       },
       additionalProperties: false,
     },
+    uiHints: {
+      "streaming.progress.label": {
+        label: "Matrix Progress Label",
+        help: 'Initial progress draft title. Use "auto" for built-in single-word labels, a custom string, or false to hide the title.',
+      },
+      "streaming.progress.labels": {
+        label: "Matrix Progress Label Pool",
+        help: 'Candidate labels for streaming.progress.label="auto". Leave unset to use OpenClaw built-in progress labels.',
+      },
+      "streaming.progress.maxLines": {
+        label: "Matrix Progress Max Lines",
+        help: "Maximum number of compact progress lines to keep below the draft label (default: 8).",
+      },
+      "streaming.progress.toolProgress": {
+        label: "Matrix Progress Tool Lines",
+        help: "Show compact tool/progress lines in progress draft mode (default: true). Set false to keep only the label until final delivery.",
+      },
+    },
   },
   {
     pluginId: "mattermost",
@@ -8064,6 +8197,101 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
         chunkMode: {
           type: "string",
           enum: ["length", "newline"],
+        },
+        streaming: {
+          anyOf: [
+            {
+              type: "string",
+              enum: ["off", "partial", "block", "progress"],
+            },
+            {
+              type: "boolean",
+            },
+            {
+              type: "object",
+              properties: {
+                mode: {
+                  type: "string",
+                  enum: ["off", "partial", "block", "progress"],
+                },
+                chunkMode: {
+                  type: "string",
+                  enum: ["length", "newline"],
+                },
+                preview: {
+                  type: "object",
+                  properties: {
+                    toolProgress: {
+                      type: "boolean",
+                    },
+                  },
+                  additionalProperties: false,
+                },
+                progress: {
+                  type: "object",
+                  properties: {
+                    label: {
+                      anyOf: [
+                        {
+                          type: "string",
+                        },
+                        {
+                          type: "boolean",
+                          const: false,
+                        },
+                      ],
+                    },
+                    labels: {
+                      type: "array",
+                      items: {
+                        type: "string",
+                      },
+                    },
+                    maxLines: {
+                      type: "integer",
+                      exclusiveMinimum: 0,
+                      maximum: 9007199254740991,
+                    },
+                    toolProgress: {
+                      type: "boolean",
+                    },
+                  },
+                  additionalProperties: false,
+                },
+                block: {
+                  type: "object",
+                  properties: {
+                    enabled: {
+                      type: "boolean",
+                    },
+                    coalesce: {
+                      type: "object",
+                      properties: {
+                        minChars: {
+                          type: "integer",
+                          exclusiveMinimum: 0,
+                          maximum: 9007199254740991,
+                        },
+                        maxChars: {
+                          type: "integer",
+                          exclusiveMinimum: 0,
+                          maximum: 9007199254740991,
+                        },
+                        idleMs: {
+                          type: "integer",
+                          minimum: 0,
+                          maximum: 9007199254740991,
+                        },
+                      },
+                      additionalProperties: false,
+                    },
+                  },
+                  additionalProperties: false,
+                },
+              },
+              additionalProperties: false,
+            },
+          ],
         },
         blockStreaming: {
           type: "boolean",
@@ -8367,6 +8595,101 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
                 type: "string",
                 enum: ["length", "newline"],
               },
+              streaming: {
+                anyOf: [
+                  {
+                    type: "string",
+                    enum: ["off", "partial", "block", "progress"],
+                  },
+                  {
+                    type: "boolean",
+                  },
+                  {
+                    type: "object",
+                    properties: {
+                      mode: {
+                        type: "string",
+                        enum: ["off", "partial", "block", "progress"],
+                      },
+                      chunkMode: {
+                        type: "string",
+                        enum: ["length", "newline"],
+                      },
+                      preview: {
+                        type: "object",
+                        properties: {
+                          toolProgress: {
+                            type: "boolean",
+                          },
+                        },
+                        additionalProperties: false,
+                      },
+                      progress: {
+                        type: "object",
+                        properties: {
+                          label: {
+                            anyOf: [
+                              {
+                                type: "string",
+                              },
+                              {
+                                type: "boolean",
+                                const: false,
+                              },
+                            ],
+                          },
+                          labels: {
+                            type: "array",
+                            items: {
+                              type: "string",
+                            },
+                          },
+                          maxLines: {
+                            type: "integer",
+                            exclusiveMinimum: 0,
+                            maximum: 9007199254740991,
+                          },
+                          toolProgress: {
+                            type: "boolean",
+                          },
+                        },
+                        additionalProperties: false,
+                      },
+                      block: {
+                        type: "object",
+                        properties: {
+                          enabled: {
+                            type: "boolean",
+                          },
+                          coalesce: {
+                            type: "object",
+                            properties: {
+                              minChars: {
+                                type: "integer",
+                                exclusiveMinimum: 0,
+                                maximum: 9007199254740991,
+                              },
+                              maxChars: {
+                                type: "integer",
+                                exclusiveMinimum: 0,
+                                maximum: 9007199254740991,
+                              },
+                              idleMs: {
+                                type: "integer",
+                                minimum: 0,
+                                maximum: 9007199254740991,
+                              },
+                            },
+                            additionalProperties: false,
+                          },
+                        },
+                        additionalProperties: false,
+                      },
+                    },
+                    additionalProperties: false,
+                  },
+                ],
+              },
               blockStreaming: {
                 type: "boolean",
               },
@@ -8517,6 +8840,52 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
       },
       required: ["dmPolicy", "groupPolicy"],
       additionalProperties: false,
+    },
+    uiHints: {
+      "": {
+        label: "Mattermost",
+        help: "Mattermost channel provider configuration for bot auth, access policy, slash commands, and preview streaming.",
+      },
+      dmPolicy: {
+        label: "Mattermost DM Policy",
+        help: 'Direct message access control ("pairing" recommended). "open" requires channels.mattermost.allowFrom=["*"].',
+      },
+      streaming: {
+        label: "Mattermost Streaming Mode",
+        help: 'Unified Mattermost stream preview mode: "off" | "partial" | "block" | "progress". "progress" keeps a single editable progress draft until final delivery.',
+      },
+      "streaming.mode": {
+        label: "Mattermost Streaming Mode",
+        help: 'Canonical Mattermost preview mode: "off" | "partial" | "block" | "progress".',
+      },
+      "streaming.progress.label": {
+        label: "Mattermost Progress Label",
+        help: 'Initial progress draft title. Use "auto" for built-in single-word labels, a custom string, or false to hide the title.',
+      },
+      "streaming.progress.labels": {
+        label: "Mattermost Progress Label Pool",
+        help: 'Candidate labels for streaming.progress.label="auto". Leave unset to use OpenClaw built-in progress labels.',
+      },
+      "streaming.progress.maxLines": {
+        label: "Mattermost Progress Max Lines",
+        help: "Maximum number of compact progress lines to keep below the draft label (default: 8).",
+      },
+      "streaming.progress.toolProgress": {
+        label: "Mattermost Progress Tool Lines",
+        help: "Show compact tool/progress lines in progress draft mode (default: true). Set false to keep only the label until final delivery.",
+      },
+      "streaming.preview.toolProgress": {
+        label: "Mattermost Draft Tool Progress",
+        help: "Show tool/progress activity in the live draft preview post (default: true). Set false to keep tool updates as separate messages.",
+      },
+      "streaming.block.enabled": {
+        label: "Mattermost Block Streaming Enabled",
+        help: 'Enable chunked block-style Mattermost preview delivery when channels.mattermost.streaming.mode="block".',
+      },
+      "streaming.block.coalesce": {
+        label: "Mattermost Block Streaming Coalesce",
+        help: "Merge streamed Mattermost block replies before final delivery.",
+      },
     },
   },
   {
@@ -8692,6 +9061,122 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
         chunkMode: {
           type: "string",
           enum: ["length", "newline"],
+        },
+        streaming: {
+          type: "object",
+          properties: {
+            mode: {
+              type: "string",
+              enum: ["off", "partial", "block", "progress"],
+            },
+            chunkMode: {
+              type: "string",
+              enum: ["length", "newline"],
+            },
+            preview: {
+              type: "object",
+              properties: {
+                chunk: {
+                  type: "object",
+                  properties: {
+                    minChars: {
+                      type: "integer",
+                      exclusiveMinimum: 0,
+                      maximum: 9007199254740991,
+                    },
+                    maxChars: {
+                      type: "integer",
+                      exclusiveMinimum: 0,
+                      maximum: 9007199254740991,
+                    },
+                    breakPreference: {
+                      anyOf: [
+                        {
+                          type: "string",
+                          const: "paragraph",
+                        },
+                        {
+                          type: "string",
+                          const: "newline",
+                        },
+                        {
+                          type: "string",
+                          const: "sentence",
+                        },
+                      ],
+                    },
+                  },
+                  additionalProperties: false,
+                },
+                toolProgress: {
+                  type: "boolean",
+                },
+              },
+              additionalProperties: false,
+            },
+            progress: {
+              type: "object",
+              properties: {
+                label: {
+                  anyOf: [
+                    {
+                      type: "string",
+                    },
+                    {
+                      type: "boolean",
+                      const: false,
+                    },
+                  ],
+                },
+                labels: {
+                  type: "array",
+                  items: {
+                    type: "string",
+                  },
+                },
+                maxLines: {
+                  type: "integer",
+                  exclusiveMinimum: 0,
+                  maximum: 9007199254740991,
+                },
+                toolProgress: {
+                  type: "boolean",
+                },
+              },
+              additionalProperties: false,
+            },
+            block: {
+              type: "object",
+              properties: {
+                enabled: {
+                  type: "boolean",
+                },
+                coalesce: {
+                  type: "object",
+                  properties: {
+                    minChars: {
+                      type: "integer",
+                      exclusiveMinimum: 0,
+                      maximum: 9007199254740991,
+                    },
+                    maxChars: {
+                      type: "integer",
+                      exclusiveMinimum: 0,
+                      maximum: 9007199254740991,
+                    },
+                    idleMs: {
+                      type: "integer",
+                      minimum: 0,
+                      maximum: 9007199254740991,
+                    },
+                  },
+                  additionalProperties: false,
+                },
+              },
+              additionalProperties: false,
+            },
+          },
+          additionalProperties: false,
         },
         typingIndicator: {
           type: "boolean",
@@ -9008,6 +9493,26 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
       configWrites: {
         label: "MS Teams Config Writes",
         help: "Allow Microsoft Teams to write config in response to channel events/commands (default: true).",
+      },
+      streaming: {
+        label: "MS Teams Streaming",
+        help: 'Microsoft Teams preview/progress streaming mode: "off" | "partial" | "block" | "progress". Personal chats use Teams native streaminfo progress when available.',
+      },
+      "streaming.progress.label": {
+        label: "MS Teams Progress Label",
+        help: 'Initial progress title. Use "auto" for built-in single-word labels, a custom string, or false to hide the title.',
+      },
+      "streaming.progress.labels": {
+        label: "MS Teams Progress Label Pool",
+        help: 'Candidate labels for streaming.progress.label="auto". Leave unset to use OpenClaw built-in progress labels.',
+      },
+      "streaming.progress.maxLines": {
+        label: "MS Teams Progress Max Lines",
+        help: "Maximum number of compact progress lines to keep below the progress title (default: 8).",
+      },
+      "streaming.progress.toolProgress": {
+        label: "MS Teams Progress Tool Lines",
+        help: "Show compact tool/progress lines in progress mode (default: true). Set false to keep only the title until final delivery.",
       },
     },
   },
@@ -11835,6 +12340,37 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
               },
               additionalProperties: false,
             },
+            progress: {
+              type: "object",
+              properties: {
+                label: {
+                  anyOf: [
+                    {
+                      type: "string",
+                    },
+                    {
+                      type: "boolean",
+                      const: false,
+                    },
+                  ],
+                },
+                labels: {
+                  type: "array",
+                  items: {
+                    type: "string",
+                  },
+                },
+                maxLines: {
+                  type: "integer",
+                  exclusiveMinimum: 0,
+                  maximum: 9007199254740991,
+                },
+                toolProgress: {
+                  type: "boolean",
+                },
+              },
+              additionalProperties: false,
+            },
             block: {
               type: "object",
               properties: {
@@ -12766,6 +13302,37 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
                     },
                     additionalProperties: false,
                   },
+                  progress: {
+                    type: "object",
+                    properties: {
+                      label: {
+                        anyOf: [
+                          {
+                            type: "string",
+                          },
+                          {
+                            type: "boolean",
+                            const: false,
+                          },
+                        ],
+                      },
+                      labels: {
+                        type: "array",
+                        items: {
+                          type: "string",
+                        },
+                      },
+                      maxLines: {
+                        type: "integer",
+                        exclusiveMinimum: 0,
+                        maximum: 9007199254740991,
+                      },
+                      toolProgress: {
+                        type: "boolean",
+                      },
+                    },
+                    additionalProperties: false,
+                  },
                   block: {
                     type: "object",
                     properties: {
@@ -13313,11 +13880,27 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
       },
       "streaming.nativeTransport": {
         label: "Slack Native Streaming",
-        help: "Enable native Slack text streaming (chat.startStream/chat.appendStream/chat.stopStream) when channels.slack.streaming.mode is partial (default: true). Requires a reply thread target; top-level DMs stay on the non-thread fallback path.",
+        help: "Enable native Slack text streaming (chat.startStream/chat.appendStream/chat.stopStream) when channels.slack.streaming.mode is partial (default: true). Native streaming and Slack assistant thread status require a reply thread target; top-level DMs can still use draft post-and-edit preview streaming.",
       },
       "streaming.preview.toolProgress": {
         label: "Slack Draft Tool Progress",
         help: "Show tool/progress activity in the live draft preview message (default: true). Set false to keep tool updates as separate messages.",
+      },
+      "streaming.progress.label": {
+        label: "Slack Progress Label",
+        help: 'Initial progress draft title. Use "auto" for built-in single-word labels, a custom string, or false to hide the title.',
+      },
+      "streaming.progress.labels": {
+        label: "Slack Progress Label Pool",
+        help: 'Candidate labels for streaming.progress.label="auto". Leave unset to use OpenClaw built-in progress labels.',
+      },
+      "streaming.progress.maxLines": {
+        label: "Slack Progress Max Lines",
+        help: "Maximum number of compact progress lines to keep below the draft label (default: 8).",
+      },
+      "streaming.progress.toolProgress": {
+        label: "Slack Progress Tool Lines",
+        help: "Show compact tool/progress lines in progress draft mode (default: true). Set false to keep only the label until final delivery.",
       },
       "thread.historyScope": {
         label: "Slack Thread History Scope",
@@ -14086,6 +14669,37 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
               },
               additionalProperties: false,
             },
+            progress: {
+              type: "object",
+              properties: {
+                label: {
+                  anyOf: [
+                    {
+                      type: "string",
+                    },
+                    {
+                      type: "boolean",
+                      const: false,
+                    },
+                  ],
+                },
+                labels: {
+                  type: "array",
+                  items: {
+                    type: "string",
+                  },
+                },
+                maxLines: {
+                  type: "integer",
+                  exclusiveMinimum: 0,
+                  maximum: 9007199254740991,
+                },
+                toolProgress: {
+                  type: "boolean",
+                },
+              },
+              additionalProperties: false,
+            },
             block: {
               type: "object",
               properties: {
@@ -14127,6 +14741,13 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
           type: "integer",
           exclusiveMinimum: 0,
           maximum: 9007199254740991,
+        },
+        mediaGroupFlushMs: {
+          description:
+            "Buffer window in milliseconds for Telegram media groups/albums before dispatching them as one inbound message. Default: 500.",
+          type: "integer",
+          minimum: 10,
+          maximum: 60000,
         },
         pollingStallThresholdMs: {
           type: "integer",
@@ -15148,6 +15769,37 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
                     },
                     additionalProperties: false,
                   },
+                  progress: {
+                    type: "object",
+                    properties: {
+                      label: {
+                        anyOf: [
+                          {
+                            type: "string",
+                          },
+                          {
+                            type: "boolean",
+                            const: false,
+                          },
+                        ],
+                      },
+                      labels: {
+                        type: "array",
+                        items: {
+                          type: "string",
+                        },
+                      },
+                      maxLines: {
+                        type: "integer",
+                        exclusiveMinimum: 0,
+                        maximum: 9007199254740991,
+                      },
+                      toolProgress: {
+                        type: "boolean",
+                      },
+                    },
+                    additionalProperties: false,
+                  },
                   block: {
                     type: "object",
                     properties: {
@@ -15189,6 +15841,13 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
                 type: "integer",
                 exclusiveMinimum: 0,
                 maximum: 9007199254740991,
+              },
+              mediaGroupFlushMs: {
+                description:
+                  "Buffer window in milliseconds for Telegram media groups/albums before dispatching them as one inbound message. Default: 500.",
+                type: "integer",
+                minimum: 10,
+                maximum: 60000,
               },
               pollingStallThresholdMs: {
                 type: "integer",
@@ -15532,11 +16191,11 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
       },
       streaming: {
         label: "Telegram Streaming Mode",
-        help: 'Unified Telegram stream preview mode: "off" | "partial" | "block" | "progress" (default: "partial"). "progress" maps to "partial" on Telegram. Legacy boolean/streamMode keys are detected; run doctor --fix to migrate.',
+        help: 'Unified Telegram stream preview mode: "off" | "partial" | "block" | "progress" (default: "partial"). "progress" keeps a single editable progress draft until final delivery. Legacy boolean/streamMode keys are detected; run doctor --fix to migrate.',
       },
       "streaming.mode": {
         label: "Telegram Streaming Mode",
-        help: 'Canonical Telegram preview mode: "off" | "partial" | "block" | "progress" (default: "partial"). "progress" maps to "partial" on Telegram.',
+        help: 'Canonical Telegram preview mode: "off" | "partial" | "block" | "progress" (default: "partial").',
       },
       "streaming.chunkMode": {
         label: "Telegram Chunk Mode",
@@ -15566,6 +16225,22 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
         label: "Telegram Draft Tool Progress",
         help: "Show tool/progress activity in the live draft preview message (default: true when preview streaming is active). Set false to keep tool updates out of the edited Telegram preview.",
       },
+      "streaming.progress.label": {
+        label: "Telegram Progress Label",
+        help: 'Initial progress draft title. Use "auto" for built-in single-word labels, a custom string, or false to hide the title.',
+      },
+      "streaming.progress.labels": {
+        label: "Telegram Progress Label Pool",
+        help: 'Candidate labels for streaming.progress.label="auto". Leave unset to use OpenClaw built-in progress labels.',
+      },
+      "streaming.progress.maxLines": {
+        label: "Telegram Progress Max Lines",
+        help: "Maximum number of compact progress lines to keep below the draft label (default: 8).",
+      },
+      "streaming.progress.toolProgress": {
+        label: "Telegram Progress Tool Lines",
+        help: "Show compact tool/progress lines in progress draft mode (default: true). Set false to keep only the label until final delivery.",
+      },
       "retry.attempts": {
         label: "Telegram Retry Attempts",
         help: "Max retry attempts for outbound Telegram API calls (default: 3).",
@@ -15593,6 +16268,10 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
       timeoutSeconds: {
         label: "Telegram API Timeout (seconds)",
         help: "Max seconds before Telegram API requests are aborted (default: 500 per grammY).",
+      },
+      mediaGroupFlushMs: {
+        label: "Telegram Media Group Flush (ms)",
+        help: "Milliseconds to buffer Telegram albums/media groups before dispatching them as one inbound message. Default: 500.",
       },
       pollingStallThresholdMs: {
         label: "Telegram Polling Stall Threshold (ms)",
@@ -15720,6 +16399,13 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
             minLength: 1,
           },
         },
+        groupInviteAllowlist: {
+          type: "array",
+          items: {
+            type: "string",
+            minLength: 1,
+          },
+        },
         autoDiscoverChannels: {
           type: "boolean",
         },
@@ -15816,6 +16502,13 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
                 },
               },
               dmAllowlist: {
+                type: "array",
+                items: {
+                  type: "string",
+                  minLength: 1,
+                },
+              },
+              groupInviteAllowlist: {
                 type: "array",
                 items: {
                   type: "string",

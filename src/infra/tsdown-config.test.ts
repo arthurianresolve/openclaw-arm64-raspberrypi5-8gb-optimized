@@ -101,6 +101,15 @@ describe("tsdown config", () => {
     );
   });
 
+  it("does not compile root-package-excluded externalized plugins into root dist entries", () => {
+    const distGraph = unifiedDistGraph();
+    const keys = entryKeys(distGraph as TsdownConfigEntry);
+
+    expect(keys).toContain(bundledEntry("active-memory"));
+    expect(keys).not.toContain(bundledEntry("feishu"));
+    expect(keys).not.toContain(bundledEntry("discord"));
+  });
+
   it("keeps gateway lifecycle lazy runtime behind one stable dist entry", () => {
     const distGraph = unifiedDistGraph();
 
@@ -147,13 +156,19 @@ describe("tsdown config", () => {
 
     if (typeof neverBundle === "function") {
       expect(neverBundle("@lancedb/lancedb")).toBe(true);
+      expect(neverBundle("@larksuiteoapi/node-sdk")).toBe(true);
       expect(neverBundle("@matrix-org/matrix-sdk-crypto-nodejs")).toBe(true);
       expect(neverBundle("matrix-js-sdk/lib/client.js")).toBe(true);
       expect(neverBundle("qrcode-terminal/lib/main.js")).toBe(true);
       expect(neverBundle("not-a-runtime-dependency")).toBe(false);
     } else {
       expect(neverBundle).toEqual(
-        expect.arrayContaining(["@lancedb/lancedb", "matrix-js-sdk", "qrcode-terminal"]),
+        expect.arrayContaining([
+          "@lancedb/lancedb",
+          "@larksuiteoapi/node-sdk",
+          "matrix-js-sdk",
+          "qrcode-terminal",
+        ]),
       );
     }
     expect(typeof external).toBe("function");

@@ -1651,6 +1651,7 @@
     "tsgo:test": "pnpm tsgo:core:test && pnpm tsgo:extensions:test",
     "tsgo:test:extensions": "pnpm tsgo:extensions:test",
     "tsgo:test:packages": "node scripts/run-tsgo.mjs -p test/tsconfig/tsconfig.test.packages.json --incremental --tsBuildInfoFile .artifacts/tsgo-cache/test-packages.tsbuildinfo",
+    "tsgo:test:root": "node scripts/run-tsgo.mjs -p test/tsconfig/tsconfig.test.json --incremental --tsBuildInfoFile .artifacts/tsgo-cache/test-root.tsbuildinfo",
     "tsgo:test:src": "node scripts/run-tsgo.mjs -p test/tsconfig/tsconfig.test.src.json --incremental --tsBuildInfoFile .artifacts/tsgo-cache/test-src.tsbuildinfo",
     "tsgo:test:ui": "node scripts/run-tsgo.mjs -p test/tsconfig/tsconfig.test.ui.json --incremental --tsBuildInfoFile .artifacts/tsgo-cache/test-ui.tsbuildinfo",
     "tui": "node scripts/run-node.mjs tui",
@@ -1786,7 +1787,6 @@
       "uuid": "14.0.0"
     },
     "onlyBuiltDependencies": [
-      "@discordjs/opus",
       "@google/genai",
       "@lydell/node-pty",
       "@matrix-org/matrix-sdk-crypto-nodejs",
@@ -1801,6 +1801,7 @@
       "sharp"
     ],
     "ignoredBuiltDependencies": [
+      "@discordjs/opus",
       "koffi",
       "tree-sitter-bash"
     ],

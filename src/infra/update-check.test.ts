@@ -48,7 +48,9 @@ describe("resolveNpmChannelTag", () => {
         const url =
           typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
         if (
-          url.includes("raw.githubusercontent.com/arthurianresolve/excaliclaw/master/package.json")
+          url.includes(
+            "raw.githubusercontent.com/arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized/master/package.json",
+          )
         ) {
           return {
             ok: githubVersion != null,

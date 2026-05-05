@@ -78,7 +78,7 @@ describe("status-all format", () => {
           },
           registry: {
             latestVersion: newerRegistryVersion,
-            sourceLabel: "github arthurianresolve/excaliclaw#master",
+            sourceLabel: "github arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master",
           },
         } as never,
       }),
@@ -86,7 +86,7 @@ describe("status-all format", () => {
       channelInfo: baseStatusExpectedUpdateChannelInfo,
       channelLabel: baseStatusExpectedUpdateChannelLabel,
       gitLabel: "main · tag v1.2.3",
-      updateLine: `git main · ↔ origin/master · behind 2 · github arthurianresolve/excaliclaw#master ${newerRegistryVersion}`,
+      updateLine: `git main · ↔ origin/master · behind 2 · github arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master ${newerRegistryVersion}`,
       updateAvailable: true,
     });
   });
@@ -337,7 +337,7 @@ describe("status-all format", () => {
           },
           registry: {
             latestVersion: "2026.4.10",
-            sourceLabel: "github arthurianresolve/excaliclaw#master",
+            sourceLabel: "github arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master",
           },
         } as never,
         tailscaleMode: "serve",

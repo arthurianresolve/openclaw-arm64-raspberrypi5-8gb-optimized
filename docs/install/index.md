@@ -127,7 +127,7 @@ Or skip the link and use `pnpm openclaw ...` from inside the repo. See [Setup](/
 ### Install from GitHub main
 
 ```bash
-npm install -g github:openclaw/openclaw#main
+npm install -g github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#main
 ```
 
 ### Containers and package managers

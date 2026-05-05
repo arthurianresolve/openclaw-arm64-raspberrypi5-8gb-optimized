@@ -286,9 +286,10 @@ describe("runGatewayUpdate", () => {
     onBaseInstall?: () => Promise<CommandResult>;
     onOmitOptionalInstall?: () => Promise<CommandResult>;
   }) {
-    const baseInstallKey = "npm i -g openclaw@latest --no-fund --no-audit --loglevel=error";
+    const baseInstallKey =
+      "npm i -g github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master --no-fund --no-audit --loglevel=error";
     const omitOptionalInstallKey =
-      "npm i -g openclaw@latest --omit=optional --no-fund --no-audit --loglevel=error";
+      "npm i -g github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master --omit=optional --no-fund --no-audit --loglevel=error";
 
     return async (argv: string[]): Promise<CommandResult> => {
       const key = argv.join(" ");
@@ -1424,11 +1425,13 @@ describe("runGatewayUpdate", () => {
   it.each([
     {
       title: "updates global npm installs when detected",
-      expectedInstallCommand: "npm i -g openclaw@latest --no-fund --no-audit --loglevel=error",
+      expectedInstallCommand:
+        "npm i -g github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master --no-fund --no-audit --loglevel=error",
     },
     {
       title: "uses update channel for global npm installs when tag is omitted",
-      expectedInstallCommand: "npm i -g openclaw@beta --no-fund --no-audit --loglevel=error",
+      expectedInstallCommand:
+        "npm i -g github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master --no-fund --no-audit --loglevel=error",
       channel: "beta" as const,
     },
     {
@@ -1453,14 +1456,14 @@ describe("runGatewayUpdate", () => {
   it("updates global npm installs from the GitHub main package spec", async () => {
     const { calls, result } = await runNpmGlobalUpdateCase({
       expectedInstallCommand:
-        "npm i -g github:arthurianresolve/excaliclaw#master --no-fund --no-audit --loglevel=error",
+        "npm i -g github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master --no-fund --no-audit --loglevel=error",
       tag: "main",
     });
 
     expect(result.status).toBe("ok");
     expect(result.mode).toBe("npm");
     expect(calls).toContain(
-      "npm i -g github:arthurianresolve/excaliclaw#master --no-fund --no-audit --loglevel=error",
+      "npm i -g github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master --no-fund --no-audit --loglevel=error",
     );
   });
 
@@ -1473,7 +1476,8 @@ describe("runGatewayUpdate", () => {
     const { calls, runCommand } = createGlobalInstallHarness({
       pkgRoot,
       npmRootOutput: nodeModules,
-      installCommand: "npm i -g openclaw@latest --no-fund --no-audit --loglevel=error",
+      installCommand:
+        "npm i -g github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master --no-fund --no-audit --loglevel=error",
       onInstall: async () => {
         await writeGlobalPackageVersion(pkgRoot);
         await writeGatewayEntrypoint(pkgRoot);
@@ -1512,7 +1516,8 @@ describe("runGatewayUpdate", () => {
     const { calls, runCommand } = createGlobalInstallHarness({
       pkgRoot,
       npmRootOutput: nodeModules,
-      installCommand: "npm i -g openclaw@latest --no-fund --no-audit --loglevel=error",
+      installCommand:
+        "npm i -g github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master --no-fund --no-audit --loglevel=error",
       onInstall: async () => {
         await writeGlobalPackageVersion(pkgRoot);
         await writeGatewayEntrypoint(pkgRoot);
@@ -1550,7 +1555,8 @@ describe("runGatewayUpdate", () => {
     const { calls, runCommand } = createGlobalInstallHarness({
       pkgRoot,
       npmRootOutput: nodeModules,
-      installCommand: "npm i -g openclaw@latest --no-fund --no-audit --loglevel=error",
+      installCommand:
+        "npm i -g github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master --no-fund --no-audit --loglevel=error",
       gitRootMode: "missing",
       onInstall: async () => writeGlobalPackageVersion(pkgRoot),
     });
@@ -1559,7 +1565,9 @@ describe("runGatewayUpdate", () => {
 
     expect(result.status).toBe("ok");
     expect(result.mode).toBe("npm");
-    expect(calls).toContain("npm i -g openclaw@latest --no-fund --no-audit --loglevel=error");
+    expect(calls).toContain(
+      "npm i -g github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master --no-fund --no-audit --loglevel=error",
+    );
   });
 
   it("cleans stale npm rename dirs before global update", async () => {
@@ -1633,7 +1641,8 @@ describe("runGatewayUpdate", () => {
 
   it("fails global npm update when bundled runtime sidecars are missing after install", async () => {
     const { nodeModules, pkgRoot } = await createGlobalPackageFixture(tempDir);
-    const expectedInstallCommand = "npm i -g openclaw@latest --no-fund --no-audit --loglevel=error";
+    const expectedInstallCommand =
+      "npm i -g github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master --no-fund --no-audit --loglevel=error";
     const { runCommand } = createGlobalInstallHarness({
       pkgRoot,
       npmRootOutput: nodeModules,
@@ -1689,7 +1698,8 @@ describe("runGatewayUpdate", () => {
     const { runCommand } = createGlobalInstallHarness({
       pkgRoot,
       npmRootOutput: nodeModules,
-      installCommand: "npm i -g openclaw@latest --no-fund --no-audit --loglevel=error",
+      installCommand:
+        "npm i -g github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master --no-fund --no-audit --loglevel=error",
       onInstall: async (options) => {
         installEnv = options?.env;
         await writeGlobalPackageVersion(options?.packageRoot ?? pkgRoot);
@@ -1724,7 +1734,8 @@ describe("runGatewayUpdate", () => {
     const { runCommand } = createGlobalInstallHarness({
       pkgRoot,
       npmRootOutput: nodeModules,
-      installCommand: "npm i -g openclaw@latest --no-fund --no-audit --loglevel=error",
+      installCommand:
+        "npm i -g github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master --no-fund --no-audit --loglevel=error",
       onInstall: async (options) => {
         await writeGlobalPackageVersion(options?.packageRoot ?? pkgRoot);
         if (options?.installPrefix) {
@@ -1778,7 +1789,8 @@ describe("runGatewayUpdate", () => {
 
       const { calls, runCommand } = createGlobalInstallHarness({
         pkgRoot,
-        installCommand: "bun add -g openclaw@latest",
+        installCommand:
+          "bun add -g github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master",
         onInstall: async () => {
           await writeGlobalPackageVersion(pkgRoot);
         },
@@ -1790,7 +1802,13 @@ describe("runGatewayUpdate", () => {
       expect(result.mode).toBe("bun");
       expect(result.before?.version).toBe("1.0.0");
       expect(result.after?.version).toBe("2.0.0");
-      expect(calls.some((call) => call === "bun add -g openclaw@latest")).toBe(true);
+      expect(
+        calls.some(
+          (call) =>
+            call ===
+            "bun add -g github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master",
+        ),
+      ).toBe(true);
     });
   });
 

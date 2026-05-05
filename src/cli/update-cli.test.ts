@@ -1492,15 +1492,18 @@ describe("update-cli", () => {
         mockPackageInstallStatus(createCaseDir("openclaw-update"));
         await updateCommand({ yes: true, tag: "main" });
       },
-      expectedSpec: "github:arthurianresolve/excaliclaw#master",
+      expectedSpec: "github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master",
     },
     {
       name: "explicit git package spec",
       run: async () => {
         mockPackageInstallStatus(createCaseDir("openclaw-update"));
-        await updateCommand({ yes: true, tag: "github:arthurianresolve/excaliclaw#master" });
+        await updateCommand({
+          yes: true,
+          tag: "github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master",
+        });
       },
-      expectedSpec: "github:arthurianresolve/excaliclaw#master",
+      expectedSpec: "github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master",
     },
     {
       name: "OPENCLAW_UPDATE_PACKAGE_SPEC override",
@@ -2519,9 +2522,13 @@ describe("update-cli", () => {
         .mocked(defaultRuntime.error)
         .mock.calls.map((call) => String(call[0]))
         .join("\n"),
-    ).toContain(
-      "Gateway version mismatch: expected 2026.4.25, running gateway reported 2026.4.24.",
-    );
+    ).toContain("Gateway did not become healthy after restart.");
+    expect(
+      vi
+        .mocked(defaultRuntime.error)
+        .mock.calls.map((call) => String(call[0]))
+        .join("\n"),
+    ).toContain("Gateway version mismatch: expected 2026.4.25");
     expect(doctorCommand).not.toHaveBeenCalled();
   });
 
@@ -2817,10 +2824,10 @@ describe("update-cli", () => {
     });
   });
 
-  it("uses ~/openclaw as the default dev checkout directory", async () => {
+  it("uses ~/excaliclaw as the default dev checkout directory", async () => {
     const homedirSpy = vi.spyOn(os, "homedir").mockReturnValue("/tmp/oc-home");
     await withEnvAsync({ OPENCLAW_GIT_DIR: undefined }, async () => {
-      expect(resolveGitInstallDir()).toBe(path.posix.join("/tmp/oc-home", "openclaw"));
+      expect(resolveGitInstallDir()).toBe(path.posix.join("/tmp/oc-home", "excaliclaw"));
     });
     homedirSpy.mockRestore();
   });

@@ -2088,7 +2088,7 @@ resolve_openclaw_bin() {
 
 install_openclaw_from_git() {
     local repo_dir="$1"
-    local repo_url="https://github.com/openclaw/openclaw.git"
+    local repo_url="https://github.com/arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized.git"
 
     if [[ -d "$repo_dir/.git" ]]; then
         ui_info "Installing OpenClaw from git checkout: ${repo_dir}"
@@ -2178,7 +2178,7 @@ resolve_package_install_spec() {
     local normalized_value=""
     normalized_value="$(to_lowercase_ascii "$value")"
     if [[ "$normalized_value" == "main" ]]; then
-        echo "github:openclaw/openclaw#main"
+        echo "github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#main"
         return 0
     fi
     if is_explicit_package_install_spec "$value"; then

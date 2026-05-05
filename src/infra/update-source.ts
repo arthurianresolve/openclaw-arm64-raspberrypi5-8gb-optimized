@@ -1,4 +1,5 @@
-export const OPENCLAW_UPDATE_GITHUB_REPO = "arthurianresolve/excaliclaw";
+export const OPENCLAW_UPDATE_GITHUB_REPO =
+  "arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized";
 export const OPENCLAW_UPDATE_GITHUB_BRANCH = "master";
 export const OPENCLAW_UPDATE_GITHUB_REPO_URL = `https://github.com/${OPENCLAW_UPDATE_GITHUB_REPO}.git`;
 export const OPENCLAW_UPDATE_GITHUB_PACKAGE_SPEC = `github:${OPENCLAW_UPDATE_GITHUB_REPO}#${OPENCLAW_UPDATE_GITHUB_BRANCH}`;

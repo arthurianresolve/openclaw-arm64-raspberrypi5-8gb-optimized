@@ -1,0 +1,41 @@
+{
+  "id": "system-prompts-and-models-of-ai-tools",
+  "owner": "x1xhlol",
+  "repo": "system-prompts-and-models-of-ai-tools",
+  "repositoryUrl": "https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools",
+  "license": "GPL-3.0-only",
+  "usage": "eval-only",
+  "description": "External prompt corpus used for offline prompt-shape analysis and red-team eval scaffolding only.",
+  "ref": {
+    "type": "commit",
+    "value": "c727405a4eddc60907b6ca8bf78f17ba450675f8"
+  },
+  "pinRequiredInCi": true,
+  "files": [
+    {
+      "path": "README.md",
+      "kind": "metadata",
+      "label": "Repository README"
+    },
+    {
+      "path": "Cursor Prompts/Agent Prompt 2.0.txt",
+      "kind": "vendor-system-prompt",
+      "label": "Cursor agent prompt 2.0"
+    },
+    {
+      "path": "Cursor Prompts/Agent Tools v1.0.json",
+      "kind": "tool-schema",
+      "label": "Cursor agent tools v1.0"
+    },
+    {
+      "path": "Anthropic/Claude Code 2.0.txt",
+      "kind": "vendor-system-prompt",
+      "label": "Claude Code 2.0 prompt"
+    },
+    {
+      "path": "Perplexity/Prompt.txt",
+      "kind": "vendor-system-prompt",
+      "label": "Perplexity prompt"
+    }
+  ]
+}

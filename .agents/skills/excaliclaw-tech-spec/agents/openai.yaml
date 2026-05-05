@@ -1,0 +1,7 @@
+interface:
+  display_name: "Excaliclaw Tech Spec"
+  short_description: "Draft TECH.md implementation plans grounded in excaliclaw code"
+  default_prompt: "Use $excaliclaw-tech-spec to draft a concise TECH.md implementation plan grounded in current OpenClaw/excaliclaw code and validation."
+
+policy:
+  allow_implicit_invocation: true

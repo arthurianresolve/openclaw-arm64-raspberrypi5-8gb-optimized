@@ -1,0 +1,16 @@
+[Unit]
+Description=OpenClaw Codesight Artifact Refresh
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=__OPENCLAW_CODESIGHT_REFRESH_BIN__
+Environment=OPENCLAW_CODESIGHT_WORKSPACE=__OPENCLAW_CODESIGHT_WORKSPACE__
+Environment=OPENCLAW_CODESIGHT_STATE_DIR=__OPENCLAW_CODESIGHT_STATE_DIR__
+Nice=10
+IOSchedulingClass=idle
+CPUWeight=20
+MemoryMax=512M
+TimeoutStartSec=600
+

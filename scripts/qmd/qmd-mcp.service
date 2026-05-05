@@ -1,0 +1,16 @@
+[Unit]
+Description=QMD MCP HTTP Server
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/qmd mcp --http --port 8181
+Restart=on-failure
+RestartSec=3
+WorkingDirectory=%h
+Environment=QMD_WRAPPER_HOME=__QMD_WRAPPER_HOME__
+Environment=QMD_LLAMA_GPU=none
+Environment=NODE_LLAMA_CPP_GPU=false
+
+[Install]
+WantedBy=default.target

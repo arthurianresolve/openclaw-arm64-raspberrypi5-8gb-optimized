@@ -1,0 +1,4 @@
+interface:
+  display_name: "QMD"
+  short_description: "Search local markdown notes and docs"
+  default_prompt: "Use $qmd to search local markdown notes and docs. Prefer qmd search first, use qmd vsearch only when keyword search fails, and use qmd query only when the user explicitly wants hybrid reranking."

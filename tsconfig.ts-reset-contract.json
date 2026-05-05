@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["internal-types/ts-reset.d.ts", "internal-types/ts-reset.contract.ts"]
+}

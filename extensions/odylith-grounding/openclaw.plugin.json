@@ -1,0 +1,58 @@
+{
+  "id": "odylith-grounding",
+  "name": "Odylith Grounding",
+  "description": "Bounded repo-grounding context engine inspired by Odylith.",
+  "kind": "context-engine",
+  "uiHints": {
+    "repoRoot": {
+      "label": "Repository Root",
+      "help": "Repo root used to resolve governed paths and explicit file anchors. Defaults to the current process working directory."
+    },
+    "governanceRoot": {
+      "label": "Governance Root",
+      "help": "Tracked governance catalog consumed by the grounding engine. Defaults to governance/odylith-grounding under the repo root."
+    },
+    "historyWindowMessages": {
+      "label": "History Window",
+      "help": "How many recent transcript messages the engine keeps before relying on the grounded packet."
+    },
+    "maxCandidateComponents": {
+      "label": "Max Candidate Components",
+      "help": "How many candidate components to surface when a request is still ambiguous."
+    },
+    "dossierCharBudget": {
+      "label": "Dossier Character Budget",
+      "help": "Maximum dossier excerpt length injected into the system prompt for a grounded slice."
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "repoRoot": {
+        "type": "string"
+      },
+      "governanceRoot": {
+        "type": "string"
+      },
+      "historyWindowMessages": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 40,
+        "default": 12
+      },
+      "maxCandidateComponents": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 6,
+        "default": 2
+      },
+      "dossierCharBudget": {
+        "type": "integer",
+        "minimum": 400,
+        "maximum": 4000,
+        "default": 1400
+      }
+    }
+  }
+}

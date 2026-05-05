@@ -233,7 +233,7 @@ export class TokenManager {
       const rawBody = await response.text();
       const logBody = rawBody.replace(/"access_token"\s*:\s*"[^"]+"/g, '"access_token": "***"');
       this.logger?.debug?.(`[qqbot:token:${appId}] <<< Body: ${logBody}`);
-      data = JSON.parse(rawBody);
+      data = JSON.parse(rawBody) as { access_token?: string; expires_in?: number };
     } catch (err) {
       throw new Error(`Failed to parse access_token response: ${formatErrorMessage(err)}`, {
         cause: err,

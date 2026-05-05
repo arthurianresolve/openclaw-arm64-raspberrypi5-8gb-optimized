@@ -23,6 +23,7 @@ jobs:
       contents: read
       issues: write
       pull-requests: write
+    if: ${{ github.event_name != 'pull_request_target' || github.event.pull_request.user.login != 'dependabot[bot]' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6

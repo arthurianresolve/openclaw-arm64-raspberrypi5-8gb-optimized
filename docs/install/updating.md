@@ -209,7 +209,7 @@ openclaw gateway restart
 
 ```bash
 git fetch origin
-git checkout "$(git rev-list -n 1 --before=\"2026-01-01\" origin/main)"
+git checkout "$(git rev-list -n 1 --before=\"2026-01-01\" origin/master)"
 pnpm install && pnpm build
 openclaw gateway restart
 ```

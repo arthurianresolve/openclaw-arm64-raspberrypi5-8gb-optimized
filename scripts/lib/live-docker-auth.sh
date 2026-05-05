@@ -8,6 +8,7 @@ OPENCLAW_DOCKER_LIVE_AUTH_FILES_ALL=(
   .claude/.credentials.json
   .claude/settings.json
   .claude/settings.local.json
+  .gemini/oauth_creds.json
   .gemini/settings.json
 )
 
@@ -74,6 +75,10 @@ openclaw_live_should_include_auth_file_for_provider() {
       printf '%s\n' ".claude/.credentials.json"
       printf '%s\n' ".claude/settings.json"
       printf '%s\n' ".claude/settings.local.json"
+      ;;
+    gemini | gemini-cli | google-gemini-cli)
+      printf '%s\n' ".gemini/oauth_creds.json"
+      printf '%s\n' ".gemini/settings.json"
       ;;
   esac
 }

@@ -7,6 +7,8 @@ const {
   runQaManualLane,
   runQaSuiteFromRuntime,
   runQaCharacterEval,
+  analyzePromptCorpus,
+  fetchExternalPromptCorpus,
   runQaMultipass,
   runTelegramQaLive,
   startQaLabServer,
@@ -18,6 +20,8 @@ const {
   runQaManualLane: vi.fn(),
   runQaSuiteFromRuntime: vi.fn(),
   runQaCharacterEval: vi.fn(),
+  analyzePromptCorpus: vi.fn(),
+  fetchExternalPromptCorpus: vi.fn(),
   runQaMultipass: vi.fn(),
   runTelegramQaLive: vi.fn(),
   startQaLabServer: vi.fn(),
@@ -38,6 +42,11 @@ vi.mock("./suite-launch.runtime.js", () => ({
 
 vi.mock("./character-eval.js", () => ({
   runQaCharacterEval,
+}));
+
+vi.mock("../../../src/infra/prompt-corpus-analysis.js", () => ({
+  analyzePromptCorpus,
+  fetchExternalPromptCorpus,
 }));
 
 vi.mock("./multipass.runtime.js", () => ({
@@ -75,6 +84,8 @@ import {
   runQaCoverageReportCommand,
   runQaManualLaneCommand,
   runQaParityReportCommand,
+  runQaPromptCorpusAnalyzeCommand,
+  runQaPromptCorpusFetchCommand,
   runQaSuiteCommand,
 } from "./cli.runtime.js";
 import { runQaTelegramCommand } from "./live-transports/telegram/cli.runtime.js";
@@ -109,6 +120,8 @@ describe("qa cli runtime", () => {
     stderrWrite = vi.spyOn(process.stderr, "write").mockReturnValue(true);
     runQaSuiteFromRuntime.mockReset();
     runQaCharacterEval.mockReset();
+    analyzePromptCorpus.mockReset();
+    fetchExternalPromptCorpus.mockReset();
     runQaManualLane.mockReset();
     runQaMultipass.mockReset();
     runTelegramQaLive.mockReset();
@@ -171,6 +184,67 @@ describe("qa cli runtime", () => {
       qaLabUrl: "http://127.0.0.1:43124",
       gatewayUrl: "http://127.0.0.1:18789/",
       stopCommand: "docker compose down",
+    });
+    fetchExternalPromptCorpus.mockResolvedValue({
+      manifest: {
+        id: "external-prompts",
+        repositoryUrl: "https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools",
+        ref: { type: "branch", value: "main" },
+        fileCount: 1,
+      },
+      cache: {
+        cacheRoot: "/tmp/openclaw-repo/qa/.cache/external-corpora",
+        corpusDir: "/tmp/openclaw-repo/qa/.cache/external-corpora/external-prompts/branch-main",
+      },
+      warnings: ["Manifest external-prompts is using an unpinned branch ref."],
+      files: [
+        {
+          path: "README.md",
+          kind: "metadata",
+          rawUrl:
+            "https://raw.githubusercontent.com/x1xhlol/system-prompts-and-models-of-ai-tools/main/README.md",
+          cachePath:
+            "/tmp/openclaw-repo/qa/.cache/external-corpora/external-prompts/branch-main/README.md",
+          status: "dry-run",
+        },
+      ],
+    });
+    analyzePromptCorpus.mockResolvedValue({
+      manifest: {
+        id: "external-prompts",
+        repositoryUrl: "https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools",
+        license: "GPL-3.0-only",
+        usage: "eval-only",
+        ref: { type: "branch", value: "main" },
+        fileCount: 1,
+      },
+      cache: {
+        cacheRoot: "/tmp/openclaw-repo/qa/.cache/external-corpora",
+        corpusDir: "/tmp/openclaw-repo/qa/.cache/external-corpora/external-prompts/branch-main",
+      },
+      warnings: ["Manifest external-prompts is using an unpinned branch ref."],
+      localSamples: [],
+      externalSamples: [],
+      aggregates: {
+        openclaw: {
+          count: 3,
+          totalChars: 1200,
+          totalEstimatedTokens: 300,
+          maxChars: 600,
+          maxEstimatedTokens: 150,
+          avgChars: 400,
+          avgEstimatedTokens: 100,
+        },
+        external: {
+          count: 1,
+          totalChars: 800,
+          totalEstimatedTokens: 200,
+          maxChars: 800,
+          maxEstimatedTokens: 200,
+          avgChars: 800,
+          avgEstimatedTokens: 200,
+        },
+      },
     });
   });
 
@@ -323,6 +397,42 @@ describe("qa cli runtime", () => {
     } finally {
       process.exitCode = priorExitCode;
     }
+  });
+
+  it("resolves prompt corpus fetch paths before dispatching", async () => {
+    await runQaPromptCorpusFetchCommand({
+      repoRoot: "/tmp/openclaw-repo",
+      manifest: "qa/external-corpora/system-prompts.manifest.json",
+      cacheRoot: "qa/.cache/external-corpora",
+      dryRun: true,
+      json: true,
+    });
+
+    expect(fetchExternalPromptCorpus).toHaveBeenCalledWith({
+      repoRoot: path.resolve("/tmp/openclaw-repo"),
+      manifestPath: "qa/external-corpora/system-prompts.manifest.json",
+      cacheRoot: "qa/.cache/external-corpora",
+      dryRun: true,
+    });
+    expect(process.stdout.write).toHaveBeenCalledWith(
+      `${JSON.stringify(await fetchExternalPromptCorpus.mock.results[0]?.value, null, 2)}\n`,
+    );
+  });
+
+  it("resolves prompt corpus analysis paths before dispatching", async () => {
+    await runQaPromptCorpusAnalyzeCommand({
+      repoRoot: "/tmp/openclaw-repo",
+      manifest: "qa/external-corpora/system-prompts.manifest.json",
+      cacheRoot: "qa/.cache/external-corpora",
+      json: false,
+    });
+
+    expect(analyzePromptCorpus).toHaveBeenCalledWith({
+      repoRoot: path.resolve("/tmp/openclaw-repo"),
+      manifestPath: "qa/external-corpora/system-prompts.manifest.json",
+      cacheRoot: "qa/.cache/external-corpora",
+    });
+    expect(process.stdout.write).toHaveBeenCalledWith("Prompt corpus manifest: external-prompts\n");
   });
 
   it("keeps telegram exit code clear when --allow-failures is set", async () => {

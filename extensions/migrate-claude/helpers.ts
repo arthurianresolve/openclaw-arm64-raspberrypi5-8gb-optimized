@@ -61,7 +61,7 @@ export async function readJsonObject(
     return {};
   }
   try {
-    const parsed = JSON.parse(content) as unknown;
+    const parsed = JSON.parse(content);
     return isRecord(parsed) ? parsed : {};
   } catch {
     return {};

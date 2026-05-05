@@ -10,7 +10,7 @@ import {
   shouldRefreshSnapshotForVersion,
 } from "../../agents/skills/refresh-state.js";
 import { ensureSkillsWatcher } from "../../agents/skills/refresh.js";
-import { hydrateResolvedSkills } from "../../agents/skills/snapshot-hydration.js";
+import { hydrateResolvedSkills as hydrateResolvedSkillsSnapshot } from "../../agents/skills/snapshot-hydration.js";
 import {
   resolveSessionFilePath,
   resolveSessionFilePathOptions,
@@ -105,6 +105,16 @@ function resolvePositiveTokenCount(value: number | undefined): number | undefine
     : undefined;
 }
 
+export function hydrateResolvedSkills(
+  snapshot: NonNullable<SessionEntry["skillsSnapshot"]>,
+  rebuild: () => NonNullable<SessionEntry["skillsSnapshot"]>,
+): NonNullable<SessionEntry["skillsSnapshot"]> {
+  if (snapshot.resolvedSkills) {
+    return snapshot;
+  }
+  return { ...snapshot, resolvedSkills: rebuild().resolvedSkills };
+}
+
 export async function ensureSkillSnapshot(params: {
   sessionEntry?: SessionEntry;
   sessionStore?: Record<string, SessionEntry>;
@@ -178,7 +188,7 @@ export async function ensureSkillSnapshot(params: {
     const skillSnapshot =
       !current.skillsSnapshot || shouldRefreshSnapshot
         ? buildSnapshot()
-        : hydrateResolvedSkills(current.skillsSnapshot, buildSnapshot);
+        : hydrateResolvedSkillsSnapshot(current.skillsSnapshot, buildSnapshot);
     nextEntry = {
       ...current,
       sessionId: sessionId ?? current.sessionId ?? crypto.randomUUID(),
@@ -195,10 +205,10 @@ export async function ensureSkillSnapshot(params: {
     (nextEntry?.skillsSnapshot !== existingSnapshot || !shouldRefreshSnapshot);
   const skillsSnapshot =
     hasFreshSnapshotInEntry && nextEntry?.skillsSnapshot
-      ? hydrateResolvedSkills(nextEntry.skillsSnapshot, buildSnapshot)
+      ? hydrateResolvedSkillsSnapshot(nextEntry.skillsSnapshot, buildSnapshot)
       : shouldRefreshSnapshot || !nextEntry?.skillsSnapshot
         ? buildSnapshot()
-        : hydrateResolvedSkills(nextEntry.skillsSnapshot, buildSnapshot);
+        : hydrateResolvedSkillsSnapshot(nextEntry.skillsSnapshot, buildSnapshot);
   if (
     skillsSnapshot &&
     sessionStore &&

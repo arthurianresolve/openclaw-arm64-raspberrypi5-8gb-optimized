@@ -2,6 +2,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
 import {
+  analyzePromptCorpus,
+  fetchExternalPromptCorpus,
+} from "../../../src/infra/prompt-corpus-analysis.js";
+import {
   buildQaAgenticParityComparison,
   renderQaAgenticParityMarkdownReport,
   type QaParitySuiteSummary,
@@ -445,6 +449,50 @@ function printQaCredentialDoctorTable(
   }
 }
 
+function printQaPromptCorpusFetchSummary(
+  summary: Awaited<ReturnType<typeof fetchExternalPromptCorpus>>,
+) {
+  process.stdout.write(`Prompt corpus manifest: ${summary.manifest.id}\n`);
+  process.stdout.write(
+    `Source: ${summary.manifest.repositoryUrl} @ ${summary.manifest.ref.type}:${summary.manifest.ref.value}\n`,
+  );
+  process.stdout.write(`Cache dir: ${summary.cache.corpusDir}\n`);
+  for (const warning of summary.warnings) {
+    process.stdout.write(`Warning: ${warning}\n`);
+  }
+  for (const file of summary.files) {
+    process.stdout.write(`${file.status.padEnd(10)} ${file.path}\n`);
+  }
+}
+
+function printQaPromptCorpusAnalysisSummary(
+  summary: Awaited<ReturnType<typeof analyzePromptCorpus>>,
+) {
+  process.stdout.write(`Prompt corpus manifest: ${summary.manifest.id}\n`);
+  process.stdout.write(
+    `Source: ${summary.manifest.repositoryUrl} @ ${summary.manifest.ref.type}:${summary.manifest.ref.value}\n`,
+  );
+  process.stdout.write(`Cache dir: ${summary.cache.corpusDir}\n`);
+  process.stdout.write(
+    `OpenClaw samples: ${summary.aggregates.openclaw.count} analyzed, max ${summary.aggregates.openclaw.maxEstimatedTokens} est. tokens\n`,
+  );
+  process.stdout.write(
+    `External samples: ${summary.aggregates.external.count} analyzed, max ${summary.aggregates.external.maxEstimatedTokens} est. tokens\n`,
+  );
+  for (const warning of summary.warnings) {
+    process.stdout.write(`Warning: ${warning}\n`);
+  }
+  const missing = summary.externalSamples.filter((sample) => sample.status === "missing");
+  if (missing.length > 0) {
+    process.stdout.write(
+      `Missing cached external files: ${missing
+        .map((sample) => sample.path)
+        .filter((entry): entry is string => typeof entry === "string")
+        .join(", ")}\n`,
+    );
+  }
+}
+
 export async function runQaLabSelfCheckCommand(opts: { repoRoot?: string; output?: string }) {
   const repoRoot = path.resolve(opts.repoRoot ?? process.cwd());
   const server = await startQaLabServer({
@@ -645,6 +693,46 @@ export async function runQaCoverageReportCommand(opts: {
   }
 
   process.stdout.write(body);
+}
+
+export async function runQaPromptCorpusFetchCommand(opts: {
+  repoRoot?: string;
+  manifest?: string;
+  cacheRoot?: string;
+  dryRun?: boolean;
+  json?: boolean;
+}) {
+  const repoRoot = path.resolve(opts.repoRoot ?? process.cwd());
+  const summary = await fetchExternalPromptCorpus({
+    repoRoot,
+    manifestPath: opts.manifest,
+    cacheRoot: opts.cacheRoot,
+    dryRun: opts.dryRun,
+  });
+  if (opts.json) {
+    process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+    return;
+  }
+  printQaPromptCorpusFetchSummary(summary);
+}
+
+export async function runQaPromptCorpusAnalyzeCommand(opts: {
+  repoRoot?: string;
+  manifest?: string;
+  cacheRoot?: string;
+  json?: boolean;
+}) {
+  const repoRoot = path.resolve(opts.repoRoot ?? process.cwd());
+  const summary = await analyzePromptCorpus({
+    repoRoot,
+    manifestPath: opts.manifest,
+    cacheRoot: opts.cacheRoot,
+  });
+  if (opts.json) {
+    process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+    return;
+  }
+  printQaPromptCorpusAnalysisSummary(summary);
 }
 
 export async function runQaCharacterEvalCommand(opts: {

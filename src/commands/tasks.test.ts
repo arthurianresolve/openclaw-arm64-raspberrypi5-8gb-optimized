@@ -137,7 +137,7 @@ describe("tasks commands", () => {
 
       const payload = JSON.parse(String(vi.mocked(runtime.log).mock.calls[0]?.[0])) as {
         mode: string;
-        maintenance: { taskFlows: { pruned: number } };
+        maintenance: { taskFlows: { pruned: number; backfilled: number } };
         auditBefore: {
           byCode: Record<string, number>;
           taskFlows: { byCode: Record<string, number> };
@@ -150,6 +150,7 @@ describe("tasks commands", () => {
 
       expect(payload.mode).toBe("preview");
       expect(payload.maintenance.taskFlows.pruned).toBe(1);
+      expect(payload.maintenance.taskFlows.backfilled).toBe(0);
       expect(payload.auditBefore.byCode).toBeDefined();
       expect(payload.auditBefore.taskFlows.byCode.stale_running).toBe(0);
       expect(payload.auditAfter.byCode).toBeDefined();

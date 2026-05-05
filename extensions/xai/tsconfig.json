@@ -51,7 +51,7 @@
       "@openclaw/speech-core/runtime-api.js": ["./.boundary-stubs/speech-core-runtime-api.d.ts"]
     }
   },
-  "include": ["./*.ts", "./src/**/*.ts"],
+  "include": ["./*.ts", "./src/**/*.ts", "./.boundary-stubs/**/*.d.ts"],
   "exclude": [
     "./**/*.test.ts",
     "./dist/**",

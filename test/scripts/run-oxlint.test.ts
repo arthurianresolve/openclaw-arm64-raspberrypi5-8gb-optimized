@@ -38,7 +38,7 @@ describe("run-oxlint", () => {
     const result = filterSparseMissingOxlintTargets(
       ["--tsconfig", "config/tsconfig/oxlint.core.json", "src", "ui", "packages", "--threads=1"],
       {
-        fileExists: (target: string) => target.endsWith("/src"),
+        fileExists: (target) => String(target).endsWith("/src"),
         isSparseCheckoutEnabled: () => true,
         isTrackedPath: ({ target }: { target: string }) => target === "ui" || target === "packages",
       },
@@ -54,7 +54,7 @@ describe("run-oxlint", () => {
 
   it("keeps missing untracked oxlint targets so typos still fail", () => {
     const result = filterSparseMissingOxlintTargets(["src", "typo"], {
-      fileExists: (target: string) => target.endsWith("/src"),
+      fileExists: (target) => String(target).endsWith("/src"),
       isSparseCheckoutEnabled: () => true,
       isTrackedPath: () => false,
     });

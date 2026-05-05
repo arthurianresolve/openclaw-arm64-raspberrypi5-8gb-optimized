@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { safeEqualSecret } from "openclaw/plugin-sdk/security-runtime";
 import { normalizeLowercaseStringOrEmpty } from "openclaw/plugin-sdk/text-runtime";
 import { z } from "zod";
+import { summarizeTaskFlows } from "../../../src/tasks/task-flow-summary.js";
 import type { PluginRuntime } from "../api.js";
 import {
   createFixedWindowRateLimiter,
@@ -182,7 +183,7 @@ export type TaskFlowWebhookTarget = {
   taskFlow: BoundTaskFlowRuntime;
 };
 
-type FlowView = {
+type RawFlowViewInput = {
   flowId: string;
   syncMode: "task_mirrored" | "managed";
   controllerId?: string;
@@ -191,6 +192,7 @@ type FlowView = {
   notifyPolicy: string;
   goal: string;
   currentStep?: string;
+  verificationState?: JsonValue;
   blockedTaskId?: string;
   blockedSummary?: string;
   stateJson?: JsonValue;
@@ -199,6 +201,12 @@ type FlowView = {
   createdAt: number;
   updatedAt: number;
   endedAt?: number;
+};
+
+type FlowView = RawFlowViewInput & {
+  priority: "repair" | "normal";
+  requiresRepair?: boolean;
+  verification?: JsonValue;
 };
 
 type TaskView = {
@@ -255,7 +263,8 @@ function pickOptionalTruthyStringFields<T extends object, TKey extends keyof T &
   return result;
 }
 
-function toFlowView(flow: FlowView): FlowView {
+function toFlowView(flow: RawFlowViewInput): FlowView {
+  const requiresRepair = flow.currentStep?.trim() === "verification_repair";
   return {
     flowId: flow.flowId,
     syncMode: flow.syncMode,
@@ -269,6 +278,9 @@ function toFlowView(flow: FlowView): FlowView {
     status: flow.status,
     notifyPolicy: flow.notifyPolicy,
     goal: flow.goal,
+    priority: requiresRepair ? "repair" : "normal",
+    ...(requiresRepair ? { requiresRepair: true } : {}),
+    ...(flow.verificationState !== undefined ? { verification: flow.verificationState } : {}),
     ...pickOptionalFields(flow, ["stateJson", "waitJson", "cancelRequestedAt"]),
     createdAt: flow.createdAt,
     updatedAt: flow.updatedAt,
@@ -436,6 +448,23 @@ function mapRunTaskStatus(result: { created: boolean; found: boolean; reason?: s
       error: result.reason,
     };
   }
+  if (
+    result.reason ===
+    "Flow is in verification repair mode; generic child work is suppressed until repair completes."
+  ) {
+    return {
+      statusCode: 409,
+      code: "repair_in_progress",
+      error: result.reason,
+    };
+  }
+  if (result.reason === "Flow already has an active verification repair task.") {
+    return {
+      statusCode: 409,
+      code: "repair_task_active",
+      error: result.reason,
+    };
+  }
   if (result.reason?.startsWith("Flow is already ")) {
     return {
       statusCode: 409,
@@ -554,8 +583,13 @@ async function executeWebhookAction(params: {
       const flow = target.taskFlow.get(action.flowId);
       return { flow: flow ? toFlowView(flow) : null };
     }
-    case "list_flows":
-      return { flows: target.taskFlow.list().map(toFlowView) };
+    case "list_flows": {
+      const flows = target.taskFlow.list();
+      return {
+        metrics: summarizeTaskFlows(flows),
+        flows: flows.map(toFlowView),
+      };
+    }
     case "find_latest_flow": {
       const flow = target.taskFlow.findLatest();
       return { flow: flow ? toFlowView(flow) : null };

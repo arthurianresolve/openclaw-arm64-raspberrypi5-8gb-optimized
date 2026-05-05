@@ -24,10 +24,31 @@ binary, and can index content beyond your workspace memory files.
 
 ### Prerequisites
 
-- Install QMD: `npm install -g @tobilu/qmd` or `bun install -g @tobilu/qmd`
+- Install QMD: `npm install -g @tobilu/qmd@2.1.0` or `bun install -g @tobilu/qmd@2.1.0`
 - SQLite build that allows extensions (`brew install sqlite` on macOS).
 - QMD must be on the gateway's `PATH`.
 - macOS and Linux work out of the box. Windows is best supported via WSL2.
+
+On Raspberry Pi or other CPU-only ARM64 hosts, install the repo's wrapper after
+installing upstream QMD:
+
+```bash
+./scripts/setup-qmd-system.sh --state-root /data/openclaw/state/qmd-home --enable-service --enable-linger
+```
+
+That wrapper keeps QMD on a writable XDG home, forces CPU mode with
+`QMD_LLAMA_GPU=none`, and defaults `qmd query` to `--no-rerank` so first-party
+OpenClaw deployments do not stall on slow reranking.
+
+If you also run the gateway on a Raspberry Pi, prefer the combined host helper:
+
+```bash
+./scripts/setup-raspberry-pi-system.sh --enable-qmd-service --enable-linger
+```
+
+That adds a gateway service drop-in with `OPENCLAW_NO_RESPAWN=1`,
+`NODE_COMPILE_CACHE=/data/openclaw/cache/node-compile`, and the same
+`QMD_WRAPPER_HOME=/data/openclaw/state/qmd-home` used by the wrapper.
 
 ### Enable
 
@@ -206,9 +227,9 @@ with no extra dependencies.
 
 ## Troubleshooting
 
-**QMD not found?** Ensure the binary is on the gateway's `PATH`. If OpenClaw
-runs as a service, create a symlink:
-`sudo ln -s ~/.bun/bin/qmd /usr/local/bin/qmd`.
+**QMD not found?** Ensure the binary is on the gateway's `PATH`. On ARM64
+service hosts, prefer the checked-in wrapper:
+`./scripts/setup-qmd-system.sh`.
 
 If `qmd --version` works in your shell but OpenClaw still reports
 `spawn qmd ENOENT`, the gateway process likely has a different `PATH` than your
@@ -229,7 +250,10 @@ Use `command -v qmd` in the environment where QMD is installed, then recheck
 with `openclaw memory status --deep`.
 
 **First search very slow?** QMD downloads GGUF models on first use. Pre-warm
-with `qmd query "test"` using the same XDG dirs OpenClaw uses.
+with `qmd query "test"` using the same XDG dirs OpenClaw uses. The
+OpenClaw wrapper also defaults `qmd query` to `--no-rerank` on CPU-only
+installs; set `QMD_DEFAULT_QUERY_MODE=full` or pass `--no-rerank` /
+`--candidate-limit` explicitly if you want different behavior.
 
 **Many QMD subprocesses during search?** Update QMD if possible. OpenClaw uses
 one process for same-source multi-collection searches only when the installed

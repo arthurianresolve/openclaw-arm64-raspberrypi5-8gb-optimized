@@ -8,6 +8,7 @@ import {
   getShellConfig,
   resolvePowerShellPath,
   resolveShellFromPath,
+  sanitizeBinaryOutput,
 } from "./shell-utils.js";
 
 const isWin = process.platform === "win32";
@@ -305,5 +306,18 @@ describe("resolvePowerShellPath", () => {
     delete process.env.WINDIR;
 
     expect(resolvePowerShellPath()).toBe(ps51Path);
+  });
+});
+
+describe("sanitizeBinaryOutput", () => {
+  it("strips ANSI terminal control sequences instead of leaking their payload", () => {
+    const oscLink = "\u001b]8;;https://example.com\u001b\\link text\u001b]8;;\u001b\\";
+    const value = `start\u001b[?25l\u001b[1;1R${oscLink}\u001b[2Kend`;
+
+    expect(sanitizeBinaryOutput(value)).toBe("startlink textend");
+  });
+
+  it("preserves plain text newlines and tabs while dropping raw control bytes", () => {
+    expect(sanitizeBinaryOutput("a\tb\nc\rd\u0007")).toBe("a\tb\nc\rd");
   });
 });

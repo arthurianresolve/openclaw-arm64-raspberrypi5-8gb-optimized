@@ -155,13 +155,21 @@ export function createScopedVitestConfig(
     fileParallelism?: boolean;
     pool?: "forks" | "threads";
     passWithNoTests?: boolean;
+    testTimeout?: number;
     excludeUnitFastTests?: boolean;
     setupFiles?: string[];
     useNonIsolatedRunner?: boolean;
   },
 ) {
   const base = sharedVitestConfig as Record<string, unknown>;
-  const baseTest = sharedVitestConfig.test ?? {};
+  const baseTest = (sharedVitestConfig.test ?? {}) as {
+    coverage?: {
+      exclude?: string[];
+    };
+    exclude?: string[];
+    sequence?: Record<string, unknown>;
+    setupFiles?: string[];
+  };
   const scopedDir = options?.dir;
   const resolvedScopedDir = scopedDir ? path.join(repoRoot, scopedDir) : undefined;
   const env = options?.env;
@@ -202,6 +210,7 @@ export function createScopedVitestConfig(
       ...(options?.fileParallelism === undefined
         ? {}
         : { fileParallelism: options.fileParallelism }),
+      ...(options?.testTimeout === undefined ? {} : { testTimeout: options.testTimeout }),
       ...(scopedGroupOrder === undefined
         ? {}
         : {

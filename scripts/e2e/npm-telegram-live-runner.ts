@@ -4,6 +4,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { runTelegramQaLive } from "../../extensions/qa-lab/src/live-transports/telegram/telegram-live.runtime.ts";
+import type { QaProviderModeInput } from "../../extensions/qa-lab/src/run-config.js";
+import { formatErrorMessage } from "./dist-modules.mjs";
 
 function parseBoolean(value: string | undefined) {
   const normalized = value?.trim().toLowerCase();
@@ -50,8 +53,6 @@ async function resolveTrustedOpenClawCommand(rawCommand: string) {
 }
 
 async function main() {
-  const { runTelegramQaLive } =
-    await import("../../extensions/qa-lab/src/live-transports/telegram/telegram-live.runtime.ts");
   const rawSutOpenClawCommand = process.env.OPENCLAW_NPM_TELEGRAM_SUT_COMMAND?.trim();
   if (!rawSutOpenClawCommand) {
     throw new Error("Missing OPENCLAW_NPM_TELEGRAM_SUT_COMMAND.");
@@ -67,7 +68,9 @@ async function main() {
     outputDir,
     sutOpenClawCommand,
     preflightInstalledOnboarding: true,
-    providerMode: process.env.OPENCLAW_NPM_TELEGRAM_PROVIDER_MODE,
+    providerMode: process.env.OPENCLAW_NPM_TELEGRAM_PROVIDER_MODE as
+      | QaProviderModeInput
+      | undefined,
     primaryModel: process.env.OPENCLAW_NPM_TELEGRAM_MODEL,
     alternateModel: process.env.OPENCLAW_NPM_TELEGRAM_ALT_MODEL,
     fastMode: parseBoolean(process.env.OPENCLAW_NPM_TELEGRAM_FAST),
@@ -88,20 +91,9 @@ async function main() {
   }
 }
 
-async function formatRunnerErrorMessage(error: unknown) {
-  try {
-    const { formatErrorMessage } = await import("../../dist/infra/errors.js");
-    return formatErrorMessage(error);
-  } catch {
-    return error instanceof Error ? error.message : String(error);
-  }
-}
-
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch(async (error) => {
-    process.stderr.write(
-      `package telegram live e2e failed: ${await formatRunnerErrorMessage(error)}\n`,
-    );
+  main().catch((error) => {
+    process.stderr.write(`package telegram live e2e failed: ${formatErrorMessage(error)}\n`);
     process.exitCode = 1;
   });
 }

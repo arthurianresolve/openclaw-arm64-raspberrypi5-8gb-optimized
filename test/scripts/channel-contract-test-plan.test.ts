@@ -35,8 +35,8 @@ describe("scripts/lib/channel-contract-test-plan.mjs", () => {
 
   it("covers every channel contract test exactly once", () => {
     const actual = createChannelContractTestShards()
-      .flatMap((shard) => shard.includePatterns)
-      .toSorted((a, b) => a.localeCompare(b));
+      .flatMap((shard) => shard.includePatterns as string[])
+      .toSorted((a: string, b: string) => a.localeCompare(b));
 
     expect(actual).toEqual(listContractTests());
     expect(new Set(actual).size).toBe(actual.length);
@@ -44,7 +44,7 @@ describe("scripts/lib/channel-contract-test-plan.mjs", () => {
 
   it("keeps registry-backed surface shards spread across checks", () => {
     for (const shard of createChannelContractTestShards()) {
-      const surfaceRegistryFiles = shard.includePatterns.filter((pattern) =>
+      const surfaceRegistryFiles = (shard.includePatterns as string[]).filter((pattern) =>
         pattern.includes("/surfaces-only.registry-backed-shard-"),
       );
       expect(surfaceRegistryFiles.length).toBeLessThanOrEqual(4);

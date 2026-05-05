@@ -320,7 +320,7 @@ function clearTimer(timer: ReturnType<typeof setTimeout> | null): null {
 
 function parseClientEvent(raw: RawData): VoiceClawClientEvent | null {
   try {
-    const parsed = JSON.parse(rawDataToString(raw)) as unknown;
+    const parsed = JSON.parse(rawDataToString(raw));
     if (!parsed || typeof parsed !== "object" || !("type" in parsed)) {
       return null;
     }

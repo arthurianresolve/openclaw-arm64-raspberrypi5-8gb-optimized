@@ -41,6 +41,13 @@
       - any-glob-to-any-file:
           - "extensions/google-meet/**"
           - "docs/plugins/google-meet.md"
+"plugin: odylith-grounding":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "extensions/odylith-grounding/**"
+          - "governance/odylith-grounding/**"
+          - "docs/plugins/odylith-grounding.md"
+          - "docs/plan/odylith-grounding-integration.md"
 "plugin: migrate-hermes":
   - changed-files:
       - any-glob-to-any-file:

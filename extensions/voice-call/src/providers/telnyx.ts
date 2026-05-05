@@ -118,14 +118,14 @@ export class TelnyxProvider implements VoiceCallProvider {
     options?: WebhookParseOptions,
   ): ProviderWebhookParseResult {
     try {
-      const payload = JSON.parse(ctx.rawBody);
+      const payload = JSON.parse(ctx.rawBody) as Record<string, unknown>;
       const data = payload.data;
 
-      if (!data || !data.event_type) {
+      if (!data || typeof data !== "object" || !("event_type" in data)) {
         return { events: [], statusCode: 200 };
       }
 
-      const event = this.normalizeEvent(data, options?.verifiedRequestKey);
+      const event = this.normalizeEvent(data as TelnyxEvent, options?.verifiedRequestKey);
       return {
         events: event ? [event] : [],
         statusCode: 200,

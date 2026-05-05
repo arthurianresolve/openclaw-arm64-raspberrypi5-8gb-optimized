@@ -282,6 +282,69 @@ describe("memory tools", () => {
     expect(getMemorySearchManagerMockCalls()).toBe(0);
   });
 
+  it("applies cross-corpus quota and normalization when enabled", async () => {
+    setMemoryBackend("builtin");
+    setMemorySearchImpl(async () => [
+      {
+        path: "memory/alpha.md",
+        startLine: 1,
+        endLine: 1,
+        score: 0.95,
+        snippet: "alpha durable memory",
+        source: "memory" as const,
+      },
+      {
+        path: "memory/beta.md",
+        startLine: 1,
+        endLine: 1,
+        score: 0.92,
+        snippet: "beta durable memory",
+        source: "memory" as const,
+      },
+    ]);
+    registerMemoryCorpusSupplement("memory-wiki", {
+      search: async () => [
+        {
+          corpus: "wiki",
+          path: "entities/wiki-a.md",
+          score: 0.7,
+          snippet: "wiki a",
+        },
+        {
+          corpus: "wiki",
+          path: "entities/wiki-b.md",
+          score: 0.69,
+          snippet: "wiki b",
+        },
+      ],
+      get: async () => null,
+    });
+    const cfg = asOpenClawConfig({
+      agents: {
+        list: [
+          {
+            id: "main",
+            default: true,
+            memorySearch: {
+              query: {
+                crossCorpus: {
+                  enabled: true,
+                  quota: { memory: 1, wiki: 1 },
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+    const tool = createMemorySearchToolOrThrow({ config: cfg });
+    const result = await tool.execute("cross_corpus_quota", { query: "alpha wiki", maxResults: 4 });
+    const details = result.details as { results: Array<{ corpus?: string; path: string }> };
+    expect(details.results).toHaveLength(2);
+    expect(details.results.filter((row) => row.corpus === "memory")).toHaveLength(1);
+    expect(details.results.filter((row) => row.corpus === "wiki")).toHaveLength(1);
+  });
+
   it("merges memory and wiki corpus search results for corpus=all", async () => {
     registerMemoryCorpusSupplement("memory-wiki", {
       search: async () => [

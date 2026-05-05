@@ -124,10 +124,15 @@ export async function fetchBlueBubblesHistory(
       let messages: unknown[] = [];
       if (Array.isArray(data)) {
         messages = data;
-      } else if (data.data && Array.isArray(data.data)) {
-        messages = data.data;
-      } else if (data.messages && Array.isArray(data.messages)) {
-        messages = data.messages;
+      } else if (typeof data === "object" && !Array.isArray(data)) {
+        const record = data as Record<string, unknown>;
+        if (Array.isArray(record.data)) {
+          messages = record.data;
+        } else if (Array.isArray(record.messages)) {
+          messages = record.messages;
+        } else {
+          continue;
+        }
       } else {
         continue;
       }

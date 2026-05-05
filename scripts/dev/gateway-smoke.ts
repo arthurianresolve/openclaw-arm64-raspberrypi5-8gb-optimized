@@ -21,7 +21,7 @@ if (!urlRaw || !token) {
 }
 
 async function main() {
-  const url = resolveGatewayUrl(urlRaw);
+  const url = resolveGatewayUrl(urlRaw ?? "");
   const { request, waitOpen, close } = createGatewayWsClient({
     url: url.toString(),
     onEvent: (evt) => {

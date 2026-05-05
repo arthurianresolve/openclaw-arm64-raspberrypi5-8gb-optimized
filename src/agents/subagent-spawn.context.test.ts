@@ -240,4 +240,29 @@ describe("sessions_spawn context modes", () => {
       "sessions.delete",
     );
   });
+
+  it("injects context-engine handoff additions into the child agent run", async () => {
+    const store: SessionStore = {
+      main: { sessionId: "parent-session-id", updatedAt: 1 },
+    };
+    usePersistentStoreMock(store);
+    resolveContextEngineMock.mockResolvedValue({
+      prepareSubagentSpawn: vi.fn(async () => ({
+        rollback: async () => undefined,
+        systemPromptAddition: "Grounded scope: src/context-engine only.",
+        initialUserMessageAddition: "Validate with pnpm test -- context-engine.",
+      })),
+    });
+
+    const result = await spawnSubagentDirect({ task: "clean worker" }, { agentSessionKey: "main" });
+
+    expect(result.status).toBe("accepted");
+    const agentCall = callGatewayMock.mock.calls.find(
+      (call) => (call[0] as GatewayRequest).method === "agent",
+    )?.[0] as GatewayRequest | undefined;
+    expect(agentCall?.params).toMatchObject({
+      extraSystemPrompt: expect.stringContaining("Grounded scope: src/context-engine only."),
+      message: expect.stringContaining("Validate with pnpm test -- context-engine."),
+    });
+  });
 });

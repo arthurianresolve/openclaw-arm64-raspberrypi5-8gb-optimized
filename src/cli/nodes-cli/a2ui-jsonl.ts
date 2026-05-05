@@ -50,7 +50,7 @@ export function validateA2UIJsonl(jsonl: string) {
     messageCount += 1;
     let obj: unknown;
     try {
-      obj = JSON.parse(trimmed) as unknown;
+      obj = JSON.parse(trimmed);
     } catch (err) {
       errors.push(`line ${idx + 1}: ${String(err)}`);
       return;

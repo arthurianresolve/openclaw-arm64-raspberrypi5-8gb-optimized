@@ -469,7 +469,7 @@ async function parseArgsInput(rawValue: string): Promise<string[] | undefined> {
   if (!trimmed) {
     return undefined;
   }
-  const parsed = JSON.parse(trimmed) as unknown;
+  const parsed = JSON.parse(trimmed);
   if (!Array.isArray(parsed) || !parsed.every((entry) => typeof entry === "string")) {
     throw new Error("args must be a JSON array of strings");
   }
@@ -510,7 +510,7 @@ async function promptExecProvider(
           return undefined;
         }
         try {
-          const parsed = JSON.parse(trimmed) as unknown;
+          const parsed = JSON.parse(trimmed);
           if (!Array.isArray(parsed) || !parsed.every((entry) => typeof entry === "string")) {
             return "Must be a JSON array of strings";
           }

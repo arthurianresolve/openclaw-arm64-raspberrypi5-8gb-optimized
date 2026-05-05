@@ -97,7 +97,7 @@ async function fetchChutesUserInfo(params: {
   if (!response.ok) {
     return null;
   }
-  const data = (await response.json()) as unknown;
+  const data = await response.json();
   if (!data || typeof data !== "object") {
     return null;
   }

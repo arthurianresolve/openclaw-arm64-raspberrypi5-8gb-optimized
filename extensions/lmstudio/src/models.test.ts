@@ -29,7 +29,7 @@ describe("lmstudio-models", () => {
     if (typeof init?.body !== "string") {
       throw new Error("Expected request body to be a JSON string");
     }
-    return JSON.parse(init.body) as unknown;
+    return JSON.parse(init.body);
   };
   const createModelLoadFetchMock = (params?: {
     loadedContextLength?: number;

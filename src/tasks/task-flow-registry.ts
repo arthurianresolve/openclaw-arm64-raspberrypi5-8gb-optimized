@@ -14,7 +14,22 @@ import type {
   TaskFlowSyncMode,
   JsonValue,
 } from "./task-flow-registry.types.js";
+import {
+  cloneTaskFlowVerificationState,
+  normalizeTaskFlowVerificationState,
+  type TaskFlowVerificationState,
+} from "./task-flow-verification-state.js";
 import type { TaskNotifyPolicy, TaskRecord } from "./task-registry.types.js";
+import {
+  cloneUnitContextPacket,
+  normalizeUnitContextPacket,
+  type UnitContextPacket,
+} from "./unit-context-packet.js";
+import {
+  cloneUnitVerificationPolicy,
+  normalizeUnitVerificationPolicy,
+  type UnitVerificationPolicy,
+} from "./unit-verification-policy.js";
 
 const log = createSubsystemLogger("tasks/task-flow-registry");
 const flows = new Map<string, TaskFlowRecord>();
@@ -32,6 +47,9 @@ type FlowRecordPatch = Omit<
       | "blockedTaskId"
       | "blockedSummary"
       | "controllerId"
+      | "unitContextPacket"
+      | "unitVerificationPolicy"
+      | "verificationState"
       | "stateJson"
       | "waitJson"
       | "cancelRequestedAt"
@@ -43,6 +61,9 @@ type FlowRecordPatch = Omit<
   | "blockedTaskId"
   | "blockedSummary"
   | "controllerId"
+  | "unitContextPacket"
+  | "unitVerificationPolicy"
+  | "verificationState"
   | "stateJson"
   | "waitJson"
   | "cancelRequestedAt"
@@ -52,6 +73,9 @@ type FlowRecordPatch = Omit<
   blockedTaskId?: string | null;
   blockedSummary?: string | null;
   controllerId?: string | null;
+  unitContextPacket?: UnitContextPacket | null;
+  unitVerificationPolicy?: UnitVerificationPolicy | null;
+  verificationState?: TaskFlowVerificationState | null;
   stateJson?: JsonValue | null;
   waitJson?: JsonValue | null;
   cancelRequestedAt?: number | null;
@@ -67,6 +91,9 @@ type FlowRecordCreateFields = {
   currentStep?: string | null;
   blockedTaskId?: string | null;
   blockedSummary?: string | null;
+  unitContextPacket?: UnitContextPacket | null;
+  unitVerificationPolicy?: UnitVerificationPolicy | null;
+  verificationState?: TaskFlowVerificationState | null;
   stateJson?: JsonValue | null;
   waitJson?: JsonValue | null;
   cancelRequestedAt?: number | null;
@@ -108,7 +135,16 @@ function cloneFlowRecord(record: TaskFlowRecord): TaskFlowRecord {
     ...(record.stateJson !== undefined
       ? { stateJson: cloneStructuredValue(record.stateJson)! }
       : {}),
+    ...(record.verificationState
+      ? { verificationState: cloneTaskFlowVerificationState(record.verificationState)! }
+      : {}),
     ...(record.waitJson !== undefined ? { waitJson: cloneStructuredValue(record.waitJson)! } : {}),
+    ...(record.unitContextPacket
+      ? { unitContextPacket: cloneUnitContextPacket(record.unitContextPacket)! }
+      : {}),
+    ...(record.unitVerificationPolicy
+      ? { unitVerificationPolicy: cloneUnitVerificationPolicy(record.unitVerificationPolicy)! }
+      : {}),
   };
 }
 
@@ -118,6 +154,14 @@ function normalizeRestoredFlowRecord(record: TaskFlowRecord): TaskFlowRecord {
     syncMode === "managed"
       ? (normalizeOptionalString(record.controllerId) ?? "core/legacy-restored")
       : undefined;
+  const unitContextPacket = normalizeUnitContextPacket(record.unitContextPacket, {
+    defaultFlowId: record.flowId,
+  });
+  const unitVerificationPolicy = normalizeUnitVerificationPolicy(record.unitVerificationPolicy);
+  const verificationState =
+    normalizeTaskFlowVerificationState(record.verificationState) ??
+    extractLegacyVerificationState(record.stateJson);
+  const stateJson = stripVerificationFromStateJson(record.stateJson);
   return {
     ...record,
     syncMode,
@@ -129,9 +173,10 @@ function normalizeRestoredFlowRecord(record: TaskFlowRecord): TaskFlowRecord {
     currentStep: normalizeOptionalString(record.currentStep),
     blockedTaskId: normalizeOptionalString(record.blockedTaskId),
     blockedSummary: normalizeOptionalString(record.blockedSummary),
-    ...(record.stateJson !== undefined
-      ? { stateJson: cloneStructuredValue(record.stateJson)! }
-      : {}),
+    unitContextPacket,
+    unitVerificationPolicy,
+    ...(verificationState ? { verificationState } : {}),
+    ...(stateJson !== undefined ? { stateJson } : {}),
     ...(record.waitJson !== undefined ? { waitJson: cloneStructuredValue(record.waitJson)! } : {}),
     revision: Math.max(0, record.revision),
     cancelRequestedAt: record.cancelRequestedAt ?? undefined,
@@ -161,6 +206,32 @@ function ensureNotifyPolicy(notifyPolicy?: TaskNotifyPolicy): TaskNotifyPolicy {
 
 function normalizeJsonBlob(value: JsonValue | null | undefined): JsonValue | undefined {
   return value === undefined ? undefined : cloneStructuredValue(value);
+}
+
+function stripVerificationFromStateJson(
+  value: JsonValue | null | undefined,
+): JsonValue | undefined {
+  const normalized = normalizeJsonBlob(value);
+  if (
+    normalized &&
+    typeof normalized === "object" &&
+    !Array.isArray(normalized) &&
+    "verification" in normalized
+  ) {
+    const clone = { ...(normalized as Record<string, JsonValue>) };
+    delete clone.verification;
+    return clone;
+  }
+  return normalized;
+}
+
+function extractLegacyVerificationState(
+  value: JsonValue | null | undefined,
+): TaskFlowVerificationState | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value) || !("verification" in value)) {
+    return undefined;
+  }
+  return normalizeTaskFlowVerificationState((value as Record<string, unknown>).verification);
 }
 
 function assertFlowOwnerKey(ownerKey: string): string {
@@ -287,10 +358,19 @@ function persistFlowDelete(flowId: string) {
 
 function buildFlowRecord(params: CreateFlowRecordParams): TaskFlowRecord {
   const now = params.createdAt ?? Date.now();
+  const flowId = crypto.randomUUID();
   const syncMode = params.syncMode ?? "managed";
   const controllerId = syncMode === "managed" ? assertControllerId(params.controllerId) : undefined;
+  const unitContextPacket = normalizeUnitContextPacket(params.unitContextPacket, {
+    defaultFlowId: flowId,
+  });
+  const unitVerificationPolicy = normalizeUnitVerificationPolicy(params.unitVerificationPolicy);
+  const verificationState =
+    normalizeTaskFlowVerificationState(params.verificationState) ??
+    extractLegacyVerificationState(params.stateJson);
+  const stateJson = stripVerificationFromStateJson(params.stateJson);
   return {
-    flowId: crypto.randomUUID(),
+    flowId,
     syncMode,
     ownerKey: assertFlowOwnerKey(params.ownerKey),
     ...(params.requesterOrigin
@@ -304,9 +384,10 @@ function buildFlowRecord(params: CreateFlowRecordParams): TaskFlowRecord {
     currentStep: normalizeOptionalString(params.currentStep),
     blockedTaskId: normalizeOptionalString(params.blockedTaskId),
     blockedSummary: normalizeOptionalString(params.blockedSummary),
-    ...(normalizeJsonBlob(params.stateJson) !== undefined
-      ? { stateJson: normalizeJsonBlob(params.stateJson)! }
-      : {}),
+    ...(unitContextPacket ? { unitContextPacket } : {}),
+    ...(unitVerificationPolicy ? { unitVerificationPolicy } : {}),
+    ...(verificationState ? { verificationState } : {}),
+    ...(stateJson !== undefined ? { stateJson } : {}),
     ...(normalizeJsonBlob(params.waitJson) !== undefined
       ? { waitJson: normalizeJsonBlob(params.waitJson)! }
       : {}),
@@ -325,6 +406,8 @@ function applyFlowPatch(current: TaskFlowRecord, patch: FlowRecordPatch): TaskFl
   if (current.syncMode === "managed") {
     assertControllerId(controllerId);
   }
+  const legacyVerificationFromState =
+    patch.stateJson === undefined ? undefined : extractLegacyVerificationState(patch.stateJson);
   return {
     ...current,
     ...(patch.status ? { status: patch.status } : {}),
@@ -343,8 +426,22 @@ function applyFlowPatch(current: TaskFlowRecord, patch: FlowRecordPatch): TaskFl
       patch.blockedSummary === undefined
         ? current.blockedSummary
         : normalizeOptionalString(patch.blockedSummary),
+    unitContextPacket:
+      patch.unitContextPacket === undefined
+        ? current.unitContextPacket
+        : normalizeUnitContextPacket(patch.unitContextPacket, { defaultFlowId: current.flowId }),
+    unitVerificationPolicy:
+      patch.unitVerificationPolicy === undefined
+        ? current.unitVerificationPolicy
+        : normalizeUnitVerificationPolicy(patch.unitVerificationPolicy),
+    verificationState:
+      patch.verificationState === undefined
+        ? (legacyVerificationFromState ?? current.verificationState)
+        : normalizeTaskFlowVerificationState(patch.verificationState),
     stateJson:
-      patch.stateJson === undefined ? current.stateJson : normalizeJsonBlob(patch.stateJson),
+      patch.stateJson === undefined
+        ? current.stateJson
+        : stripVerificationFromStateJson(patch.stateJson),
     waitJson: patch.waitJson === undefined ? current.waitJson : normalizeJsonBlob(patch.waitJson),
     cancelRequestedAt:
       patch.cancelRequestedAt === undefined
@@ -400,6 +497,8 @@ export function createTaskFlowForTask(params: {
     | "endedAt"
     | "terminalSummary"
     | "progressSummary"
+    | "unitContextPacket"
+    | "unitVerificationPolicy"
   >;
   requesterOrigin?: TaskFlowRecord["requesterOrigin"];
 }): TaskFlowRecord {
@@ -416,6 +515,8 @@ export function createTaskFlowForTask(params: {
     notifyPolicy: params.task.notifyPolicy,
     goal:
       normalizeOptionalString(params.task.label) ?? (params.task.task.trim() || "Background task"),
+    unitContextPacket: params.task.unitContextPacket,
+    unitVerificationPolicy: params.task.unitVerificationPolicy,
     blockedTaskId:
       terminalFlowStatus === "blocked" ? normalizeOptionalString(params.task.taskId) : undefined,
     blockedSummary: resolveFlowBlockedSummary(params.task),
@@ -467,6 +568,8 @@ export function setFlowWaiting(params: {
   flowId: string;
   expectedRevision: number;
   currentStep?: string | null;
+  unitContextPacket?: UnitContextPacket | null;
+  unitVerificationPolicy?: UnitVerificationPolicy | null;
   stateJson?: JsonValue | null;
   waitJson?: JsonValue | null;
   blockedTaskId?: string | null;
@@ -483,6 +586,8 @@ export function setFlowWaiting(params: {
           ? "blocked"
           : "waiting",
       currentStep: params.currentStep,
+      unitContextPacket: params.unitContextPacket,
+      unitVerificationPolicy: params.unitVerificationPolicy,
       stateJson: params.stateJson,
       waitJson: params.waitJson,
       blockedTaskId: params.blockedTaskId,
@@ -498,6 +603,8 @@ export function resumeFlow(params: {
   expectedRevision: number;
   status?: Extract<TaskFlowStatus, "queued" | "running">;
   currentStep?: string | null;
+  unitContextPacket?: UnitContextPacket | null;
+  unitVerificationPolicy?: UnitVerificationPolicy | null;
   stateJson?: JsonValue | null;
   updatedAt?: number;
 }): TaskFlowUpdateResult {
@@ -507,6 +614,8 @@ export function resumeFlow(params: {
     patch: {
       status: params.status ?? "queued",
       currentStep: params.currentStep,
+      unitContextPacket: params.unitContextPacket,
+      unitVerificationPolicy: params.unitVerificationPolicy,
       stateJson: params.stateJson,
       waitJson: null,
       blockedTaskId: null,
@@ -521,6 +630,8 @@ export function finishFlow(params: {
   flowId: string;
   expectedRevision: number;
   currentStep?: string | null;
+  unitContextPacket?: UnitContextPacket | null;
+  unitVerificationPolicy?: UnitVerificationPolicy | null;
   stateJson?: JsonValue | null;
   updatedAt?: number;
   endedAt?: number;
@@ -532,6 +643,8 @@ export function finishFlow(params: {
     patch: {
       status: "succeeded",
       currentStep: params.currentStep,
+      unitContextPacket: params.unitContextPacket,
+      unitVerificationPolicy: params.unitVerificationPolicy,
       stateJson: params.stateJson,
       waitJson: null,
       blockedTaskId: null,
@@ -546,6 +659,8 @@ export function failFlow(params: {
   flowId: string;
   expectedRevision: number;
   currentStep?: string | null;
+  unitContextPacket?: UnitContextPacket | null;
+  unitVerificationPolicy?: UnitVerificationPolicy | null;
   stateJson?: JsonValue | null;
   blockedTaskId?: string | null;
   blockedSummary?: string | null;
@@ -559,6 +674,8 @@ export function failFlow(params: {
     patch: {
       status: "failed",
       currentStep: params.currentStep,
+      unitContextPacket: params.unitContextPacket,
+      unitVerificationPolicy: params.unitVerificationPolicy,
       stateJson: params.stateJson,
       waitJson: null,
       blockedTaskId: params.blockedTaskId,
@@ -643,6 +760,16 @@ export function getTaskFlowById(flowId: string): TaskFlowRecord | undefined {
   ensureFlowRegistryReady();
   const flow = flows.get(flowId);
   return flow ? cloneFlowRecord(flow) : undefined;
+}
+
+export function persistCurrentTaskFlowRecord(flowId: string): boolean {
+  ensureFlowRegistryReady();
+  const flow = flows.get(flowId);
+  if (!flow) {
+    return false;
+  }
+  persistFlowUpsert(flow);
+  return true;
 }
 
 export function listTaskFlowsForOwnerKey(ownerKey: string): TaskFlowRecord[] {

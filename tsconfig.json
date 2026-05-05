@@ -29,6 +29,12 @@
       "@openclaw/*": ["./extensions/*"]
     }
   },
-  "include": ["src/**/*", "ui/**/*", "extensions/**/*", "packages/**/*"],
+  "include": [
+    "internal-types/**/*.d.ts",
+    "src/**/*",
+    "ui/**/*",
+    "extensions/**/*",
+    "packages/**/*"
+  ],
   "exclude": ["node_modules", "dist", "**/dist/**"]
 }

@@ -60,6 +60,7 @@ const result = await executePluginCommand({
 
 if (result.text) {
   await sendMessageTelegram(chatId, result.text, {
+    cfg,
     accountId: accountId,
   });
 }

@@ -43,7 +43,7 @@ function parseUntrustedJsonBlock(text: string, label: string): unknown {
   if (!match?.[1]) {
     throw new Error(`missing ${label} json block`);
   }
-  return JSON.parse(match[1]) as unknown;
+  return JSON.parse(match[1]);
 }
 
 function parseConversationInfoPayload(text: string): Record<string, unknown> {

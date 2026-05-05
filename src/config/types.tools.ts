@@ -464,6 +464,22 @@ export type MemorySearchConfig = {
   query?: {
     maxResults?: number;
     minScore?: number;
+    crossCorpus?: {
+      /** Enable cross-corpus normalization/diversity re-ranking (default: false). */
+      enabled?: boolean;
+      /** Normalization strategy applied per corpus. */
+      normalization?: "minmax" | "none";
+      /** Per-corpus result caps before final merge. */
+      quota?: {
+        memory?: number;
+        sessions?: number;
+        wiki?: number;
+        codesight?: number;
+        other?: number;
+      };
+      /** Optional stale-result penalty after normalization (0-1). */
+      stalePenalty?: number;
+    };
     hybrid?: {
       /** Enable hybrid BM25 + vector search (default: true). */
       enabled?: boolean;

@@ -8,6 +8,8 @@ import type {
   TaskRegistrySummary,
   TaskRuntime,
 } from "../../tasks/task-registry.types.js";
+import type { UnitContextPacket } from "../../tasks/unit-context-packet.js";
+import type { UnitVerificationPolicy } from "../../tasks/unit-verification-policy.js";
 import type { OpenClawPluginToolContext } from "../tool-types.js";
 
 export type ManagedTaskFlowRecord = TaskFlowRecord & {
@@ -58,6 +60,8 @@ export type BoundTaskFlowRuntime = {
     status?: ManagedTaskFlowRecord["status"];
     notifyPolicy?: TaskNotifyPolicy;
     currentStep?: string | null;
+    unitContextPacket?: UnitContextPacket | null;
+    unitVerificationPolicy?: UnitVerificationPolicy | null;
     stateJson?: JsonValue | null;
     waitJson?: JsonValue | null;
     cancelRequestedAt?: number | null;
@@ -74,6 +78,8 @@ export type BoundTaskFlowRuntime = {
     flowId: string;
     expectedRevision: number;
     currentStep?: string | null;
+    unitContextPacket?: UnitContextPacket | null;
+    unitVerificationPolicy?: UnitVerificationPolicy | null;
     stateJson?: JsonValue | null;
     waitJson?: JsonValue | null;
     blockedTaskId?: string | null;
@@ -85,12 +91,17 @@ export type BoundTaskFlowRuntime = {
     expectedRevision: number;
     status?: Extract<ManagedTaskFlowRecord["status"], "queued" | "running">;
     currentStep?: string | null;
+    unitContextPacket?: UnitContextPacket | null;
+    unitVerificationPolicy?: UnitVerificationPolicy | null;
     stateJson?: JsonValue | null;
     updatedAt?: number;
   }) => ManagedTaskFlowMutationResult;
   finish: (params: {
     flowId: string;
     expectedRevision: number;
+    currentStep?: string | null;
+    unitContextPacket?: UnitContextPacket | null;
+    unitVerificationPolicy?: UnitVerificationPolicy | null;
     stateJson?: JsonValue | null;
     updatedAt?: number;
     endedAt?: number;
@@ -98,6 +109,9 @@ export type BoundTaskFlowRuntime = {
   fail: (params: {
     flowId: string;
     expectedRevision: number;
+    currentStep?: string | null;
+    unitContextPacket?: UnitContextPacket | null;
+    unitVerificationPolicy?: UnitVerificationPolicy | null;
     stateJson?: JsonValue | null;
     blockedTaskId?: string | null;
     blockedSummary?: string | null;
@@ -120,6 +134,8 @@ export type BoundTaskFlowRuntime = {
     runId?: string;
     label?: string;
     task: string;
+    unitContextPacket?: UnitContextPacket;
+    unitVerificationPolicy?: UnitVerificationPolicy;
     preferMetadata?: boolean;
     notifyPolicy?: TaskNotifyPolicy;
     deliveryStatus?: TaskDeliveryStatus;

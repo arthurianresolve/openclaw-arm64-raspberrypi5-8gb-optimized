@@ -136,9 +136,9 @@ export function parseMessageContent(content: string, messageType: string): strin
   }
 
   try {
-    const parsed = JSON.parse(content);
+    const parsed = JSON.parse(content) as Record<string, unknown>;
     if (messageType === "text") {
-      return parsed.text || "";
+      return typeof parsed.text === "string" ? parsed.text : "";
     }
     if (["image", "file", "audio", "video", "media", "sticker"].includes(messageType)) {
       if (messageType === "audio") {
@@ -178,16 +178,16 @@ export function parseMessageContent(content: string, messageType: string): strin
 
 function formatSubMessageContent(content: string, contentType: string): string {
   try {
-    const parsed = JSON.parse(content);
+    const parsed = JSON.parse(content) as Record<string, unknown>;
     switch (contentType) {
       case "text":
-        return parsed.text || content;
+        return typeof parsed.text === "string" ? parsed.text : content;
       case "post":
         return parsePostContent(content).textContent;
       case "image":
         return "[Image]";
       case "file":
-        return `[File: ${parsed.file_name || "unknown"}]`;
+        return `[File: ${typeof parsed.file_name === "string" ? parsed.file_name : "unknown"}]`;
       case "audio":
         return "[Audio]";
       case "video":
@@ -218,7 +218,8 @@ export function parseMergeForwardContent(params: { content: string; log?: Feishu
     create_time?: string;
   }>;
   try {
-    items = JSON.parse(content);
+    const parsed = JSON.parse(content);
+    items = Array.isArray(parsed) ? (parsed as typeof items) : [];
   } catch {
     log?.("feishu: merge_forward items parse failed");
     return "[Merged and Forwarded Message - parse error]";
@@ -304,19 +305,20 @@ function parseMediaKeys(
   messageType: string,
 ): { imageKey?: string; fileKey?: string; fileName?: string } {
   try {
-    const parsed = JSON.parse(content);
+    const parsed = JSON.parse(content) as Record<string, unknown>;
     const imageKey = normalizeFeishuExternalKey(parsed.image_key);
     const fileKey = normalizeFeishuExternalKey(parsed.file_key);
+    const fileName = normalizeFeishuExternalKey(parsed.file_name);
     switch (messageType) {
       case "image":
-        return { imageKey, fileName: parsed.file_name };
+        return { imageKey, fileName };
       case "file":
       case "audio":
       case "sticker":
-        return { fileKey, fileName: parsed.file_name };
+        return { fileKey, fileName };
       case "video":
       case "media":
-        return { fileKey, imageKey, fileName: parsed.file_name };
+        return { fileKey, imageKey, fileName };
       default:
         return {};
     }

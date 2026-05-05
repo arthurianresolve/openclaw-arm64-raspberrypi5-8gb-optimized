@@ -258,7 +258,7 @@ async function readPricingJsonObject(
   if (buffer.byteLength > MAX_PRICING_CATALOG_BYTES) {
     throw new Error(`${source} pricing response too large: ${buffer.byteLength} bytes`);
   }
-  const payload = JSON.parse(Buffer.from(buffer).toString("utf8")) as unknown;
+  const payload = JSON.parse(Buffer.from(buffer).toString("utf8"));
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error(`${source} pricing response is not a JSON object`);
   }

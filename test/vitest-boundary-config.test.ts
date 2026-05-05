@@ -31,6 +31,6 @@ describe("boundary vitest config", () => {
     ]);
 
     expect(config.test?.include).toEqual(["src/infra/openclaw-root.test.ts"]);
-    expect(config.test?.passWithNoTests).toBe(true);
+    expect((config.test as { passWithNoTests?: boolean } | undefined)?.passWithNoTests).toBe(true);
   });
 });

@@ -697,7 +697,7 @@ export class VoiceClawGeminiLiveAdapter implements VoiceClawRealtimeAdapter {
 
 function parseToolOutput(output: string): Record<string, unknown> {
   try {
-    const parsed = JSON.parse(output) as unknown;
+    const parsed = JSON.parse(output);
     return parsed && typeof parsed === "object" && !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
       : { result: parsed };

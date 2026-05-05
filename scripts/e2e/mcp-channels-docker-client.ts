@@ -300,18 +300,17 @@ async function main() {
 
     let helpNotification: ClaudeChannelNotification;
     try {
-      helpNotification = await waitFor(
-        "Claude channel notification",
-        () =>
-          mcpHandle.rawMessages
-            .map((entry) => ClaudeChannelNotificationSchema.safeParse(entry))
-            .find(
-              (entry) =>
-                entry.success &&
-                entry.data.params.meta.session_key === "agent:main:main" &&
-                entry.data.params.content === channelMessage,
-            )?.data.params,
-      );
+      helpNotification = await waitFor("Claude channel notification", () => {
+        const notification = mcpHandle.rawMessages
+          .map((entry) => ClaudeChannelNotificationSchema.safeParse(entry))
+          .find(
+            (entry) =>
+              entry.success &&
+              entry.data.params.meta.session_key === "agent:main:main" &&
+              entry.data.params.content === channelMessage,
+          );
+        return notification?.success ? notification.data.params : undefined;
+      });
     } catch (error) {
       throw new Error(
         `timeout waiting for Claude channel notification: ${JSON.stringify(
@@ -341,13 +340,12 @@ async function main() {
       message: "yes abcde",
       idempotencyKey: randomUUID(),
     });
-    const permission = await waitFor(
-      "Claude permission notification",
-      () =>
-        mcpHandle.rawMessages
-          .map((entry) => ClaudePermissionNotificationSchema.safeParse(entry))
-          .find((entry) => entry.success && entry.data.params.request_id === "abcde")?.data.params,
-    );
+    const permission = await waitFor("Claude permission notification", () => {
+      const notification = mcpHandle.rawMessages
+        .map((entry) => ClaudePermissionNotificationSchema.safeParse(entry))
+        .find((entry) => entry.success && entry.data.params.request_id === "abcde");
+      return notification?.success ? notification.data.params : undefined;
+    });
     assert(permission.behavior === "allow", "expected allow permission reply");
 
     process.stdout.write(

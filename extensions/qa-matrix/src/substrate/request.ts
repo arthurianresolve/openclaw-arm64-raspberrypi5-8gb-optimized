@@ -34,7 +34,7 @@ export async function requestMatrixJson<T>(params: {
   });
   let body: unknown = {};
   try {
-    body = (await response.json()) as unknown;
+    body = await response.json();
   } catch {
     body = {};
   }

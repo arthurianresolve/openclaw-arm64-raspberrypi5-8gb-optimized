@@ -46,6 +46,8 @@ Need to install Node? See [Node setup](/install/node).
 
     <Note>
     Other install methods (Docker, Nix, npm): [Install](/install).
+    On Raspberry Pi / ARM64 hosts with SSD-backed storage, prefer the hackable
+    install under `/data/openclaw`; see [Raspberry Pi](/install/raspberry-pi).
     </Note>
 
   </Step>
@@ -124,6 +126,9 @@ openclaw dashboard
   <Card title="Connect a channel" href="/channels" icon="message-square">
     Discord, Feishu, iMessage, Matrix, Microsoft Teams, Signal, Slack, Telegram, WhatsApp, Zalo, and more.
   </Card>
+  <Card title="Choose a learning path" href="/start/learning-paths" icon="route">
+    Follow a sequenced route for operators, agent builders, security reviewers, automators, media users, or contributors.
+  </Card>
   <Card title="Pairing and safety" href="/channels/pairing" icon="shield">
     Control who can message your agent.
   </Card>
@@ -148,5 +153,6 @@ Full reference: [Environment variables](/help/environment).
 ## Related
 
 - [Install overview](/install)
+- [Learning paths](/start/learning-paths)
 - [Channels overview](/channels)
 - [Setup](/start/setup)

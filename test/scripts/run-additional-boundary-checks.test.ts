@@ -12,11 +12,12 @@ function createOutputBuffer() {
   const chunks: string[] = [];
   return {
     output: {
+      fd: 1,
       write(chunk: string) {
         chunks.push(chunk);
         return true;
       },
-    },
+    } as NodeJS.WriteStream & { fd: 1 },
     text: () => chunks.join(""),
   };
 }

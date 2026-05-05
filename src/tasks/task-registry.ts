@@ -47,6 +47,16 @@ import type {
   TaskStatus,
   TaskTerminalOutcome,
 } from "./task-registry.types.js";
+import {
+  cloneUnitContextPacket,
+  normalizeUnitContextPacket,
+  type UnitContextPacket,
+} from "./unit-context-packet.js";
+import {
+  cloneUnitVerificationPolicy,
+  normalizeUnitVerificationPolicy,
+  type UnitVerificationPolicy,
+} from "./unit-verification-policy.js";
 
 const log = createSubsystemLogger("tasks/registry");
 const DEFAULT_TASK_RETENTION_MS = 7 * 24 * 60 * 60_000;
@@ -177,7 +187,15 @@ function assertParentFlowLinkAllowed(params: {
 }
 
 function cloneTaskRecord(record: TaskRecord): TaskRecord {
-  return { ...record };
+  return {
+    ...record,
+    ...(record.unitContextPacket
+      ? { unitContextPacket: cloneUnitContextPacket(record.unitContextPacket)! }
+      : {}),
+    ...(record.unitVerificationPolicy
+      ? { unitVerificationPolicy: cloneUnitVerificationPolicy(record.unitVerificationPolicy)! }
+      : {}),
+  };
 }
 
 function normalizeTaskTimestamps(task: TaskRecord): TaskRecord {
@@ -200,15 +218,14 @@ function normalizeTaskTimestamps(task: TaskRecord): TaskRecord {
     typeof task.endedAt === "number"
       ? Math.max(task.endedAt, startedAt ?? createdAt)
       : task.endedAt;
-
-  if (
-    createdAt === task.createdAt &&
-    startedAt === task.startedAt &&
-    lastEventAt === task.lastEventAt &&
-    endedAt === task.endedAt
-  ) {
-    return task;
-  }
+  const unitContextPacket = task.unitContextPacket
+    ? normalizeUnitContextPacket(task.unitContextPacket, {
+        defaultFlowId: task.parentFlowId,
+      })
+    : undefined;
+  const unitVerificationPolicy = task.unitVerificationPolicy
+    ? normalizeUnitVerificationPolicy(task.unitVerificationPolicy)
+    : undefined;
 
   const normalized: TaskRecord = {
     ...task,
@@ -222,6 +239,12 @@ function normalizeTaskTimestamps(task: TaskRecord): TaskRecord {
   }
   if (typeof endedAt === "number") {
     normalized.endedAt = endedAt;
+  }
+  if (task.unitContextPacket !== undefined || unitContextPacket !== undefined) {
+    normalized.unitContextPacket = unitContextPacket;
+  }
+  if (task.unitVerificationPolicy !== undefined || unitVerificationPolicy !== undefined) {
+    normalized.unitVerificationPolicy = unitVerificationPolicy;
   }
   return normalized;
 }
@@ -748,6 +771,8 @@ function mergeExistingTaskForCreate(
     agentId?: string;
     label?: string;
     task: string;
+    unitContextPacket?: UnitContextPacket;
+    unitVerificationPolicy?: UnitVerificationPolicy;
     preferMetadata?: boolean;
     deliveryStatus?: TaskDeliveryStatus;
     notifyPolicy?: TaskNotifyPolicy;
@@ -779,6 +804,14 @@ function mergeExistingTaskForCreate(
   }
   if (params.parentTaskId?.trim() && !existing.parentTaskId?.trim()) {
     patch.parentTaskId = params.parentTaskId.trim();
+  }
+  if (params.unitContextPacket && !existing.unitContextPacket) {
+    patch.unitContextPacket = normalizeUnitContextPacket(params.unitContextPacket, {
+      defaultFlowId: params.parentFlowId,
+    });
+  }
+  if (params.unitVerificationPolicy && !existing.unitVerificationPolicy) {
+    patch.unitVerificationPolicy = normalizeUnitVerificationPolicy(params.unitVerificationPolicy);
   }
   if (params.agentId?.trim() && !existing.agentId?.trim()) {
     patch.agentId = params.agentId.trim();
@@ -1490,6 +1523,8 @@ export function createTaskRecord(params: {
   runId?: string;
   label?: string;
   task: string;
+  unitContextPacket?: UnitContextPacket;
+  unitVerificationPolicy?: UnitVerificationPolicy;
   preferMetadata?: boolean;
   status?: TaskStatus;
   deliveryStatus?: TaskDeliveryStatus;
@@ -1554,6 +1589,10 @@ export function createTaskRecord(params: {
     scopeKind,
   });
   const lastEventAt = params.lastEventAt ?? params.startedAt ?? now;
+  const unitContextPacket = normalizeUnitContextPacket(params.unitContextPacket, {
+    defaultFlowId: params.parentFlowId,
+  });
+  const unitVerificationPolicy = normalizeUnitVerificationPolicy(params.unitVerificationPolicy);
   const record: TaskRecord = normalizeTaskTimestamps({
     taskId,
     runtime: params.runtime,
@@ -1569,6 +1608,8 @@ export function createTaskRecord(params: {
     runId: normalizeOptionalString(params.runId),
     label: normalizeOptionalString(params.label),
     task: params.task,
+    ...(unitContextPacket ? { unitContextPacket } : {}),
+    ...(unitVerificationPolicy ? { unitVerificationPolicy } : {}),
     status,
     deliveryStatus,
     notifyPolicy,

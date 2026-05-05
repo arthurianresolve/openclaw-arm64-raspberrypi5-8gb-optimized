@@ -37,14 +37,29 @@ describe("compareSemverStrings", () => {
 
 describe("resolveNpmChannelTag", () => {
   let versionByTag: Record<string, string | null>;
+  let githubVersion: string | null;
 
   beforeEach(() => {
     versionByTag = {};
+    githubVersion = null;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
         const url =
           typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        if (
+          url.includes(
+            "raw.githubusercontent.com/arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized/master/package.json",
+          )
+        ) {
+          return {
+            ok: githubVersion != null,
+            status: githubVersion != null ? 200 : 404,
+            json: async () => ({
+              version: githubVersion,
+            }),
+          } as Response;
+        }
         const tag = decodeURIComponent(url.split("/").pop() ?? "");
         const version = versionByTag[tag] ?? null;
         return {
@@ -63,31 +78,11 @@ describe("resolveNpmChannelTag", () => {
     vi.unstubAllGlobals();
   });
 
-  it("falls back to latest when beta is older", async () => {
-    versionByTag.beta = "1.0.0-beta.1";
-    versionByTag.latest = "1.0.1-1";
-
+  it("resolves package updates from the GitHub master branch", async () => {
+    versionByTag.beta = "1.0.2";
+    versionByTag.latest = "1.2.3";
     const resolved = await resolveNpmChannelTag({ channel: "beta", timeoutMs: 1000 });
-
-    expect(resolved).toEqual({ tag: "latest", version: "1.0.1-1" });
-  });
-
-  it("keeps beta when beta is not older", async () => {
-    versionByTag.beta = "1.0.2-beta.1";
-    versionByTag.latest = "1.0.1-1";
-
-    const resolved = await resolveNpmChannelTag({ channel: "beta", timeoutMs: 1000 });
-
-    expect(resolved).toEqual({ tag: "beta", version: "1.0.2-beta.1" });
-  });
-
-  it("falls back to latest when beta has same base as stable", async () => {
-    versionByTag.beta = "1.0.1-beta.2";
-    versionByTag.latest = "1.0.1";
-
-    const resolved = await resolveNpmChannelTag({ channel: "beta", timeoutMs: 1000 });
-
-    expect(resolved).toEqual({ tag: "latest", version: "1.0.1" });
+    expect(resolved).toEqual({ tag: "latest", version: "1.2.3" });
   });
 
   it("keeps non-beta channels unchanged", async () => {
@@ -99,7 +94,8 @@ describe("resolveNpmChannelTag", () => {
     });
   });
 
-  it("exposes tag fetch helpers for success and http failures", async () => {
+  it("exposes source fetch helpers for success and npm http failures", async () => {
+    githubVersion = "1.0.4";
     versionByTag.latest = "1.0.4";
 
     await expect(
@@ -148,15 +144,15 @@ describe("formatGitInstallLabel", () => {
           root: "/repo",
           sha: "1234567890abcdef",
           tag: null,
-          branch: "main",
-          upstream: "origin/main",
+          branch: "master",
+          upstream: "origin/master",
           dirty: false,
           ahead: 0,
           behind: 0,
           fetchOk: true,
         },
       }),
-    ).toBe("main · @ 12345678");
+    ).toBe("master · @ 12345678");
 
     expect(
       formatGitInstallLabel({

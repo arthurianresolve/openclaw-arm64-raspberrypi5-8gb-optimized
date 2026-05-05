@@ -26,6 +26,7 @@ openclaw tasks maintenance
 openclaw tasks maintenance --apply
 openclaw tasks flow list
 openclaw tasks flow show <lookup>
+openclaw tasks flow audit <lookup>
 openclaw tasks flow cancel <lookup>
 ```
 
@@ -88,16 +89,26 @@ For cron tasks, reconciliation uses persisted run logs/job state before marking 
 old active task `lost`, so completed cron runs do not become false audit errors
 just because the in-memory Gateway runtime state is gone. Offline CLI audit is
 not authoritative for the Gateway's process-local cron active-job set.
+For Task Flows, maintenance also backfills legacy `stateJson.verification`
+payloads into typed `verificationState` storage and reports the `backfilled`
+count in text and JSON output.
 
 ### `flow`
 
 ```bash
 openclaw tasks flow list [--status <name>] [--json]
 openclaw tasks flow show <lookup> [--json]
+openclaw tasks flow audit <lookup> [--json]
 openclaw tasks flow cancel <lookup>
 ```
 
 Inspects or cancels durable Task Flow state under the task ledger.
+
+`openclaw tasks flow list --json` includes repair metrics for machine-facing
+callers. `openclaw tasks flow audit <lookup>` is the focused repair/verification
+inspection surface: priority, repair-required state, latest verification
+summary, command results, remaining repair budget, repair-task linkage, and
+verification history.
 
 ## Related
 

@@ -12,7 +12,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 async function readJsonFile(pathname: string): Promise<unknown> {
-  return JSON.parse(await fs.readFile(pathname, "utf8")) as unknown;
+  return JSON.parse(await fs.readFile(pathname, "utf8"));
 }
 
 async function writeJsonFile(pathname: string, value: unknown) {

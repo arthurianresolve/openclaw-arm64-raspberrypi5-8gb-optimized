@@ -55,6 +55,26 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isJsonRpcRequest(value: unknown): value is JsonRpcRequest {
+  if (!isRecord(value) || value.jsonrpc !== "2.0" || typeof value.method !== "string") {
+    return false;
+  }
+  const params = value.params;
+  return params === undefined || isRecord(params);
+}
+
+function parseJsonRpcRequestBody(body: string): JsonRpcRequest | JsonRpcRequest[] {
+  const parsed = JSON.parse(body);
+  if (Array.isArray(parsed)) {
+    if (parsed.every(isJsonRpcRequest)) {
+      return parsed;
+    }
+  } else if (isJsonRpcRequest(parsed)) {
+    return parsed;
+  }
+  throw new Error("Invalid JSON-RPC request body");
+}
+
 function createRequestAbortSignal(req: IncomingMessage, res: ServerResponse) {
   const controller = new AbortController();
   const abort = () => {
@@ -104,7 +124,7 @@ export async function startMcpLoopbackServer(port = 0): Promise<{
     void (async () => {
       try {
         const body = await readMcpHttpBody(req);
-        const parsed: JsonRpcRequest | JsonRpcRequest[] = JSON.parse(body);
+        const parsed = parseJsonRpcRequestBody(body);
         const cfg = getRuntimeConfig();
         const requestContext = resolveMcpRequestContext(req, cfg, auth);
         const scopedTools = toolCache.resolve({

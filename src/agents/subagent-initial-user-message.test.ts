@@ -25,6 +25,18 @@ describe("buildSubagentInitialUserMessage", () => {
     expect(msg).toContain("persistent and remains available");
   });
 
+  it("includes bounded subagent handoff guidance when provided", () => {
+    const msg = buildSubagentInitialUserMessage({
+      childDepth: 1,
+      maxSpawnDepth: 2,
+      persistentSession: false,
+      initialUserMessageAddition: "Use only src/context-engine and validate with pnpm test.",
+    });
+
+    expect(msg).toContain("[Subagent Handoff]");
+    expect(msg).toContain("Use only src/context-engine");
+  });
+
   it("keeps the delegated task single-sourced across system and first user text", () => {
     const task = "UNIQUE_SUBAGENT_TASK_TOKEN\n  preserve indentation";
     const system = buildSubagentSystemPrompt({

@@ -116,7 +116,10 @@ function createCompilerContext(repoRoot: string) {
     throw new Error(ts.flattenDiagnosticMessageText(configFile.error.messageText, "\n"));
   }
   const parsedConfig = ts.parseJsonConfigFileContent(configFile.config, ts.sys, repoRoot);
-  const program = ts.createProgram(parsedConfig.fileNames, parsedConfig.options);
+  const fileNames = parsedConfig.fileNames.filter(
+    (fileName) => !relativePath(repoRoot, fileName).startsWith("internal-types/"),
+  );
+  const program = ts.createProgram(fileNames, parsedConfig.options);
   return {
     checker: program.getTypeChecker(),
     printer: ts.createPrinter({ newLine: ts.NewLineKind.LineFeed }),

@@ -29,7 +29,7 @@ This page covers running the regular test suites and Docker/Parallels runners. T
 
 Most days:
 
-- Full gate (expected before push): `pnpm build && pnpm check && pnpm check:test-types && pnpm test`
+- Full gate (expected before push): `pnpm build && pnpm check && pnpm check:types:extended && pnpm test`
 - Faster local full-suite run on a roomy machine: `pnpm test:max`
 - Direct Vitest watch loop: `pnpm test:watch`
 - Direct file targeting now routes extension/channel paths too: `pnpm test extensions/discord/src/monitor/message-handler.preflight.test.ts`
@@ -132,6 +132,14 @@ Full release live media shards use
 commit, then pull it with `OPENCLAW_SKIP_DOCKER_BUILD=1` instead of rebuilding
 inside every shard.
 
+Workflow action bumps are reviewed as behavior changes, not just version bumps:
+`openai/codex-action` updates can tighten bot eligibility for the maintainer
+agent jobs, while `pnpm/action-setup` only changes the bundled pnpm when a
+workflow does not pin `version` itself. In this repo, the reusable release
+workflows pass `version: ${{ env.PNPM_VERSION }}` and `package.json` already
+pins `pnpm@10.33.0`, so the bundled pnpm version does not change the normal
+install/runtime path.
+
 - `pnpm openclaw qa suite`
   - Runs repo-backed QA scenarios directly on the host.
   - Runs multiple selected scenarios in parallel by default with isolated
@@ -198,8 +206,10 @@ inside every shard.
   - `OPENCLAW_NPM_TELEGRAM_CREDENTIAL_ROLE=ci|maintainer` overrides the shared
     `OPENCLAW_QA_CREDENTIAL_ROLE` for this lane only.
   - GitHub Actions exposes this lane as the manual maintainer workflow
-    `NPM Telegram Beta E2E`. It does not run on merge. The workflow uses the
-    `qa-live-shared` environment and Convex CI credential leases.
+    `NPM Telegram Beta E2E`. It does not run on merge. The workflow can install
+    a published npm spec, pack a trusted branch/tag/SHA, verify an HTTPS tarball
+    URL plus SHA-256, or reuse a tarball artifact from another Actions run. It
+    uses the `qa-live-shared` environment and Convex CI credential leases.
 - GitHub Actions also exposes `Package Acceptance` for side-run product proof
   against one candidate package. It accepts a trusted ref, published npm spec,
   HTTPS tarball URL plus SHA-256, or tarball artifact from another run, uploads
@@ -667,6 +677,10 @@ Gradle output directories so Docker live runs do not spend minutes copying
 machine-specific artifacts.
 They also set `OPENCLAW_SKIP_CHANNELS=1` so gateway live probes do not start
 real Telegram/Discord/etc. channel workers inside the container.
+The source-side Docker E2E drivers that need to exercise packaged CLI/runtime
+artifacts keep their own source files typechecked and load the built modules
+through a tiny adapter layer at runtime, so the smoke still validates the
+tarball without hiding declarations inside ignored build output.
 `test:docker:live-models` still runs `pnpm test:live`, so pass through
 `OPENCLAW_LIVE_GATEWAY_*` as well when you need to narrow or exclude gateway
 live coverage from that Docker lane.
@@ -713,9 +727,10 @@ Useful env vars:
 - `OPENCLAW_DOCKER_CLI_TOOLS_DIR=...` (default: `~/.cache/openclaw/docker-cli-tools`) mounted to `/home/node/.npm-global` for cached CLI installs inside Docker
 - External CLI auth dirs/files under `$HOME` are mounted read-only under `/host-auth...`, then copied into `/home/node/...` before tests start
   - Default dirs: `.minimax`
-  - Default files: `~/.codex/auth.json`, `~/.codex/config.toml`, `.claude.json`, `~/.claude/.credentials.json`, `~/.claude/settings.json`, `~/.claude/settings.local.json`
+  - Default files: `~/.codex/auth.json`, `~/.codex/config.toml`, `.claude.json`, `~/.claude/.credentials.json`, `~/.claude/settings.json`, `~/.claude/settings.local.json`, `~/.gemini/oauth_creds.json`
   - Narrowed provider runs mount only the needed dirs/files inferred from `OPENCLAW_LIVE_PROVIDERS` / `OPENCLAW_LIVE_GATEWAY_PROVIDERS`
   - Override manually with `OPENCLAW_DOCKER_AUTH_DIRS=all`, `OPENCLAW_DOCKER_AUTH_DIRS=none`, or a comma list like `OPENCLAW_DOCKER_AUTH_DIRS=.claude,.codex`
+- If you need to hydrate Gemini OAuth creds from a secrets file in CI or local live runs, set `OPENCLAW_GEMINI_OAUTH_CREDENTIALS_JSON`; the hydration script writes it to `~/.gemini/oauth_creds.json`.
 - `OPENCLAW_LIVE_GATEWAY_MODELS=...` / `OPENCLAW_LIVE_MODELS=...` to narrow the run
 - `OPENCLAW_LIVE_GATEWAY_PROVIDERS=...` / `OPENCLAW_LIVE_PROVIDERS=...` to filter providers in-container
 - `OPENCLAW_SKIP_DOCKER_BUILD=1` to reuse an existing `openclaw:local-live` image for reruns that do not need a rebuild

@@ -238,7 +238,7 @@ export async function readJsonBodyWithLimit(
       return { ok: true, value: {} };
     }
     try {
-      return { ok: true, value: JSON.parse(trimmed) as unknown };
+      return { ok: true, value: JSON.parse(trimmed) };
     } catch (error) {
       return {
         ok: false,

@@ -292,7 +292,7 @@ export async function fetchBrowserJson<T>(
     for (const [key, value] of parsed.searchParams.entries()) {
       query[key] = value;
     }
-    let body = init?.body;
+    let body: unknown = init?.body;
     if (typeof body === "string") {
       try {
         body = JSON.parse(body);

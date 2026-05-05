@@ -4,11 +4,13 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { runCli, shouldStartCrestodianForBareRoot } from "../../dist/cli/run-main.js";
-import { clearConfigCache } from "../../dist/config/config.js";
-import type { OpenClawConfig } from "../../dist/config/types.openclaw.js";
-import { runCrestodian } from "../../dist/crestodian/crestodian.js";
-import type { RuntimeEnv } from "../../dist/runtime.js";
+import {
+  clearConfigCache,
+  runCli,
+  runCrestodian,
+  shouldStartCrestodianForBareRoot,
+} from "./dist-modules.mjs";
+import type { OpenClawConfig, RuntimeEnv } from "./dist-modules.mjs";
 
 type CrestodianFirstRunCommand = {
   id: string;
@@ -39,9 +41,9 @@ function createRuntime(): { runtime: RuntimeEnv; lines: string[] } {
   return {
     lines,
     runtime: {
-      log: (...args) => lines.push(args.join(" ")),
-      error: (...args) => lines.push(args.join(" ")),
-      exit: (code) => {
+      log: (...args: unknown[]) => lines.push(args.map(String).join(" ")),
+      error: (...args: unknown[]) => lines.push(args.map(String).join(" ")),
+      exit: (code: number) => {
         throw new Error(`exit ${code}`);
       },
     },
@@ -135,7 +137,7 @@ async function main() {
       config.agents.defaults.model.primary === spec.model,
     "first-run setup did not write default model",
   );
-  const reef = config.agents?.list?.find((agent) => agent.id === spec.agentId);
+  const reef = config.agents?.list?.find((agent: { id?: string }) => agent.id === spec.agentId);
   assert(reef, "Crestodian did not create reef agent");
   assert(reef.workspace === spec.dockerAgentWorkspace, "Crestodian did not write reef workspace");
   assert(reef.model === spec.model, "Crestodian did not write reef model");

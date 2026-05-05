@@ -326,14 +326,25 @@ export const configHandlers: GatewayRequestHandlers = {
     if (!parsed) {
       return;
     }
-    if (!(await ensureResolvableSecretRefsOrRespond({ config: parsed.config, respond }))) {
+    const preparedSecretsSnapshot = await ensureResolvableSecretRefsOrRespond({
+      config: parsed.config,
+      respond,
+    });
+    if (!preparedSecretsSnapshot) {
       return;
     }
+    const disconnectSharedAuthClients =
+      didSharedGatewayAuthChange(snapshot.config, parsed.config) ||
+      didActiveSharedGatewayAuthChange({
+        fallbackPrev: snapshot.config,
+        next: preparedSecretsSnapshot.config,
+      });
     const writeResult = await commitGatewayConfigWrite({
       snapshot,
       writeOptions,
       nextConfig: parsed.config,
       context,
+      disconnectSharedAuthClients,
     });
     respond(
       true,

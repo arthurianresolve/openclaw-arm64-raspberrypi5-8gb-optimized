@@ -31,7 +31,7 @@ class FakeWebSocket extends EventEmitter {
   closeReason: string | undefined;
 
   send(payload: string): void {
-    this.sent.push(JSON.parse(payload) as unknown);
+    this.sent.push(JSON.parse(payload));
   }
 
   close(code?: number, reason?: string | Buffer): void {

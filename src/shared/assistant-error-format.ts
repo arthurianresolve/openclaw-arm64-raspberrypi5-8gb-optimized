@@ -77,7 +77,7 @@ export function parseApiErrorPayload(raw?: string): ErrorPayload | null {
       continue;
     }
     try {
-      const parsed = JSON.parse(candidate) as unknown;
+      const parsed = JSON.parse(candidate);
       if (isErrorPayloadObject(parsed)) {
         return parsed;
       }

@@ -967,7 +967,7 @@ function extractFirstUserMessageFromTranscriptChunk(
       continue;
     }
     try {
-      const parsed = JSON.parse(line);
+      const parsed = JSON.parse(line) as { message?: TranscriptMessage };
       const msg = parsed?.message as TranscriptMessage | undefined;
       if (msg?.role !== "user") {
         continue;
@@ -1051,7 +1051,7 @@ function readLastMessagePreviewFromOpenTranscript(params: {
   for (let i = tailLines.length - 1; i >= 0; i--) {
     const line = tailLines[i];
     try {
-      const parsed = JSON.parse(line);
+      const parsed = JSON.parse(line) as { message?: TranscriptMessage };
       const msg = parsed?.message as TranscriptMessage | undefined;
       if (msg?.role !== "user" && msg?.role !== "assistant") {
         continue;
@@ -1086,7 +1086,7 @@ async function readLastMessagePreviewFromOpenTranscriptAsync(params: {
   for (let i = tailLines.length - 1; i >= 0; i--) {
     const line = tailLines[i];
     try {
-      const parsed = JSON.parse(line);
+      const parsed = JSON.parse(line) as { message?: TranscriptMessage };
       const msg = parsed?.message as TranscriptMessage | undefined;
       if (msg?.role !== "user" && msg?.role !== "assistant") {
         continue;
@@ -1638,7 +1638,7 @@ function readRecentMessagesFromTranscript(
     for (let i = tailLines.length - 1; i >= 0; i--) {
       const line = tailLines[i];
       try {
-        const parsed = JSON.parse(line);
+        const parsed = JSON.parse(line) as { message?: TranscriptPreviewMessage };
         const msg = parsed?.message as TranscriptPreviewMessage | undefined;
         if (msg && typeof msg === "object") {
           collected.push(msg);

@@ -207,8 +207,9 @@ describe("barnacle-auto-response", () => {
     expect(managedLabelSpecs["r: too-many-prs"].description).toContain("twenty active PRs");
 
     for (const label of Object.values(candidateLabels)) {
-      expect(managedLabelSpecs[label]).toBeDefined();
-      expect(managedLabelSpecs[label].description).toMatch(/^Candidate:/);
+      const spec = managedLabelSpecs[label as keyof typeof managedLabelSpecs];
+      expect(spec).toBeDefined();
+      expect(spec.description).toMatch(/^Candidate:/);
     }
   });
 
@@ -314,9 +315,7 @@ describe("barnacle-auto-response", () => {
           login: "maintainer",
         },
       }),
-      core: {
-        info: () => undefined,
-      },
+      core: console as Console,
     });
 
     expect(calls.addLabels).toEqual([]);
@@ -344,9 +343,7 @@ describe("barnacle-auto-response", () => {
         },
         [candidateLabels.dirtyCandidate, "r: too-many-prs"],
       ),
-      core: {
-        info: () => undefined,
-      },
+      core: console as Console,
     });
 
     expect(calls.addLabels).toEqual([]);
@@ -563,9 +560,7 @@ describe("barnacle-auto-response", () => {
     await runBarnacleAutoResponse({
       github,
       context: barnacleContext({}),
-      core: {
-        info: () => undefined,
-      },
+      core: console as Console,
     });
 
     expect(calls.addLabels).toContainEqual(

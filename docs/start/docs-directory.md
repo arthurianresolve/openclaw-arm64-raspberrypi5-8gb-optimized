@@ -7,12 +7,14 @@ title: "Docs directory"
 
 <Note>
 This page is a curated index. If you are new, start with [Getting Started](/start/getting-started).
-For a complete map of the docs, see [Docs hubs](/start/hubs).
+For a sequenced route, see [Learning paths](/start/learning-paths). For a
+complete map of the docs, see [Docs hubs](/start/hubs).
 </Note>
 
 ## Start here
 
 - [Docs hubs (all pages linked)](/start/hubs)
+- [Learning paths](/start/learning-paths)
 - [Help](/help)
 - [Configuration](/gateway/configuration)
 - [Configuration examples](/gateway/configuration-examples)
@@ -67,4 +69,5 @@ For a complete map of the docs, see [Docs hubs](/start/hubs).
 ## Related
 
 - [Getting started](/start/getting-started)
+- [Learning paths](/start/learning-paths)
 - [Docs hubs](/start/hubs)

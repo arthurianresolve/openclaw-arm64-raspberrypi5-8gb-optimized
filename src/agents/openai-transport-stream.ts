@@ -18,6 +18,7 @@ import type {
   ResponseFunctionCallOutputItemList,
   ResponseInput,
   ResponseInputMessageContentList,
+  ResponseReasoningItem,
 } from "openai/resources/responses/responses.js";
 import type { ModelCompatConfig } from "../config/types.models.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
@@ -288,7 +289,10 @@ function convertResponsesMessages(
       for (const block of msg.content) {
         if (block.type === "thinking") {
           if (block.thinkingSignature) {
-            output.push(JSON.parse(block.thinkingSignature));
+            const parsedThinking = parseResponseInputItem(block.thinkingSignature);
+            if (parsedThinking) {
+              output.push(parsedThinking);
+            }
           }
         } else if (block.type === "text") {
           let msgId = parseTextSignature(block.textSignature)?.id ?? `msg_${msgIndex}`;
@@ -832,6 +836,24 @@ function resolveOpenAIReasoningEffort(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function parseResponseInputItem(raw: string): ResponseReasoningItem | null {
+  try {
+    const parsed = JSON.parse(raw);
+    return isResponseReasoningItem(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function isResponseReasoningItem(value: unknown): value is ResponseReasoningItem {
+  return (
+    isRecord(value) &&
+    value.type === "reasoning" &&
+    typeof value.id === "string" &&
+    Array.isArray(value.summary)
+  );
 }
 
 function hasResponsesWebSearchTool(tools: unknown): boolean {

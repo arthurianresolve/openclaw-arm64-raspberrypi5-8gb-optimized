@@ -144,6 +144,7 @@ import {
 } from "./run/incomplete-turn.js";
 import type { RunEmbeddedPiAgentParams } from "./run/params.js";
 import { buildEmbeddedRunPayloads } from "./run/payloads.js";
+import { resolveRunPromptProfile } from "./run/prompt-profile.js";
 import { handleRetryLimitExhaustion } from "./run/retry-limit.js";
 import {
   buildBeforeModelResolveAttachments,
@@ -1045,6 +1046,11 @@ export async function runEmbeddedPiAgent(
             agentDir,
             agentId: workspaceResolution.agentId,
             thinkingLevel: thinkLevel,
+            promptProfile: resolveRunPromptProfile({
+              promptMode: params.promptMode ?? "full",
+              toolsAllow: params.toolsAllow,
+              modelRun: params.modelRun,
+            }),
             extraParamsOverride: {
               ...params.streamParams,
               fastMode: params.fastMode,

@@ -4,10 +4,8 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { clearConfigCache } from "../../dist/config/config.js";
-import type { OpenClawConfig } from "../../dist/config/types.openclaw.js";
-import { runCrestodian } from "../../dist/crestodian/crestodian.js";
-import type { RuntimeEnv } from "../../dist/runtime.js";
+import { clearConfigCache, runCrestodian } from "./dist-modules.mjs";
+import type { OpenClawConfig, RuntimeEnv } from "./dist-modules.mjs";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -20,9 +18,9 @@ function createRuntime(): { runtime: RuntimeEnv; lines: string[] } {
   return {
     lines,
     runtime: {
-      log: (...args) => lines.push(args.join(" ")),
-      error: (...args) => lines.push(args.join(" ")),
-      exit: (code) => {
+      log: (...args: unknown[]) => lines.push(args.map(String).join(" ")),
+      error: (...args: unknown[]) => lines.push(args.map(String).join(" ")),
+      exit: (code: number) => {
         throw new Error(`exit ${code}`);
       },
     },

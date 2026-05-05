@@ -18,7 +18,7 @@ async function runFetch(url: string, readability: boolean) {
   const tool = createWebFetchTool({
     config: {
       tools: {
-        web: { fetch: { readability, cacheTtlMinutes: 0, firecrawl: { enabled: false } } },
+        web: { fetch: { readability, cacheTtlMinutes: 0 } },
       },
     },
     sandboxed: false,

@@ -556,7 +556,7 @@ async function readResponseTextWithLimit(response: Response): Promise<string> {
 async function readJsonResponseWithLimit(response: Response): Promise<unknown> {
   const text = await readResponseTextWithLimit(response);
   try {
-    return JSON.parse(text) as unknown;
+    return JSON.parse(text);
   } catch {
     throw new Error("tweakcn returned invalid JSON.");
   }

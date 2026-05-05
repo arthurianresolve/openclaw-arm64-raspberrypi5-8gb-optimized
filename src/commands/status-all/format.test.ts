@@ -70,7 +70,7 @@ describe("status-all format", () => {
           git: {
             branch: "main",
             tag: "v1.2.3",
-            upstream: "origin/main",
+            upstream: "origin/master",
             dirty: false,
             behind: 2,
             ahead: 0,
@@ -78,6 +78,7 @@ describe("status-all format", () => {
           },
           registry: {
             latestVersion: newerRegistryVersion,
+            sourceLabel: "github arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master",
           },
         } as never,
       }),
@@ -85,7 +86,7 @@ describe("status-all format", () => {
       channelInfo: baseStatusExpectedUpdateChannelInfo,
       channelLabel: baseStatusExpectedUpdateChannelLabel,
       gitLabel: "main · tag v1.2.3",
-      updateLine: `git main · ↔ origin/main · behind 2 · npm update ${newerRegistryVersion}`,
+      updateLine: `git main · ↔ origin/master · behind 2 · github arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master ${newerRegistryVersion}`,
       updateAvailable: true,
     });
   });
@@ -328,13 +329,16 @@ describe("status-all format", () => {
           git: {
             branch: "main",
             tag: "v1.2.3",
-            upstream: "origin/main",
+            upstream: "origin/master",
             dirty: false,
             behind: 2,
             ahead: 0,
             fetchOk: true,
           },
-          registry: { latestVersion: "2026.4.10" },
+          registry: {
+            latestVersion: "2026.4.10",
+            sourceLabel: "github arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master",
+          },
         } as never,
         tailscaleMode: "serve",
         tailscaleDns: "box.tail.ts.net",

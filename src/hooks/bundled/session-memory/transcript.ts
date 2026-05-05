@@ -2,6 +2,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { hasInterSessionUserProvenance } from "../../../sessions/input-provenance.js";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
 function extractTextMessageContent(content: unknown): string | undefined {
   if (typeof content === "string") {
     return content;
@@ -33,7 +37,7 @@ export async function getRecentSessionContent(
     for (const line of lines) {
       try {
         const entry = JSON.parse(line);
-        if (entry.type === "message" && entry.message) {
+        if (isRecord(entry) && entry.type === "message" && isRecord(entry.message)) {
           const msg = entry.message as {
             role?: unknown;
             content?: unknown;

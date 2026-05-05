@@ -92,7 +92,14 @@ source ~/.bashrc
 - `NODE_COMPILE_CACHE` improves repeated command startup times.
 - `OPENCLAW_NO_RESPAWN=1` avoids extra startup overhead from a self-respawn path.
 - First command run warms the cache; subsequent runs are faster.
-- For Raspberry Pi specifics, see [Raspberry Pi](/install/raspberry-pi).
+- For Raspberry Pi specifics, see [Raspberry Pi](/install/raspberry-pi). On Pi
+  hosts booting from SSD/NVMe, prefer `/data/openclaw` plus the checked-in
+  helper:
+
+```bash
+cd /data/openclaw
+./scripts/setup-raspberry-pi-system.sh --enable-qmd-service --enable-linger
+```
 
 ### systemd tuning checklist (optional)
 

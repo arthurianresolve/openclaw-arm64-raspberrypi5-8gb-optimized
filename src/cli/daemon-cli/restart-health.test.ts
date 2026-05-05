@@ -305,7 +305,7 @@ describe("inspectGatewayRestart", () => {
 
     const snapshot = await inspectGatewayRestartWithSnapshot({
       runtime: { status: "running", pid: 8000 },
-      expectedVersion: "2026.4.24",
+      expectedVersion: "2026.4.25",
       portUsage: {
         port: 18789,
         status: "busy",
@@ -317,9 +317,9 @@ describe("inspectGatewayRestart", () => {
     expect(snapshot).toMatchObject({
       healthy: false,
       gatewayVersion: "2026.4.23",
-      expectedVersion: "2026.4.24",
+      expectedVersion: "2026.4.25",
       versionMismatch: {
-        expected: "2026.4.24",
+        expected: "2026.4.25",
         actual: "2026.4.23",
       },
     });
@@ -329,12 +329,12 @@ describe("inspectGatewayRestart", () => {
     probeGateway.mockResolvedValue({
       ok: true,
       close: null,
-      server: { version: "2026.4.24", connId: "new" },
+      server: { version: "2026.4.25", connId: "new" },
     });
 
     const snapshot = await inspectGatewayRestartWithSnapshot({
       runtime: { status: "running", pid: 8000 },
-      expectedVersion: "2026.4.24",
+      expectedVersion: "2026.4.25",
       portUsage: {
         port: 18789,
         status: "busy",
@@ -345,8 +345,8 @@ describe("inspectGatewayRestart", () => {
 
     expect(snapshot).toMatchObject({
       healthy: true,
-      gatewayVersion: "2026.4.24",
-      expectedVersion: "2026.4.24",
+      gatewayVersion: "2026.4.25",
+      expectedVersion: "2026.4.25",
     });
     expect(snapshot.versionMismatch).toBeUndefined();
   });
@@ -397,7 +397,7 @@ describe("inspectGatewayRestart", () => {
     const snapshot = await waitForGatewayHealthyRestart({
       service: makeGatewayService({ status: "running", pid: 8000 }),
       port: 18789,
-      expectedVersion: "2026.4.24",
+      expectedVersion: "2026.4.25",
     });
 
     expect(snapshot).toMatchObject({
@@ -405,7 +405,7 @@ describe("inspectGatewayRestart", () => {
       waitOutcome: "version-mismatch",
       elapsedMs: 0,
       versionMismatch: {
-        expected: "2026.4.24",
+        expected: "2026.4.25",
         actual: "2026.4.23",
       },
     });
@@ -416,7 +416,7 @@ describe("inspectGatewayRestart", () => {
     probeGateway.mockResolvedValue({
       ok: true,
       close: null,
-      server: { version: "2026.4.24", connId: "new" },
+      server: { version: "2026.4.25", connId: "new" },
       health: {
         ok: true,
         plugins: {
@@ -440,7 +440,7 @@ describe("inspectGatewayRestart", () => {
 
     const snapshot = await inspectGatewayRestartWithSnapshot({
       runtime: { status: "running", pid: 8000 },
-      expectedVersion: "2026.4.24",
+      expectedVersion: "2026.4.25",
       portUsage: {
         port: 18789,
         status: "busy",
@@ -451,8 +451,8 @@ describe("inspectGatewayRestart", () => {
 
     expect(snapshot).toMatchObject({
       healthy: false,
-      gatewayVersion: "2026.4.24",
-      expectedVersion: "2026.4.24",
+      gatewayVersion: "2026.4.25",
+      expectedVersion: "2026.4.25",
       activatedPluginErrors: [
         {
           id: "telegram",
@@ -475,7 +475,7 @@ describe("inspectGatewayRestart", () => {
     probeGateway.mockResolvedValue({
       ok: true,
       close: null,
-      server: { version: "2026.4.24", connId: "new" },
+      server: { version: "2026.4.25", connId: "new" },
       health: {
         ok: true,
         plugins: {
@@ -501,7 +501,7 @@ describe("inspectGatewayRestart", () => {
     const snapshot = await waitForGatewayHealthyRestart({
       service: makeGatewayService({ status: "running", pid: 8000 }),
       port: 18789,
-      expectedVersion: "2026.4.24",
+      expectedVersion: "2026.4.25",
     });
 
     expect(snapshot).toMatchObject({
@@ -517,7 +517,7 @@ describe("inspectGatewayRestart", () => {
     probeGateway.mockResolvedValue({
       ok: true,
       close: null,
-      server: { version: "2026.4.24", connId: "new" },
+      server: { version: "2026.4.25", connId: "new" },
       health: {
         ok: true,
         channels: {
@@ -539,7 +539,7 @@ describe("inspectGatewayRestart", () => {
     const snapshot = await waitForGatewayHealthyRestart({
       service: makeGatewayService({ status: "running", pid: 8000 }),
       port: 18789,
-      expectedVersion: "2026.4.24",
+      expectedVersion: "2026.4.25",
     });
 
     expect(snapshot).toMatchObject({

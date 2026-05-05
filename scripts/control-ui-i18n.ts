@@ -13,6 +13,8 @@ interface TranslationMap {
   [key: string]: string | TranslationMap;
 }
 
+type TranslationValue = string | TranslationMap;
+
 type LocaleEntry = {
   exportName: string;
   fileName: string;
@@ -1020,12 +1022,15 @@ class PiRpcClient {
   private readonly stderrChunks: string[] = [];
   private closed = false;
   private pending: PendingPrompt | null = null;
-  private readonly process;
-  private readonly stdin;
+  private readonly process: ReturnType<typeof spawn>;
+  private readonly stdin: NonNullable<ReturnType<typeof spawn>["stdin"]>;
   private requestCount = 0;
-  private sequence = Promise.resolve();
+  private sequence: Promise<string> = Promise.resolve("");
 
   private constructor(processHandle: ReturnType<typeof spawn>) {
+    if (!processHandle.stdin || !processHandle.stdout || !processHandle.stderr) {
+      throw new Error("pi process stdio was not initialized");
+    }
     this.process = processHandle;
     this.stdin = processHandle.stdin;
   }
@@ -1059,12 +1064,18 @@ class PiRpcClient {
   }
 
   private bindProcess() {
-    const stderr = createInterface({ input: this.process.stderr });
+    const stderrStream = this.process.stderr;
+    const stdoutStream = this.process.stdout;
+    if (!stderrStream || !stdoutStream) {
+      throw new Error("pi process stdio became unavailable");
+    }
+
+    const stderr = createInterface({ input: stderrStream });
     stderr.on("line", (line) => {
       this.stderrChunks.push(line);
     });
 
-    const stdout = createInterface({ input: this.process.stdout });
+    const stdout = createInterface({ input: stdoutStream });
     stdout.on("line", (line) => {
       void this.handleStdoutLine(line);
     });
@@ -1208,7 +1219,7 @@ class PiRpcClient {
       });
     });
 
-    return (await this.sequence) as string;
+    return await this.sequence;
   }
 
   async close() {

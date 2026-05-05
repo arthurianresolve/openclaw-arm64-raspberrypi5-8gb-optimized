@@ -111,7 +111,7 @@ export async function minimaxUnderstandImage(params: {
     );
   }
 
-  const json = (await res.json().catch(() => null)) as unknown;
+  const json = await res.json().catch(() => null);
   if (!isRecord(json)) {
     const trace = traceId ? ` Trace-Id: ${traceId}` : "";
     throw new Error(`MiniMax VLM response was not JSON.${trace}`);

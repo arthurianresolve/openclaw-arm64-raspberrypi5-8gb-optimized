@@ -760,6 +760,29 @@ describe("plugin sdk alias helpers", () => {
     );
   });
 
+  it("adds the private qa-channel api alias when private qa is enabled", () => {
+    const fixture = createPluginSdkAliasFixture();
+    const qaChannelApiPath = path.join(fixture.root, "extensions", "qa-channel", "api.ts");
+    mkdirSafeDir(path.dirname(qaChannelApiPath));
+    fs.writeFileSync(qaChannelApiPath, "export const qaChannelApi = true;\n", "utf-8");
+    const sourcePluginEntry = writePluginEntry(
+      fixture.root,
+      bundledPluginFile("qa-lab", "src/runtime-api.ts"),
+    );
+
+    const publicAliases = withEnv({ OPENCLAW_ENABLE_PRIVATE_QA_CLI: undefined }, () =>
+      buildPluginLoaderAliasMap(sourcePluginEntry),
+    );
+    const privateAliases = withEnv({ OPENCLAW_ENABLE_PRIVATE_QA_CLI: "1" }, () =>
+      buildPluginLoaderAliasMap(sourcePluginEntry),
+    );
+
+    expect(publicAliases["@openclaw/qa-channel/api.js"]).toBeUndefined();
+    expect(fs.realpathSync(privateAliases["@openclaw/qa-channel/api.js"] ?? "")).toBe(
+      fs.realpathSync(qaChannelApiPath),
+    );
+  });
+
   it("applies explicit dist resolution to plugin-sdk subpath aliases too", () => {
     const { fixture, distRootAlias, distChannelRuntimePath } = createPluginSdkAliasTargetFixture();
     const sourcePluginEntry = writePluginEntry(

@@ -7,6 +7,8 @@ title: "Docs hubs"
 
 <Note>
 If you are new to OpenClaw, start with [Getting Started](/start/getting-started).
+If you know your role but not the right docs order, use
+[Learning paths](/start/learning-paths).
 </Note>
 
 Use these hubs to discover every page, including deep dives and reference docs that don’t appear in the left nav.
@@ -20,6 +22,7 @@ Use these hubs to discover every page, including deep dives and reference docs t
 - [Setup](/start/setup)
 - [Dashboard (local Gateway)](http://127.0.0.1:18789/)
 - [Help](/help)
+- [Learning paths](/start/learning-paths)
 - [Docs directory](/start/docs-directory)
 - [Configuration](/gateway/configuration)
 - [Configuration examples](/gateway/configuration-examples)

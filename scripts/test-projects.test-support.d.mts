@@ -7,11 +7,11 @@ export type VitestRunPlan = {
 
 export type VitestRunSpec = {
   config: string;
-  env: Record<string, string | undefined>;
-  includeFilePath: string | null;
-  includePatterns: string[] | null;
-  pnpmArgs: string[];
-  watchMode: boolean;
+  env?: Record<string, string | undefined>;
+  includeFilePath?: string | null;
+  includePatterns?: string[] | null;
+  pnpmArgs?: string[];
+  watchMode?: boolean;
 };
 
 export type ChangedTestTargetOptions = {
@@ -38,6 +38,8 @@ export function buildVitestRunPlans(
   options?: ChangedTestTargetOptions,
 ): VitestRunPlan[];
 
+export function buildFullSuiteVitestRunPlans(args: string[], cwd?: string): VitestRunPlan[];
+
 export function resolveChangedTargetArgs(
   args: string[],
   cwd?: string,
@@ -55,6 +57,12 @@ export function resolveChangedTestTargetPlan(
 
 export function listFullExtensionVitestProjectConfigs(): string[];
 
+export function resolveParallelFullSuiteConcurrency(
+  specCount: number,
+  env?: Record<string, string | undefined>,
+  hostInfo?: unknown,
+): number;
+
 export function createVitestRunSpecs(
   args: string[],
   params?: {
@@ -71,6 +79,18 @@ export function applyDefaultVitestNoOutputTimeout(
   },
 ): VitestRunSpec[];
 
+export function shouldRetryVitestNoOutputTimeout(
+  env?: Record<string, string | undefined>,
+): boolean;
+
+export function applyParallelVitestCachePaths(
+  specs: VitestRunSpec[],
+  params?: {
+    cwd?: string;
+    env?: Record<string, string | undefined>;
+  },
+): VitestRunSpec[];
+
 export function applyDefaultMultiSpecVitestCachePaths(
   specs: VitestRunSpec[],
   params?: {
@@ -82,3 +102,8 @@ export function applyDefaultMultiSpecVitestCachePaths(
 export function writeVitestIncludeFile(filePath: string, includePatterns: string[]): void;
 
 export function buildVitestArgs(args: string[], cwd?: string): string[];
+
+export function shouldAcquireLocalHeavyCheckLock(
+  runSpecs: VitestRunSpec[],
+  env?: Record<string, string | undefined>,
+): boolean;

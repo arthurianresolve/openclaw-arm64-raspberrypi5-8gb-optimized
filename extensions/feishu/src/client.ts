@@ -192,10 +192,12 @@ export function createFeishuClient(creds: FeishuClientCredentials): Lark.Client 
   return client;
 }
 
-export type FeishuWsClientCallbacks = Pick<
-  ConstructorParameters<typeof feishuClientSdk.WSClient>[0],
-  "onError" | "onReady" | "onReconnected" | "onReconnecting"
->;
+export type FeishuWsClientCallbacks = {
+  onError?: (err: Error) => void;
+  onReady?: () => void;
+  onReconnected?: () => void;
+  onReconnecting?: () => void;
+};
 
 /**
  * Create a Feishu WebSocket client for an account.
@@ -203,7 +205,7 @@ export type FeishuWsClientCallbacks = Pick<
  */
 export async function createFeishuWSClient(
   account: ResolvedFeishuAccount,
-  callbacks: FeishuWsClientCallbacks = {},
+  callbacks: Partial<FeishuWsClientCallbacks> = {},
 ): Promise<Lark.WSClient> {
   const { accountId, appId, appSecret, domain } = account;
 

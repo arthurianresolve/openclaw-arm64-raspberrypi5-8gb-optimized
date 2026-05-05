@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REMOTE_URL="${OPENCLAW_REF_REMOTE:-https://github.com/openclaw/openclaw.git}"
+REMOTE_URL="${OPENCLAW_REF_REMOTE:-https://github.com/arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized.git}"
 REF=""
 EXPECTED_SHA=""
 FALLBACK_OK=0

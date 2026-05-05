@@ -1154,7 +1154,9 @@ async function runVideoGenerate(params: {
               : path.join(parsed.dir, `${parsed.name}-${String(index + 1)}${ext}`);
           await fs.mkdir(path.dirname(filePath), { recursive: true });
           await pipeline(
-            Readable.fromWeb(response.body as import("node:stream/web").ReadableStream),
+            Readable.fromWeb(
+              response.body as unknown as import("node:stream/web").ReadableStream<Uint8Array>,
+            ),
             createWriteStream(filePath),
           );
           const stat = await fs.stat(filePath);

@@ -60,7 +60,7 @@ function tryExtractUsableToolCallArguments(raw: string): ToolCallArgumentRepair 
     return undefined;
   }
   try {
-    const parsed = JSON.parse(raw) as unknown;
+    const parsed = JSON.parse(raw);
     return parsed && typeof parsed === "object" && !Array.isArray(parsed)
       ? {
           args: parsed as Record<string, unknown>,
@@ -89,7 +89,7 @@ function tryExtractUsableToolCallArguments(raw: string): ToolCallArgumentRepair 
       return undefined;
     }
     try {
-      const parsed = JSON.parse(extracted.json) as unknown;
+      const parsed = JSON.parse(extracted.json);
       return parsed && typeof parsed === "object" && !Array.isArray(parsed)
         ? {
             args: parsed as Record<string, unknown>,

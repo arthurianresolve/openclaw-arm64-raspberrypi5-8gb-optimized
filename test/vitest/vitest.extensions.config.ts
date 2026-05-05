@@ -39,6 +39,9 @@ export function createExtensionsVitestConfig(
     env,
     name: "extensions",
     passWithNoTests: true,
+    // Raspberry Pi 5 8 GB hosts need more breathing room for the Codex
+    // app-server extension suite than the shared 120s default provides.
+    testTimeout: 300_000,
     setupFiles: ["test/setup.extensions.ts"],
     // Some bundled plugins still run on the channel surface; keep those roots
     // out of the shared extensions lane.

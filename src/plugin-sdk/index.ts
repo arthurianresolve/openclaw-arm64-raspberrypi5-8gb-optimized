@@ -71,6 +71,7 @@ export type {
 } from "../plugins/runtime/runtime-tasks.types.js";
 export type {
   TaskFlowDetail,
+  TaskFlowMetrics,
   TaskFlowView,
   TaskRunAggregateSummary,
   TaskRunCancelResult,

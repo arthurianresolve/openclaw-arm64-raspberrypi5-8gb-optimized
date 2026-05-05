@@ -65,7 +65,7 @@ export function scrubLegacyStaticAuthJsonEntriesForDiscovery(pathname: string): 
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(fs.readFileSync(pathname, "utf8")) as unknown;
+    parsed = JSON.parse(fs.readFileSync(pathname, "utf8"));
   } catch {
     return;
   }

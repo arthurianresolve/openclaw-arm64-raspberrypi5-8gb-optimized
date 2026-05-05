@@ -33,8 +33,8 @@ describe("resolveUpdateAvailability", () => {
         root: "/tmp/repo",
         sha: null,
         tag: null,
-        branch: "main",
-        upstream: "origin/main",
+        branch: "master",
+        upstream: "origin/master",
         dirty: false,
         ahead: 0,
         behind: 3,
@@ -73,14 +73,16 @@ describe("formatUpdateOneLiner", () => {
         root: "/tmp/repo",
         sha: "abc123456789",
         tag: null,
-        branch: "main",
-        upstream: "origin/main",
+        branch: "master",
+        upstream: "origin/master",
         dirty: true,
         ahead: 0,
         behind: 2,
         fetchOk: true,
       },
-      registry: { latestVersion: VERSION },
+      registry: {
+        latestVersion: VERSION,
+      },
       deps: {
         manager: "pnpm",
         status: "ok",
@@ -90,7 +92,7 @@ describe("formatUpdateOneLiner", () => {
     });
 
     expect(formatUpdateOneLiner(update)).toBe(
-      `Update: git main · ↔ origin/main · dirty · behind 2 · npm latest ${VERSION} · deps ok`,
+      `Update: git master · ↔ origin/master · dirty · behind 2 · npm latest ${VERSION} · deps ok`,
     );
   });
 
@@ -101,14 +103,16 @@ describe("formatUpdateOneLiner", () => {
         root: "/tmp/repo",
         sha: "abc123456789",
         tag: null,
-        branch: "main",
-        upstream: "origin/main",
+        branch: "master",
+        upstream: "origin/master",
         dirty: false,
         ahead: 0,
         behind: 0,
         fetchOk: true,
       },
-      registry: { latestVersion: VERSION },
+      registry: {
+        latestVersion: VERSION,
+      },
       deps: {
         manager: "pnpm",
         status: "ok",
@@ -118,7 +122,7 @@ describe("formatUpdateOneLiner", () => {
     });
 
     expect(formatUpdateOneLiner(update)).toBe(
-      `Update: git main · ↔ origin/main · up to date · npm latest ${VERSION} · deps ok`,
+      `Update: git master · ↔ origin/master · up to date · npm latest ${VERSION} · deps ok`,
     );
   });
 
@@ -126,7 +130,9 @@ describe("formatUpdateOneLiner", () => {
     const update = buildUpdate({
       installKind: "package",
       packageManager: "npm",
-      registry: { latestVersion: VERSION },
+      registry: {
+        latestVersion: VERSION,
+      },
       deps: {
         manager: "npm",
         status: "ok",
@@ -162,7 +168,10 @@ describe("formatUpdateOneLiner", () => {
     const update = buildUpdate({
       installKind: "package",
       packageManager: "npm",
-      registry: { latestVersion: null, error: "offline" },
+      registry: {
+        latestVersion: null,
+        error: "offline",
+      },
       deps: {
         manager: "npm",
         status: "missing",
@@ -180,7 +189,9 @@ describe("formatUpdateAvailableHint", () => {
     const update = buildUpdate({
       installKind: "package",
       packageManager: "pnpm",
-      registry: { latestVersion: VERSION },
+      registry: {
+        latestVersion: VERSION,
+      },
     });
 
     expect(formatUpdateAvailableHint(update)).toBeNull();
@@ -194,8 +205,8 @@ describe("formatUpdateAvailableHint", () => {
         root: "/tmp/repo",
         sha: null,
         tag: null,
-        branch: "main",
-        upstream: "origin/main",
+        branch: "master",
+        upstream: "origin/master",
         dirty: false,
         ahead: 0,
         behind: 2,

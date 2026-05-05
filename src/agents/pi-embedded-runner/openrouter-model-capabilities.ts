@@ -124,7 +124,7 @@ function readDiskCache(): Map<string, OpenRouterModelCapabilities> | undefined {
       return undefined;
     }
     const raw = readFileSync(cachePath, "utf-8");
-    const payload = JSON.parse(raw) as unknown;
+    const payload = JSON.parse(raw);
     if (!payload || typeof payload !== "object") {
       return undefined;
     }

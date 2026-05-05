@@ -109,7 +109,7 @@ describe("update-startup", () => {
     await suiteRootTracker.cleanup();
   });
 
-  function mockPackageUpdateStatus(tag = "latest", version = "2.0.0") {
+  function mockPackageUpdateStatus(tag = "master", version = "2.0.0") {
     mockPackageInstallStatus();
     mockNpmChannelTag(tag, version);
   }
@@ -131,7 +131,7 @@ describe("update-startup", () => {
   }
 
   async function runUpdateCheckAndReadState(channel: "stable" | "beta") {
-    mockPackageUpdateStatus("latest", "2.0.0");
+    mockPackageUpdateStatus("master", "2.0.0");
 
     const log = { info: vi.fn() };
     await runGatewayUpdateCheck({
@@ -213,11 +213,11 @@ describe("update-startup", () => {
     const { log, parsed } = await runUpdateCheckAndReadState(channel);
 
     expect(log.info).toHaveBeenCalledWith(
-      expect.stringContaining("update available (latest): v2.0.0"),
+      expect.stringContaining("update available (master): v2.0.0"),
     );
     expect(parsed.lastNotifiedVersion).toBe("2.0.0");
     expect(parsed.lastAvailableVersion).toBe("2.0.0");
-    expect(parsed.lastNotifiedTag).toBe("latest");
+    expect(parsed.lastNotifiedTag).toBe("master");
   });
 
   it("hydrates cached update from persisted state during throttle window", async () => {
@@ -228,7 +228,7 @@ describe("update-startup", () => {
         {
           lastCheckedAt: new Date(Date.now()).toISOString(),
           lastAvailableVersion: "2.0.0",
-          lastAvailableTag: "latest",
+          lastAvailableTag: "master",
         },
         null,
         2,
@@ -249,12 +249,12 @@ describe("update-startup", () => {
     expect(onUpdateAvailableChange).toHaveBeenCalledWith({
       currentVersion: "1.0.0",
       latestVersion: "2.0.0",
-      channel: "latest",
+      channel: "master",
     });
     expect(getUpdateAvailable()).toEqual({
       currentVersion: "1.0.0",
       latestVersion: "2.0.0",
-      channel: "latest",
+      channel: "master",
     });
   });
 

@@ -6,7 +6,7 @@ export function safeParseJson(value: string | null | undefined): unknown {
     return undefined;
   }
   try {
-    return JSON.parse(trimmed) as unknown;
+    return JSON.parse(trimmed);
   } catch {
     return { payloadJSON: value };
   }

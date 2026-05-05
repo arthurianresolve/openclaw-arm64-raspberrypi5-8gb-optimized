@@ -80,6 +80,10 @@ export type ContextEngineInfo = {
 export type SubagentSpawnPreparation = {
   /** Roll back pre-spawn setup when subagent launch fails. */
   rollback: () => void | Promise<void>;
+  /** Optional additional system prompt context to inject into the child run. */
+  systemPromptAddition?: string;
+  /** Optional additional first-turn user guidance for the child run. */
+  initialUserMessageAddition?: string;
 };
 
 export type SubagentEndReason = "deleted" | "completed" | "swept" | "released";

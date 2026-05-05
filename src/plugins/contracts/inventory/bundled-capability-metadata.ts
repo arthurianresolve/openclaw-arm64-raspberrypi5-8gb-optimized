@@ -60,7 +60,7 @@ export type BundledCapabilityManifest = Pick<
 
 function readJsonRecord(filePath: string): Record<string, unknown> | undefined {
   try {
-    const raw = JSON.parse(fs.readFileSync(filePath, "utf-8")) as unknown;
+    const raw = JSON.parse(fs.readFileSync(filePath, "utf-8"));
     return raw && typeof raw === "object" && !Array.isArray(raw)
       ? (raw as Record<string, unknown>)
       : undefined;

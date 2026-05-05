@@ -55,6 +55,25 @@ Type `/compact` in any chat to force a compaction. Add instructions to guide the
 
 When `agents.defaults.compaction.keepRecentTokens` is set, manual compaction honors that Pi cut-point and keeps the recent tail in rebuilt context. Without an explicit keep budget, manual compaction behaves as a hard checkpoint and continues from the new summary alone.
 
+### Structured resume state
+
+OpenClaw now prepends a compact resume-state block to compaction instructions
+so the model preserves the parts of the session that matter most after
+summarization:
+
+- current task
+- current status
+- blockers
+- decisions
+- next step
+- commitments
+- opaque identifiers
+
+This block is a prompt-shaping aid, not a replacement for the freeform summary.
+The goal is to make the next turn resume faster with fewer re-orientation
+tokens. Identifier preservation remains configurable through
+`identifierPolicy`.
+
 ## Configuration
 
 Configure compaction under `agents.defaults.compaction` in your `openclaw.json`. The most common knobs are listed below; for the full reference, see [Session management deep dive](/reference/session-management-compaction).

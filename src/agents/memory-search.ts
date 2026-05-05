@@ -77,6 +77,18 @@ export type ResolvedMemorySearchConfig = {
   query: {
     maxResults: number;
     minScore: number;
+    crossCorpus: {
+      enabled: boolean;
+      normalization: "minmax" | "none";
+      quota: {
+        memory?: number;
+        sessions?: number;
+        wiki?: number;
+        codesight?: number;
+        other?: number;
+      };
+      stalePenalty: number;
+    };
     hybrid: {
       enabled: boolean;
       vectorWeight: number;
@@ -108,6 +120,9 @@ const DEFAULT_SESSION_DELTA_MESSAGES = 50;
 const DEFAULT_MAX_RESULTS = 6;
 const DEFAULT_MIN_SCORE = 0.35;
 const DEFAULT_HYBRID_ENABLED = true;
+const DEFAULT_CROSS_CORPUS_ENABLED = false;
+const DEFAULT_CROSS_CORPUS_NORMALIZATION = "minmax";
+const DEFAULT_CROSS_CORPUS_STALE_PENALTY = 0.08;
 const DEFAULT_HYBRID_VECTOR_WEIGHT = 0.7;
 const DEFAULT_HYBRID_TEXT_WEIGHT = 0.3;
 const DEFAULT_HYBRID_CANDIDATE_MULTIPLIER = 4;
@@ -271,6 +286,33 @@ function mergeConfig(
     maxResults: overrides?.query?.maxResults ?? defaults?.query?.maxResults ?? DEFAULT_MAX_RESULTS,
     minScore: overrides?.query?.minScore ?? defaults?.query?.minScore ?? DEFAULT_MIN_SCORE,
   };
+  const crossCorpus = {
+    enabled:
+      overrides?.query?.crossCorpus?.enabled ??
+      defaults?.query?.crossCorpus?.enabled ??
+      DEFAULT_CROSS_CORPUS_ENABLED,
+    normalization:
+      overrides?.query?.crossCorpus?.normalization ??
+      defaults?.query?.crossCorpus?.normalization ??
+      DEFAULT_CROSS_CORPUS_NORMALIZATION,
+    quota: {
+      memory:
+        overrides?.query?.crossCorpus?.quota?.memory ?? defaults?.query?.crossCorpus?.quota?.memory,
+      sessions:
+        overrides?.query?.crossCorpus?.quota?.sessions ??
+        defaults?.query?.crossCorpus?.quota?.sessions,
+      wiki: overrides?.query?.crossCorpus?.quota?.wiki ?? defaults?.query?.crossCorpus?.quota?.wiki,
+      codesight:
+        overrides?.query?.crossCorpus?.quota?.codesight ??
+        defaults?.query?.crossCorpus?.quota?.codesight,
+      other:
+        overrides?.query?.crossCorpus?.quota?.other ?? defaults?.query?.crossCorpus?.quota?.other,
+    },
+    stalePenalty:
+      overrides?.query?.crossCorpus?.stalePenalty ??
+      defaults?.query?.crossCorpus?.stalePenalty ??
+      DEFAULT_CROSS_CORPUS_STALE_PENALTY,
+  };
   const hybrid = {
     enabled:
       overrides?.query?.hybrid?.enabled ??
@@ -363,6 +405,33 @@ function mergeConfig(
     query: {
       ...query,
       minScore,
+      crossCorpus: {
+        enabled: crossCorpus.enabled,
+        normalization: crossCorpus.normalization === "none" ? "none" : "minmax",
+        quota: {
+          memory:
+            typeof crossCorpus.quota.memory === "number"
+              ? Math.max(1, Math.floor(crossCorpus.quota.memory))
+              : undefined,
+          sessions:
+            typeof crossCorpus.quota.sessions === "number"
+              ? Math.max(1, Math.floor(crossCorpus.quota.sessions))
+              : undefined,
+          wiki:
+            typeof crossCorpus.quota.wiki === "number"
+              ? Math.max(1, Math.floor(crossCorpus.quota.wiki))
+              : undefined,
+          codesight:
+            typeof crossCorpus.quota.codesight === "number"
+              ? Math.max(1, Math.floor(crossCorpus.quota.codesight))
+              : undefined,
+          other:
+            typeof crossCorpus.quota.other === "number"
+              ? Math.max(1, Math.floor(crossCorpus.quota.other))
+              : undefined,
+        },
+        stalePenalty: clampNumber(crossCorpus.stalePenalty, 0, 1),
+      },
       hybrid: {
         enabled: hybrid.enabled,
         vectorWeight: normalizedVectorWeight,

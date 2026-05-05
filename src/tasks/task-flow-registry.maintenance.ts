@@ -8,15 +8,19 @@ import {
   deleteTaskFlowRecordById,
   getTaskFlowById,
   listTaskFlowRecords,
+  persistCurrentTaskFlowRecord,
   updateFlowRecordByIdExpectedRevision,
 } from "./task-flow-registry.js";
+import { getTaskFlowRegistryStore } from "./task-flow-registry.store.js";
 import type { TaskFlowRecord } from "./task-flow-registry.types.js";
+import { normalizeTaskFlowVerificationState } from "./task-flow-verification-state.js";
 
 const TASK_FLOW_RETENTION_MS = 7 * 24 * 60 * 60_000;
 
 export type TaskFlowRegistryMaintenanceSummary = {
   reconciled: number;
   pruned: number;
+  backfilled: number;
 };
 
 function isTerminalFlow(flow: TaskFlowRecord): boolean {
@@ -57,6 +61,33 @@ function shouldFinalizeCancelledFlow(flow: TaskFlowRecord): boolean {
     return false;
   }
   return !hasActiveLinkedTasks(flow.flowId);
+}
+
+function hasLegacyVerificationPayload(flow: TaskFlowRecord): boolean {
+  if (
+    flow.stateJson &&
+    typeof flow.stateJson === "object" &&
+    !Array.isArray(flow.stateJson) &&
+    "verification" in flow.stateJson
+  ) {
+    return (
+      normalizeTaskFlowVerificationState(
+        (flow.stateJson as Record<string, unknown>).verification,
+      ) !== undefined
+    );
+  }
+  return false;
+}
+
+function listLegacyVerificationBackfillCandidates(): string[] {
+  const snapshot = getTaskFlowRegistryStore().loadSnapshot();
+  const ids: string[] = [];
+  for (const flow of snapshot.flows.values()) {
+    if (hasLegacyVerificationPayload(flow)) {
+      ids.push(flow.flowId);
+    }
+  }
+  return ids;
 }
 
 function finalizeCancelledFlow(flow: TaskFlowRecord, now: number): boolean {
@@ -131,6 +162,7 @@ export function previewTaskFlowRegistryMaintenance(): TaskFlowRegistryMaintenanc
   const now = Date.now();
   let reconciled = 0;
   let pruned = 0;
+  const backfilled = listLegacyVerificationBackfillCandidates().length;
   for (const flow of listTaskFlowRecords()) {
     if (shouldRepairTerminalMirroredFlowTimestamp(flow)) {
       reconciled += 1;
@@ -144,13 +176,14 @@ export function previewTaskFlowRegistryMaintenance(): TaskFlowRegistryMaintenanc
       pruned += 1;
     }
   }
-  return { reconciled, pruned };
+  return { reconciled, pruned, backfilled };
 }
 
 export async function runTaskFlowRegistryMaintenance(): Promise<TaskFlowRegistryMaintenanceSummary> {
   const now = Date.now();
   let reconciled = 0;
   let pruned = 0;
+  let backfilled = 0;
   for (const flow of listTaskFlowRecords()) {
     const current = getTaskFlowById(flow.flowId);
     if (!current) {
@@ -172,5 +205,10 @@ export async function runTaskFlowRegistryMaintenance(): Promise<TaskFlowRegistry
       pruned += 1;
     }
   }
-  return { reconciled, pruned };
+  for (const flowId of listLegacyVerificationBackfillCandidates()) {
+    if (persistCurrentTaskFlowRecord(flowId)) {
+      backfilled += 1;
+    }
+  }
+  return { reconciled, pruned, backfilled };
 }

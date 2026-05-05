@@ -14,6 +14,7 @@ export type AgentRuntimeThinkLevel =
   | "max";
 
 export type AgentRuntimePromptMode = "full" | "minimal" | "none";
+export type AgentRuntimePromptProfile = "default" | "explore" | "plan" | "verify";
 export type AgentRuntimePromptTrigger =
   | "cron"
   | "heartbeat"
@@ -178,6 +179,7 @@ export type AgentRuntimeSystemPromptContributionContext = {
   provider: string;
   modelId: string;
   promptMode: AgentRuntimePromptMode;
+  promptProfile?: AgentRuntimePromptProfile;
   runtimeChannel?: string;
   runtimeCapabilities?: string[];
   agentId?: string;
@@ -354,6 +356,7 @@ export type BuildAgentRuntimePlanParams = {
   sessionAuthProfileId?: string;
   agentId?: string;
   thinkingLevel?: AgentRuntimeThinkLevel;
+  promptProfile?: AgentRuntimePromptProfile;
   extraParamsOverride?: Record<string, unknown>;
   resolvedTransport?: AgentRuntimeTransport;
 };

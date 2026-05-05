@@ -16,7 +16,14 @@ type BoundTaskFlow = ReturnType<
 >;
 
 type FlowRecord = ReturnType<BoundTaskFlow["createManaged"]>;
+type ExistingFlowRecord = NonNullable<ReturnType<BoundTaskFlow["get"]>>;
 type MutationResult = ReturnType<BoundTaskFlow["setWaiting"]>;
+type FlowUnitContextPacket = NonNullable<
+  Parameters<BoundTaskFlow["createManaged"]>[0]["unitContextPacket"]
+>;
+type FlowUnitVerificationPolicy = NonNullable<
+  Parameters<BoundTaskFlow["createManaged"]>[0]["unitVerificationPolicy"]
+>;
 
 type LobsterApprovalWaitState = {
   kind: "lobster_approval";
@@ -32,6 +39,8 @@ type RunManagedLobsterFlowParams = {
   runnerParams: LobsterRunnerParams;
   controllerId: string;
   goal: string;
+  unitContextPacket?: FlowUnitContextPacket;
+  unitVerificationPolicy?: FlowUnitVerificationPolicy;
   stateJson?: JsonLike;
   currentStep?: string;
   waitingStep?: string;
@@ -128,16 +137,29 @@ function buildApprovalWaitState(envelope: Extract<LobsterEnvelope, { ok: true }>
 
 function applyEnvelopeToFlow(params: {
   taskFlow: BoundTaskFlow;
-  flow: FlowRecord;
+  flow: ExistingFlowRecord;
   envelope: LobsterEnvelope;
   waitingStep: string;
 }): MutationResult {
   const { taskFlow, flow, envelope, waitingStep } = params;
+  const waitingPacket = deriveLobsterStepPacket({
+    flow,
+    step: waitingStep,
+    fallbackGoal: flow.goal,
+  });
+  const verificationPolicy = flow.unitVerificationPolicy;
 
   if (!envelope.ok) {
     return taskFlow.fail({
       flowId: flow.flowId,
       expectedRevision: flow.revision,
+      currentStep: "lobster_failed",
+      unitContextPacket: deriveLobsterStepPacket({
+        flow,
+        step: "lobster_failed",
+        fallbackGoal: flow.goal,
+      }),
+      unitVerificationPolicy: verificationPolicy,
     });
   }
 
@@ -146,6 +168,8 @@ function applyEnvelopeToFlow(params: {
       flowId: flow.flowId,
       expectedRevision: flow.revision,
       currentStep: waitingStep,
+      unitContextPacket: waitingPacket,
+      unitVerificationPolicy: verificationPolicy,
       waitJson: buildApprovalWaitState(envelope),
     });
   }
@@ -153,11 +177,58 @@ function applyEnvelopeToFlow(params: {
   return taskFlow.finish({
     flowId: flow.flowId,
     expectedRevision: flow.revision,
+    currentStep: "lobster_complete",
+    unitContextPacket: deriveLobsterStepPacket({
+      flow,
+      step: "lobster_complete",
+      fallbackGoal: flow.goal,
+    }),
+    unitVerificationPolicy: verificationPolicy,
   });
 }
 
 function buildEnvelopeError(envelope: Extract<LobsterEnvelope, { ok: false }>) {
   return new Error(envelope.error.message);
+}
+
+function buildDefaultLobsterUnitContextPacket(params: {
+  controllerId: string;
+  goal: string;
+  verificationPolicy?: FlowUnitVerificationPolicy;
+}): FlowUnitContextPacket {
+  return {
+    unitId: `lobster:${params.controllerId}`,
+    objective: params.goal,
+    ownedPaths: [],
+    relevantDocs: [],
+    invariants: [],
+    validationCommands: params.verificationPolicy?.commands ?? [],
+    contextMode: "isolated-session",
+    packetSource: "lobster",
+  };
+}
+
+function deriveLobsterStepPacket(params: {
+  flow: Pick<ExistingFlowRecord, "flowId" | "goal" | "controllerId" | "unitContextPacket">;
+  step: string;
+  fallbackGoal: string;
+}): FlowUnitContextPacket {
+  const basePacket = params.flow.unitContextPacket;
+  const baseUnitId =
+    basePacket?.unitId?.replace(/@[^@]+$/, "") ??
+    `lobster:${params.flow.controllerId ?? params.flow.flowId}`;
+  return {
+    unitId: `${baseUnitId}@${params.step}`,
+    objective: `${basePacket?.objective ?? params.fallbackGoal} (${params.step})`,
+    ownedPaths: [...(basePacket?.ownedPaths ?? [])],
+    relevantDocs: [...(basePacket?.relevantDocs ?? [])],
+    invariants: [...(basePacket?.invariants ?? [])],
+    validationCommands: [...(basePacket?.validationCommands ?? [])],
+    ...(basePacket?.stopCondition ? { stopCondition: basePacket.stopCondition } : {}),
+    ...(basePacket?.modelHint ? { modelHint: basePacket.modelHint } : {}),
+    contextMode: basePacket?.contextMode ?? "isolated-session",
+    packetSource: "lobster",
+  };
 }
 
 export async function runManagedLobsterFlow(
@@ -167,6 +238,14 @@ export async function runManagedLobsterFlow(
     controllerId: params.controllerId,
     goal: params.goal,
     currentStep: params.currentStep ?? "run_lobster",
+    unitContextPacket:
+      params.unitContextPacket ??
+      buildDefaultLobsterUnitContextPacket({
+        controllerId: params.controllerId,
+        goal: params.goal,
+        verificationPolicy: params.unitVerificationPolicy,
+      }),
+    unitVerificationPolicy: params.unitVerificationPolicy,
     ...(params.stateJson !== undefined ? { stateJson: params.stateJson } : {}),
   });
 
@@ -198,6 +277,13 @@ export async function runManagedLobsterFlow(
       const mutation = params.taskFlow.fail({
         flowId: flow.flowId,
         expectedRevision: flow.revision,
+        currentStep: "lobster_failed",
+        unitContextPacket: deriveLobsterStepPacket({
+          flow,
+          step: "lobster_failed",
+          fallbackGoal: flow.goal,
+        }),
+        unitVerificationPolicy: flow.unitVerificationPolicy,
       });
       return {
         ok: false,
@@ -218,11 +304,22 @@ export async function runManagedLobsterFlow(
 export async function resumeManagedLobsterFlow(
   params: ResumeManagedLobsterFlowParams,
 ): Promise<ManagedLobsterFlowResult> {
+  const existingFlow = params.taskFlow.get(params.flowId);
   const resumed = params.taskFlow.resume({
     flowId: params.flowId,
     expectedRevision: params.expectedRevision,
     status: "running",
     currentStep: params.currentStep ?? "resume_lobster",
+    ...(existingFlow
+      ? {
+          unitContextPacket: deriveLobsterStepPacket({
+            flow: existingFlow,
+            step: params.currentStep ?? "resume_lobster",
+            fallbackGoal: existingFlow.goal,
+          }),
+          unitVerificationPolicy: existingFlow.unitVerificationPolicy,
+        }
+      : {}),
   });
 
   if (!resumed.applied) {
@@ -261,6 +358,13 @@ export async function resumeManagedLobsterFlow(
       const mutation = params.taskFlow.fail({
         flowId: params.flowId,
         expectedRevision: resumed.flow.revision,
+        currentStep: "lobster_failed",
+        unitContextPacket: deriveLobsterStepPacket({
+          flow: resumed.flow,
+          step: "lobster_failed",
+          fallbackGoal: resumed.flow.goal,
+        }),
+        unitVerificationPolicy: resumed.flow.unitVerificationPolicy,
       });
       return {
         ok: false,

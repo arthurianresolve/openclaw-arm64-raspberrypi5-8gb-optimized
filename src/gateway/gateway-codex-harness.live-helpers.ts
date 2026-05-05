@@ -241,6 +241,11 @@ export function isExpectedCodexModelsCommandText(text: string): boolean {
     mentionsInteractiveSelection &&
     normalized.includes("plain list") &&
     mentionsCurrentSelectedModel;
+  const isInteractiveTuiHeaderSummary =
+    mentionsCodexModelsCommand &&
+    (normalized.includes("interactive here") || normalized.includes("interactive tui")) &&
+    (normalized.includes("did not print a model list") || normalized.includes("plain list")) &&
+    normalized.includes("visible session header showed the current model");
 
   return (
     isSandboxFallback ||
@@ -249,6 +254,7 @@ export function isExpectedCodexModelsCommandText(text: string): boolean {
     isAgentIdModelSummary ||
     isCodexAgentModelSummary ||
     isAvailableHereModelSummary ||
-    isInteractiveTuiSummary
+    isInteractiveTuiSummary ||
+    isInteractiveTuiHeaderSummary
   );
 }

@@ -210,17 +210,19 @@ snapshots:
             },
           ),
         stdout: {
+          fd: 1,
           write(chunk: string) {
             stdoutChunks.push(chunk);
             return true;
           },
-        } as NodeJS.WriteStream,
+        } as NodeJS.WriteStream & { fd: 1 },
         stderr: {
+          fd: 2,
           write(chunk: string) {
             stderrChunks.push(chunk);
             return true;
           },
-        } as NodeJS.WriteStream,
+        } as NodeJS.WriteStream & { fd: 2 },
       });
 
       expect(exitCode).toBe(1);

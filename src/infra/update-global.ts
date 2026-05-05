@@ -7,12 +7,14 @@ import { normalizeLowercaseStringOrEmpty } from "../shared/string-coerce.js";
 import { pathExists } from "../utils.js";
 import {
   collectPackageDistInventory,
+  collectPackageDistImportReferenceErrors,
   PACKAGE_DIST_INVENTORY_RELATIVE_PATH,
   readPackageDistInventoryIfPresent,
 } from "./package-dist-inventory.js";
 import { readPackageVersion } from "./package-json.js";
 import { applyPathPrepend } from "./path-prepend.js";
 import { parseSemver } from "./runtime-guard.js";
+import { isDefaultBranchAlias, OPENCLAW_UPDATE_GITHUB_PACKAGE_SPEC } from "./update-source.js";
 
 export type GlobalInstallManager = "npm" | "pnpm" | "bun";
 
@@ -34,7 +36,7 @@ export type ResolvedGlobalInstallTarget = ResolvedGlobalInstallCommand & {
 const PRIMARY_PACKAGE_NAME = "openclaw";
 const ALL_PACKAGE_NAMES = [PRIMARY_PACKAGE_NAME] as const;
 const GLOBAL_RENAME_PREFIX = ".";
-export const OPENCLAW_MAIN_PACKAGE_SPEC = "github:openclaw/openclaw#main";
+export const OPENCLAW_MAIN_PACKAGE_SPEC = OPENCLAW_UPDATE_GITHUB_PACKAGE_SPEC;
 const COREPACK_ENABLE_DOWNLOAD_PROMPT_DEFAULT = "0";
 const NPM_GLOBAL_INSTALL_QUIET_FLAGS = ["--no-fund", "--no-audit", "--loglevel=error"] as const;
 const NPM_GLOBAL_INSTALL_OMIT_OPTIONAL_FLAGS = [
@@ -59,7 +61,7 @@ function normalizePackageTarget(value: string): string {
 }
 
 export function isMainPackageTarget(value: string): boolean {
-  return normalizeLowercaseStringOrEmpty(normalizePackageTarget(value)) === "main";
+  return isDefaultBranchAlias(normalizePackageTarget(value));
 }
 
 export function isExplicitPackageInstallSpec(value: string): boolean {
@@ -167,15 +169,17 @@ async function collectInstalledPackageDistErrors(params: {
       missingMessage: (relativePath) => `missing packaged dist file ${relativePath}`,
       unexpectedMessage: (relativePath) => `unexpected packaged dist file ${relativePath}`,
     });
+    const importErrors = await collectPackageDistImportReferenceErrors(params.packageRoot);
     const inventorySet = new Set(inventoryFiles);
     const supplementalCriticalPaths = criticalPaths.filter(
       (relativePath) => !inventorySet.has(relativePath),
     );
     if (supplementalCriticalPaths.length === 0) {
-      return inventoryErrors;
+      return [...inventoryErrors, ...importErrors];
     }
     return [
       ...inventoryErrors,
+      ...importErrors,
       ...(await collectInstalledPathErrors({
         packageRoot: params.packageRoot,
         expectedFiles: supplementalCriticalPaths,

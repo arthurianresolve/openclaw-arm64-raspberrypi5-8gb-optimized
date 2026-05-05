@@ -85,7 +85,8 @@ describe("ts-topology", () => {
   });
 
   it("renders stable text summaries for the public-surface report", () => {
-    expect(renderTextReport({ ...publicSurfaceEnvelope, limit: 3 }, 3)).toMatchInlineSnapshot(`
+    expect(renderTextReport({ ...(publicSurfaceEnvelope as any), limit: 3 }, 3))
+      .toMatchInlineSnapshot(`
       "Scope: custom
       Public exports analyzed: 6
       Production-used exports: 4

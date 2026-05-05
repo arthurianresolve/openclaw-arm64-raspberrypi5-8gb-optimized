@@ -16,6 +16,11 @@ import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import { checkQmdBinaryAvailability } from "../memory-host-sdk/engine-qmd.js";
 import { DEFAULT_LOCAL_MODEL } from "../memory-host-sdk/host/embedding-defaults.js";
+import {
+  isSupportedQmdVersion,
+  SUPPORTED_QMD_VERSION_FLOOR,
+  SUPPORTED_QMD_VERSION_RANGE,
+} from "../memory-host-sdk/host/qmd-version.js";
 import { hasConfiguredMemorySecretInput } from "../memory-host-sdk/secret.js";
 import {
   auditDreamingArtifacts,
@@ -355,7 +360,7 @@ export async function noteMemorySearchHealth(
           qmdCheck.error ? `Probe error: ${qmdCheck.error}` : null,
           "",
           "Fix (pick one):",
-          "- Install the supported QMD package: npm install -g @tobilu/qmd (or bun install -g @tobilu/qmd)",
+          `- Install the supported QMD package: npm install -g @tobilu/qmd@${SUPPORTED_QMD_VERSION_FLOOR} (or bun install -g @tobilu/qmd@${SUPPORTED_QMD_VERSION_FLOOR})`,
           `- Set an explicit binary path: ${formatCliCommand("openclaw config set memory.qmd.command /absolute/path/to/qmd")}`,
           `- Or switch back to builtin memory: ${formatCliCommand("openclaw config set memory.backend builtin")}`,
           "",
@@ -363,6 +368,19 @@ export async function noteMemorySearchHealth(
         ]
           .filter(Boolean)
           .join("\n"),
+        "Memory search",
+      );
+    } else if (qmdCheck.version && !isSupportedQmdVersion(qmdCheck.version)) {
+      note(
+        [
+          `QMD memory backend is configured, but the detected qmd version (${qmdCheck.version}) is older than the supported OpenClaw baseline (${SUPPORTED_QMD_VERSION_RANGE}).`,
+          "",
+          "Fix:",
+          `- Upgrade QMD: npm install -g @tobilu/qmd@${SUPPORTED_QMD_VERSION_FLOOR} (or bun install -g @tobilu/qmd@${SUPPORTED_QMD_VERSION_FLOOR})`,
+          `- Reinstall the OpenClaw wrapper if you use it: ${formatCliCommand("./scripts/setup-qmd-system.sh --enable-service --enable-linger")}`,
+          "",
+          `Verify: ${formatCliCommand("openclaw memory status --deep")}`,
+        ].join("\n"),
         "Memory search",
       );
     }

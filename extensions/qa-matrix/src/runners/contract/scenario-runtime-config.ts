@@ -13,9 +13,7 @@ function requireMatrixQaGatewayConfigObject(config: unknown): Record<string, unk
 }
 
 async function readMatrixQaGatewayConfigFile(configPath: string) {
-  return requireMatrixQaGatewayConfigObject(
-    JSON.parse(await readFile(configPath, "utf8")) as unknown,
-  );
+  return requireMatrixQaGatewayConfigObject(JSON.parse(await readFile(configPath, "utf8")));
 }
 
 async function writeMatrixQaGatewayConfigFile(configPath: string, config: unknown) {

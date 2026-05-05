@@ -369,8 +369,29 @@ describe("noteMemorySearchHealth", () => {
     const message = String(note.mock.calls[0]?.[0] ?? "");
     expect(message).toContain("QMD memory backend is configured");
     expect(message).toContain("spawn qmd ENOENT");
-    expect(message).toContain("npm install -g @tobilu/qmd");
-    expect(message).toContain("bun install -g @tobilu/qmd");
+    expect(message).toContain("npm install -g @tobilu/qmd@2.1.0");
+    expect(message).toContain("bun install -g @tobilu/qmd@2.1.0");
+  });
+
+  it("warns when QMD backend is active but the qmd version is below the supported baseline", async () => {
+    const qmdCfg = { memory: { backend: "qmd", qmd: { command: "qmd" } } } as OpenClawConfig;
+    checkQmdBinaryAvailability.mockResolvedValueOnce({
+      available: true,
+      version: "2.0.1",
+    });
+    resolveMemorySearchConfig.mockReturnValue({
+      provider: "auto",
+      local: {},
+      remote: {},
+    });
+
+    await noteMemorySearchHealth(qmdCfg, {});
+
+    expect(note).toHaveBeenCalledTimes(1);
+    const message = String(note.mock.calls[0]?.[0] ?? "");
+    expect(message).toContain("detected qmd version (2.0.1)");
+    expect(message).toContain("supported OpenClaw baseline (2.1.x)");
+    expect(message).toContain("npm install -g @tobilu/qmd@2.1.0");
   });
 
   it("does not warn when remote apiKey is configured for explicit provider", async () => {

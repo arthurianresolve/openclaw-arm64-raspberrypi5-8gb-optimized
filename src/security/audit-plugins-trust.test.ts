@@ -429,6 +429,35 @@ describe("security audit install metadata findings", () => {
       findings.find((finding) => finding.checkId === "plugins.allow_phantom_entries"),
     ).toBeUndefined();
   });
+
+  it("ignores install backup and debris dirs when auditing installed plugin roots", async () => {
+    const stateDir = await makeTmpDir("installed-plugin-debris");
+    for (const name of [
+      "live-plugin",
+      ".openclaw-install-backups",
+      "node_modules",
+      "old-plugin.backup-20260502",
+      "old-plugin.disabled.20260502",
+      "old-plugin.bak",
+    ]) {
+      await fs.mkdir(path.join(stateDir, "extensions", name), { recursive: true });
+    }
+
+    const findings = await runInstallMetadataAudit({}, stateDir);
+
+    const noAllowlist = findings.find(
+      (finding) => finding.checkId === "plugins.extensions_no_allowlist",
+    );
+    expect(noAllowlist?.detail).toContain("Found 1 extension(s)");
+
+    const toolsReachable = findings.find(
+      (finding) => finding.checkId === "plugins.tools_reachable_permissive_policy",
+    );
+    expect(toolsReachable?.detail).toContain("Enabled extension plugins: live-plugin.");
+    expect(findings.map((finding) => finding.detail).join("\n")).not.toContain(
+      ".openclaw-install-backups",
+    );
+  });
 });
 
 describe("security audit extension tool reachability findings", () => {

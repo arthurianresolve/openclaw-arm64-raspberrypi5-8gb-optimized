@@ -44,6 +44,8 @@ Perfect for:
 ## 1) Flash the OS
 
 Use **Raspberry Pi OS Lite (64-bit)** — no desktop needed for a headless server.
+This guide is intended for current Raspberry Pi OS 64-bit images, including the
+Debian 13 / Raspberry Pi OS **Trixie** line.
 
 1. Download [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
 2. Choose OS: **Raspberry Pi OS Lite (64-bit)**
@@ -127,6 +129,17 @@ npm link
 
 The hackable install gives you direct access to logs and code — useful for debugging ARM-specific issues.
 
+If your Pi boots from an NVMe or other SSD mounted under `/data`, move the repo
+there before continuing so state, cache, and QMD models avoid SD-card random-I/O
+penalties:
+
+```bash
+sudo mkdir -p /data
+sudo chown "$(whoami)":"$(whoami)" /data
+mv ~/openclaw /data/openclaw
+cd /data/openclaw
+```
+
 ## 7) Run Onboarding
 
 ```bash
@@ -151,6 +164,51 @@ systemctl --user status openclaw-gateway.service
 
 # View logs
 journalctl --user -u openclaw-gateway.service -f
+```
+
+## 8.5) Apply Raspberry Pi runtime tuning (recommended)
+
+After `openclaw onboard --install-daemon`, use the checked-in helper to install
+the gateway service drop-in plus the QMD wrapper/service with SSD-backed state:
+
+```bash
+cd /data/openclaw
+./scripts/setup-raspberry-pi-system.sh --enable-qmd-service --enable-linger
+openclaw gateway install --force
+systemctl --user restart openclaw-gateway.service
+```
+
+What this sets up:
+
+- `OPENCLAW_NO_RESPAWN=1` for the gateway service
+- `NODE_COMPILE_CACHE=/data/openclaw/cache/node-compile`
+- `QMD_WRAPPER_HOME=/data/openclaw/state/qmd-home`
+- optional `qmd-mcp.service` using the same SSD-backed state root
+
+## 8.6) Install the optimized QMD wrapper directly (advanced / optional)
+
+If you plan to use the QMD memory backend on a Pi 5, install the repo-managed
+wrapper and MCP service after upstream QMD:
+
+```bash
+npm install -g @tobilu/qmd@2.1.0
+cd /data/openclaw
+./scripts/setup-qmd-system.sh --state-root /data/openclaw/state/qmd-home --enable-service --enable-linger
+```
+
+Why this wrapper exists:
+
+- Keeps QMD state under a writable XDG home instead of fragile default paths
+- Forces CPU mode with `QMD_LLAMA_GPU=none`
+- Defaults `qmd query` to `--no-rerank`, which is much more practical on a
+  4-core ARM CPU
+- Installs an optional `qmd-mcp.service` user unit on port `8181`
+
+Verify:
+
+```bash
+qmd status
+systemctl --user status qmd-mcp.service
 ```
 
 ## 9) Access the OpenClaw Dashboard
@@ -198,12 +256,15 @@ See [Pi USB boot guide](https://www.raspberrypi.com/documentation/computers/rasp
 
 ### Speed up CLI startup (module compile cache)
 
-On lower-power Pi hosts, enable Node's module compile cache so repeated CLI runs are faster:
+On lower-power Pi hosts, enable Node's module compile cache so repeated CLI runs are faster.
+If you already ran `./scripts/setup-raspberry-pi-system.sh`, the gateway service
+is already configured with an SSD-backed compile cache and you only need this
+snippet for interactive shell usage:
 
 ```bash
-grep -q 'NODE_COMPILE_CACHE=/var/tmp/openclaw-compile-cache' ~/.bashrc || cat >> ~/.bashrc <<'EOF' # pragma: allowlist secret
-export NODE_COMPILE_CACHE=/var/tmp/openclaw-compile-cache
-mkdir -p /var/tmp/openclaw-compile-cache
+grep -q 'NODE_COMPILE_CACHE=/data/openclaw/cache/node-compile' ~/.bashrc || cat >> ~/.bashrc <<'EOF' # pragma: allowlist secret
+export NODE_COMPILE_CACHE=/data/openclaw/cache/node-compile
+mkdir -p /data/openclaw/cache/node-compile
 export OPENCLAW_NO_RESPAWN=1
 EOF
 source ~/.bashrc
@@ -212,14 +273,14 @@ source ~/.bashrc
 Notes:
 
 - `NODE_COMPILE_CACHE` speeds up subsequent runs (`status`, `health`, `--help`).
-- `/var/tmp` survives reboots better than `/tmp`.
+- `/data/openclaw/cache` keeps the compile cache on SSD-backed storage.
 - `OPENCLAW_NO_RESPAWN=1` avoids extra startup cost from CLI self-respawn.
 - First run warms the cache; later runs benefit most.
 
 ### systemd startup tuning (optional)
 
-If this Pi is mostly running OpenClaw, add a service drop-in to reduce restart
-jitter and keep startup env stable:
+If you did not use `./scripts/setup-raspberry-pi-system.sh`, add a service
+drop-in manually to reduce restart jitter and keep startup env stable:
 
 ```bash
 systemctl --user edit openclaw-gateway.service
@@ -228,7 +289,8 @@ systemctl --user edit openclaw-gateway.service
 ```ini
 [Service]
 Environment=OPENCLAW_NO_RESPAWN=1
-Environment=NODE_COMPILE_CACHE=/var/tmp/openclaw-compile-cache
+Environment=NODE_COMPILE_CACHE=/data/openclaw/cache/node-compile
+Environment=QMD_WRAPPER_HOME=/data/openclaw/state/qmd-home
 Restart=always
 RestartSec=2
 TimeoutStartSec=90
@@ -243,6 +305,20 @@ systemctl --user restart openclaw-gateway.service
 
 If possible, keep OpenClaw state/cache on SSD-backed storage to avoid SD-card
 random-I/O bottlenecks during cold starts.
+
+### Raspberry Pi OS Trixie notes
+
+Raspberry Pi OS Trixie does not currently need a separate OpenClaw installer
+code path. The worthwhile changes are the same ones this guide now automates:
+
+- prefer `/data/openclaw` for state/cache/model paths when SSD storage is available
+- keep the gateway on Node 24 with `OPENCLAW_NO_RESPAWN=1`
+- keep QMD in CPU mode with `--no-rerank` by default
+
+At the repo level, a Trixie-specific package/install branch would add
+maintenance cost without enough gain yet. The practical differences are
+documentary: current Raspberry Pi OS is now Debian 13 / Trixie, and SSD-backed
+paths matter more than distro-conditional shell logic.
 
 If this is a headless Pi, enable lingering once so the user service survives
 logout:

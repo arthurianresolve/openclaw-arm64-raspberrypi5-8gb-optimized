@@ -5,6 +5,7 @@ import {
   jsonResult,
   readNumberParam,
   readStringParam,
+  resolveMemorySearchConfig,
   type OpenClawConfig,
 } from "openclaw/plugin-sdk/memory-core-host-runtime-core";
 import type {
@@ -108,6 +109,151 @@ function resolveActiveMemoryQmdSearchModeOverride(
       : undefined;
   const searchMode = normalizeActiveMemoryQmdSearchMode(pluginConfig?.qmd?.searchMode);
   return searchMode === "inherit" ? undefined : searchMode;
+}
+
+type SearchSurfaceResult = {
+  corpus?: string;
+  path: string;
+  score: number;
+  provenanceLabel?: string;
+  [key: string]: unknown;
+};
+
+function resolveCrossCorpusLabel(result: SearchSurfaceResult): string {
+  if (typeof result.corpus === "string" && result.corpus.trim().length > 0) {
+    return result.corpus;
+  }
+  return "other";
+}
+
+function isCrossCorpusStaleResult(result: SearchSurfaceResult): boolean {
+  const label = result.provenanceLabel?.toLowerCase() ?? "";
+  return label.includes("stale");
+}
+
+function normalizeCrossCorpusScores(params: {
+  rows: SearchSurfaceResult[];
+  normalization: "minmax" | "none";
+  stalePenalty: number;
+}) {
+  if (params.rows.length === 0) {
+    return [];
+  }
+  const grouped = new Map<string, SearchSurfaceResult[]>();
+  for (const row of params.rows) {
+    const key = resolveCrossCorpusLabel(row);
+    const list = grouped.get(key);
+    if (list) {
+      list.push(row);
+    } else {
+      grouped.set(key, [row]);
+    }
+  }
+
+  const normalized = params.rows.map((row) => {
+    const corpusKey = resolveCrossCorpusLabel(row);
+    const group = grouped.get(corpusKey) ?? [row];
+    const scores = group.map((entry) => entry.score);
+    const min = Math.min(...scores);
+    const max = Math.max(...scores);
+    let normalizedScore = row.score;
+    if (params.normalization === "minmax") {
+      normalizedScore = max > min ? (row.score - min) / (max - min) : row.score;
+    }
+    if (isCrossCorpusStaleResult(row)) {
+      normalizedScore = Math.max(0, normalizedScore - params.stalePenalty);
+    }
+    return {
+      ...row,
+      normalizedScore,
+      finalScore: normalizedScore,
+    };
+  });
+  return normalized;
+}
+
+function applyCrossCorpusQuota(params: {
+  rows: Array<SearchSurfaceResult & { normalizedScore: number; finalScore: number }>;
+  quota: {
+    memory?: number;
+    sessions?: number;
+    wiki?: number;
+    codesight?: number;
+    other?: number;
+  };
+}) {
+  const counters = new Map<string, number>();
+  const allowed = (corpus: string): number | undefined => {
+    if (corpus === "memory") {
+      return params.quota.memory;
+    }
+    if (corpus === "sessions") {
+      return params.quota.sessions;
+    }
+    if (corpus === "wiki") {
+      return params.quota.wiki;
+    }
+    if (corpus === "codesight") {
+      return params.quota.codesight;
+    }
+    return params.quota.other;
+  };
+  const accepted: Array<SearchSurfaceResult & { normalizedScore: number; finalScore: number }> = [];
+  for (const row of params.rows) {
+    const corpus = resolveCrossCorpusLabel(row);
+    const current = counters.get(corpus) ?? 0;
+    const cap = allowed(corpus);
+    if (typeof cap === "number" && current >= cap) {
+      continue;
+    }
+    counters.set(corpus, current + 1);
+    accepted.push(row);
+  }
+  return accepted;
+}
+
+function mergeSearchResultsWithCrossCorpusPolicy(params: {
+  memoryResults: SearchSurfaceResult[];
+  supplementResults: SearchSurfaceResult[];
+  maxResults: number;
+  cfg: OpenClawConfig;
+  agentId: string;
+}) {
+  const allRows = [...params.memoryResults, ...params.supplementResults];
+  const resolved = resolveMemorySearchConfig(params.cfg, params.agentId);
+  const crossCorpus = resolved?.query.crossCorpus;
+  if (!crossCorpus?.enabled) {
+    return allRows
+      .toSorted((left, right) => {
+        if (left.score !== right.score) {
+          return right.score - left.score;
+        }
+        return left.path.localeCompare(right.path);
+      })
+      .slice(0, params.maxResults);
+  }
+
+  const normalized = normalizeCrossCorpusScores({
+    rows: allRows,
+    normalization: crossCorpus.normalization,
+    stalePenalty: crossCorpus.stalePenalty,
+  }).toSorted((left, right) => {
+    if (left.finalScore !== right.finalScore) {
+      return right.finalScore - left.finalScore;
+    }
+    const leftCorpus = resolveCrossCorpusLabel(left);
+    const rightCorpus = resolveCrossCorpusLabel(right);
+    if (leftCorpus !== rightCorpus) {
+      return leftCorpus.localeCompare(rightCorpus);
+    }
+    return left.path.localeCompare(right.path);
+  });
+
+  const quotaApplied = applyCrossCorpusQuota({
+    rows: normalized,
+    quota: crossCorpus.quota,
+  });
+  return quotaApplied.slice(0, params.maxResults);
 }
 
 async function getSupplementMemoryReadResult(params: {
@@ -319,14 +465,13 @@ export function createMemorySearchTool(options: {
                 corpus: requestedCorpus,
               })
             : [];
-          const results = [...surfacedMemoryResults, ...supplementResults]
-            .toSorted((left, right) => {
-              if (left.score !== right.score) {
-                return right.score - left.score;
-              }
-              return left.path.localeCompare(right.path);
-            })
-            .slice(0, Math.max(1, maxResults ?? 10));
+          const results = mergeSearchResultsWithCrossCorpusPolicy({
+            memoryResults: surfacedMemoryResults,
+            supplementResults,
+            maxResults: Math.max(1, maxResults ?? 10),
+            cfg,
+            agentId,
+          });
           return jsonResult({
             results,
             provider,

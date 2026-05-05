@@ -19,6 +19,7 @@ export const BUILD_ALL_STEPS = [
     args: ["scripts/check-cli-bootstrap-imports.mjs"],
   },
   { label: "runtime-postbuild", kind: "node", args: ["scripts/runtime-postbuild.mjs"] },
+  { label: "ui:build", kind: "pnpm", pnpmArgs: ["ui:build"] },
   { label: "build-stamp", kind: "node", args: ["scripts/build-stamp.mjs"] },
   {
     label: "runtime-postbuild-stamp",
@@ -103,6 +104,7 @@ export const BUILD_ALL_PROFILES = {
     "tsdown",
     "check-cli-bootstrap-imports",
     "runtime-postbuild",
+    "ui:build",
     "build-stamp",
     "runtime-postbuild-stamp",
     "build:plugin-sdk:dts",

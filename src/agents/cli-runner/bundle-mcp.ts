@@ -27,7 +27,7 @@ function resolveBundleMcpMode(mode: CliBundleMcpMode | undefined): CliBundleMcpM
 
 async function readExternalMcpConfig(configPath: string): Promise<BundleMcpConfig> {
   try {
-    const raw = JSON.parse(await fs.readFile(configPath, "utf-8")) as unknown;
+    const raw = JSON.parse(await fs.readFile(configPath, "utf-8"));
     return { mcpServers: extractMcpServerMap(raw) };
   } catch {
     return { mcpServers: {} };

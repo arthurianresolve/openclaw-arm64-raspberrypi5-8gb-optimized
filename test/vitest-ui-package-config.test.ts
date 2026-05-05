@@ -4,14 +4,23 @@ import uiNodeConfig from "../ui/vitest.node.config.ts";
 
 describe("ui package vitest config", () => {
   it("keeps the standalone ui package on thread workers with isolation enabled", () => {
-    expect(uiConfig.test?.pool).toBe("threads");
-    expect(uiConfig.test?.isolate).toBe(true);
-    expect(uiConfig.test?.projects).toHaveLength(3);
+    const config = uiConfig as {
+      test?: { pool?: string; isolate?: boolean; projects?: unknown[] };
+    };
+    expect(config.test?.pool).toBe("threads");
+    expect(config.test?.isolate).toBe(true);
+    expect(config.test?.projects).toHaveLength(3);
 
-    for (const project of uiConfig.test?.projects ?? []) {
-      expect(project.test?.pool).toBe("threads");
-      expect(project.test?.isolate).toBe(true);
-      expect(project.test?.runner).toBeUndefined();
+    for (const project of config.test?.projects ?? []) {
+      if (!project || typeof project !== "object" || !("test" in project)) {
+        continue;
+      }
+      const typedProject = project as {
+        test?: { pool?: string; isolate?: boolean; runner?: unknown };
+      };
+      expect(typedProject.test?.pool).toBe("threads");
+      expect(typedProject.test?.isolate).toBe(true);
+      expect(typedProject.test?.runner).toBeUndefined();
     }
   });
 

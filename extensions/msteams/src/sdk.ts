@@ -483,7 +483,7 @@ async function updateActivityViaRest(params: {
       });
     }
 
-    return await response.json().catch(() => ({ id: activityId }));
+    return (await response.json().catch(() => ({ id: activityId }))) as { id?: string };
   } finally {
     await release();
   }

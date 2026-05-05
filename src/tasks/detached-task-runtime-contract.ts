@@ -9,6 +9,8 @@ import type {
   TaskStatus,
   TaskTerminalOutcome,
 } from "./task-registry.types.js";
+import type { UnitContextPacket } from "./unit-context-packet.js";
+import type { UnitVerificationPolicy } from "./unit-verification-policy.js";
 
 export type DetachedTaskCreateParams = {
   runtime: TaskRuntime;
@@ -25,6 +27,8 @@ export type DetachedTaskCreateParams = {
   runId?: string;
   label?: string;
   task: string;
+  unitContextPacket?: UnitContextPacket;
+  unitVerificationPolicy?: UnitVerificationPolicy;
   preferMetadata?: boolean;
   notifyPolicy?: TaskNotifyPolicy;
   deliveryStatus?: TaskDeliveryStatus;

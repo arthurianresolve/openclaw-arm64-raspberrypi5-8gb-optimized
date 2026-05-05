@@ -52,7 +52,7 @@ export function registerUpdateCli(program: Command) {
         ["openclaw update --channel beta", "Switch to beta channel (git + npm)"],
         ["openclaw update --channel dev", "Switch to dev channel (git + npm)"],
         ["openclaw update --tag beta", "One-off update to a dist-tag or version"],
-        ["openclaw update --tag main", "One-off package install from GitHub main"],
+        ["openclaw update --tag master", "One-off package install from GitHub master"],
         ["openclaw update --dry-run", "Preview actions without changing anything"],
         ["openclaw update --no-restart", "Update without restarting the service"],
         ["openclaw update --json", "Output result as JSON"],

@@ -79,7 +79,7 @@ function loadBundleLspConfigFile(params: {
     if (!stat.isFile()) {
       return { lspServers: {} };
     }
-    const raw = JSON.parse(fs.readFileSync(opened.fd, "utf-8")) as unknown;
+    const raw = JSON.parse(fs.readFileSync(opened.fd, "utf-8"));
     return { lspServers: extractLspServerMap(raw) };
   } finally {
     fs.closeSync(opened.fd);

@@ -14,12 +14,26 @@ export function createFakeTaskFlow(overrides?: Partial<BoundTaskFlow>): BoundTas
     ownerKey: "agent:main:main",
     status: "running" as const,
     goal: "Run Lobster workflow",
+    unitContextPacket: {
+      unitId: "lobster:tests/lobster",
+      objective: "Run Lobster workflow",
+      ownedPaths: [],
+      relevantDocs: [],
+      invariants: [],
+      validationCommands: [],
+      contextMode: "isolated-session" as const,
+      packetSource: "lobster" as const,
+    },
   };
 
   return {
     sessionKey: "agent:main:main",
     createManaged: vi.fn().mockReturnValue(baseFlow),
-    get: vi.fn(),
+    get: vi
+      .fn()
+      .mockImplementation((flowId: string) =>
+        flowId === baseFlow.flowId ? { ...baseFlow } : undefined,
+      ),
     list: vi.fn().mockReturnValue([]),
     findLatest: vi.fn(),
     resolve: vi.fn(),
@@ -34,7 +48,7 @@ export function createFakeTaskFlow(overrides?: Partial<BoundTaskFlow>): BoundTas
     })),
     finish: vi.fn().mockImplementation((input) => ({
       applied: true,
-      flow: { ...baseFlow, revision: input.expectedRevision + 1, status: "completed" as const },
+      flow: { ...baseFlow, revision: input.expectedRevision + 1, status: "succeeded" as const },
     })),
     fail: vi.fn().mockImplementation((input) => ({
       applied: true,

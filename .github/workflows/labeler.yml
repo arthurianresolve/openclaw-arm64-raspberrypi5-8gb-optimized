@@ -30,6 +30,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    if: ${{ github.event_name != 'pull_request_target' || github.event.pull_request.user.login != 'dependabot[bot]' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/create-github-app-token@v3
@@ -762,6 +763,7 @@ jobs:
   label-issues:
     permissions:
       issues: write
+    if: github.event_name == 'issues'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/create-github-app-token@v3

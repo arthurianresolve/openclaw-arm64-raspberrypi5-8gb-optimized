@@ -37,7 +37,7 @@ jobs:
   preflight:
     permissions:
       contents: read
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.user.login != 'dependabot[bot]' && !github.event.pull_request.draft) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     outputs:
@@ -300,7 +300,7 @@ jobs:
   security-scm-fast:
     permissions:
       contents: read
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.user.login != 'dependabot[bot]' && !github.event.pull_request.draft) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -393,7 +393,7 @@ jobs:
   security-dependency-audit:
     permissions:
       contents: read
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.user.login != 'dependabot[bot]' && !github.event.pull_request.draft) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -418,7 +418,7 @@ jobs:
   security-fast:
     permissions: {}
     needs: [security-scm-fast, security-dependency-audit]
-    if: ${{ !cancelled() && always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.user.login != 'dependabot[bot]' && !github.event.pull_request.draft) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -1417,7 +1417,7 @@ jobs:
               pnpm check:import-cycles
               ;;
             test-types)
-              pnpm check:test-types
+              pnpm check:types:extended
               ;;
             strict-smoke)
               # build-artifacts already runs the tsdown/runtime build for the same Node-relevant changes.

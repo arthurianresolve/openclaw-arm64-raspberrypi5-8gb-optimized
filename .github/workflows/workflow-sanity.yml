@@ -18,7 +18,7 @@ env:
 
 jobs:
   no-tabs:
-    if: github.event_name != 'workflow_dispatch'
+    if: github.event_name != 'workflow_dispatch' && (github.event_name != 'pull_request' || github.event.pull_request.user.login != 'dependabot[bot]')
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -50,7 +50,7 @@ jobs:
           PY
 
   actionlint:
-    if: github.event_name != 'workflow_dispatch'
+    if: github.event_name != 'workflow_dispatch' && (github.event_name != 'pull_request' || github.event.pull_request.user.login != 'dependabot[bot]')
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout

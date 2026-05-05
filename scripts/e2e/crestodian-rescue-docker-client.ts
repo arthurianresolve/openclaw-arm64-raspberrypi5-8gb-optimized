@@ -4,10 +4,12 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { handleCrestodianCommand } from "../../dist/auto-reply/reply/commands-crestodian.js";
-import { clearConfigCache } from "../../dist/config/config.js";
-import type { OpenClawConfig } from "../../dist/config/types.openclaw.js";
-import { runCrestodianRescueMessage } from "../../dist/crestodian/rescue-message.js";
+import {
+  clearConfigCache,
+  handleCrestodianCommand,
+  runCrestodianRescueMessage,
+} from "./dist-modules.mjs";
+import type { OpenClawConfig } from "./dist-modules.mjs";
 
 type CommandResult = Awaited<ReturnType<typeof handleCrestodianCommand>>;
 
@@ -175,7 +177,7 @@ async function main() {
     agentId: "default",
     isGroup: false,
     deps: {
-      runDoctor: async (_runtime, options) => {
+      runDoctor: async (_runtime: unknown, options: { repair?: boolean }) => {
         doctorRuns.push(options.repair ? "repair" : "check");
       },
     },
@@ -191,7 +193,7 @@ async function main() {
     agentId: "default",
     isGroup: false,
     deps: {
-      runDoctor: async (_runtime, options) => {
+      runDoctor: async (_runtime: unknown, options: { repair?: boolean }) => {
         doctorRuns.push(options.repair ? "repair" : "check");
       },
     },
@@ -221,7 +223,8 @@ async function main() {
   );
   assert(
     updatedConfig.agents?.list?.some(
-      (agent) => agent.id === "work" && agent.workspace === "/tmp/openclaw-work",
+      (agent: { id?: string; workspace?: string }) =>
+        agent.id === "work" && agent.workspace === "/tmp/openclaw-work",
     ),
     "agent config was not updated",
   );

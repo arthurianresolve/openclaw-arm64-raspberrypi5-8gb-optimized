@@ -22,6 +22,16 @@ export const MIN_CHUNK_RATIO = 0.15;
 export const SAFETY_MARGIN = 1.2; // 20% buffer for estimateTokens() inaccuracy
 const DEFAULT_SUMMARY_FALLBACK = "No prior history.";
 const DEFAULT_PARTS = 2;
+const RESUME_STATE_INSTRUCTIONS = [
+  "RESUME STATE:",
+  "- Current task: state the active task in one short line.",
+  "- Current status: summarize the live state, not the whole history.",
+  "- Blockers: list anything preventing progress.",
+  "- Decisions: capture the decisions that must survive compaction.",
+  "- Next step: name the immediate next action.",
+  "- Commitments: preserve promised follow-ups and deadlines.",
+  "- Identifiers: preserve opaque identifiers exactly as written.",
+].join("\n");
 const MERGE_SUMMARIES_INSTRUCTIONS = [
   "Merge these partial summaries into a single cohesive summary.",
   "",
@@ -89,16 +99,12 @@ export function buildCompactionSummarizationInstructions(
 ): string | undefined {
   const custom = customInstructions?.trim();
   const identifierPreservation = resolveIdentifierPreservationInstructions(instructions);
-  if (!identifierPreservation && !custom) {
-    return undefined;
-  }
+  const baseSections = [RESUME_STATE_INSTRUCTIONS, identifierPreservation].filter(Boolean);
   if (!custom) {
-    return identifierPreservation;
+    return baseSections.length > 0 ? baseSections.join("\n\n") : undefined;
   }
-  if (!identifierPreservation) {
-    return `Additional focus:\n${custom}`;
-  }
-  return `${identifierPreservation}\n\nAdditional focus:\n${custom}`;
+  const sections = [...baseSections, `Additional focus:\n${custom}`];
+  return sections.join("\n\n");
 }
 
 export function estimateMessagesTokens(messages: AgentMessage[]): number {

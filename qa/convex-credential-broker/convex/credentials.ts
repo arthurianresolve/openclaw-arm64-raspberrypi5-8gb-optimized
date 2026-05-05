@@ -60,13 +60,92 @@ type CredentialSetRecord = {
   lease?: CredentialLease;
 };
 
-type EventInsertCtx = {
-  db: {
-    insert: (
-      table: "lease_events" | "admin_events",
-      value: Record<string, unknown>,
-    ) => Promise<unknown>;
-  };
+type CredentialSetInsert = Omit<CredentialSetRecord, "_id">;
+
+type RetentionEventRecord = {
+  _id: string;
+  occurredAtMs: number;
+};
+
+type ConvexIndexCursor = {
+  eq(field: string, value: unknown): ConvexIndexCursor;
+  lt(field: string, value: number): ConvexIndexCursor;
+};
+
+type ConvexQuery<T> = {
+  withIndex(name: string, build: (q: ConvexIndexCursor) => ConvexIndexCursor): ConvexQuery<T>;
+  collect(): Promise<T[]>;
+  take(limit: number): Promise<T[]>;
+};
+
+type BrokerDb = {
+  insert(table: "credential_sets", value: CredentialSetInsert): Promise<Id<"credential_sets">>;
+  insert(table: "lease_events" | "admin_events", value: Record<string, unknown>): Promise<unknown>;
+  patch(id: Id<"credential_sets">, value: Partial<CredentialSetInsert>): Promise<void>;
+  get(id: Id<"credential_sets">): Promise<CredentialSetRecord | null>;
+  delete(id: string): Promise<void>;
+  query(table: "credential_sets"): ConvexQuery<CredentialSetRecord>;
+  query(table: "lease_events" | "admin_events"): ConvexQuery<RetentionEventRecord>;
+};
+
+type BrokerScheduler = {
+  runAfter(delayMs: number, ref: unknown, args: Record<string, unknown>): Promise<unknown>;
+};
+
+type BrokerMutationCtx = {
+  db: BrokerDb;
+  scheduler: BrokerScheduler;
+};
+
+type BrokerQueryCtx = {
+  db: BrokerDb;
+};
+
+type EventInsertCtx = Pick<BrokerMutationCtx, "db">;
+
+type AcquireLeaseArgs = {
+  kind: string;
+  ownerId: string;
+  actorRole: ActorRole;
+  leaseTtlMs?: number;
+  heartbeatIntervalMs?: number;
+};
+
+type HeartbeatLeaseArgs = {
+  kind: string;
+  ownerId: string;
+  actorRole: ActorRole;
+  credentialId: Id<"credential_sets">;
+  leaseToken: string;
+  leaseTtlMs?: number;
+};
+
+type ReleaseLeaseArgs = {
+  kind: string;
+  ownerId: string;
+  actorRole: ActorRole;
+  credentialId: Id<"credential_sets">;
+  leaseToken: string;
+};
+
+type AddCredentialSetArgs = {
+  kind: string;
+  payload: unknown;
+  note?: string;
+  actorId?: string;
+  status?: CredentialStatus;
+};
+
+type DisableCredentialSetArgs = {
+  credentialId: Id<"credential_sets">;
+  actorId?: string;
+};
+
+type ListCredentialSetsArgs = {
+  kind?: string;
+  status?: ListStatus;
+  includePayload?: boolean;
+  limit?: number;
 };
 
 function normalizeIntervalMs(params: {
@@ -227,7 +306,7 @@ export const acquireLease = internalMutation({
     leaseTtlMs: v.optional(v.number()),
     heartbeatIntervalMs: v.optional(v.number()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx: BrokerMutationCtx, args: AcquireLeaseArgs) => {
     const nowMs = Date.now();
     const leaseTtlMs = normalizeIntervalMs({
       value: args.leaseTtlMs,
@@ -254,10 +333,10 @@ export const acquireLease = internalMutation({
       );
     }
 
-    const activeRows = (await ctx.db
+    const activeRows = await ctx.db
       .query("credential_sets")
       .withIndex("by_kind_status", (q) => q.eq("kind", args.kind).eq("status", "active"))
-      .collect()) as CredentialSetRecord[];
+      .collect();
 
     const availableRows = activeRows.filter((row) => !leaseIsActive(row.lease, nowMs));
 
@@ -326,7 +405,10 @@ export const heartbeatLease = internalMutation({
     leaseToken: v.string(),
     leaseTtlMs: v.optional(v.number()),
   },
-  handler: async (ctx, args): Promise<BrokerErrorResult | BrokerOkResult> => {
+  handler: async (
+    ctx: BrokerMutationCtx,
+    args: HeartbeatLeaseArgs,
+  ): Promise<BrokerErrorResult | BrokerOkResult> => {
     const nowMs = Date.now();
     const leaseTtlMs = normalizeIntervalMs({
       value: args.leaseTtlMs,
@@ -341,7 +423,7 @@ export const heartbeatLease = internalMutation({
       );
     }
 
-    const row = (await ctx.db.get(args.credentialId)) as CredentialSetRecord | null;
+    const row = await ctx.db.get(args.credentialId);
     if (!row) {
       return brokerError("CREDENTIAL_NOT_FOUND", "Credential record does not exist.");
     }
@@ -385,9 +467,12 @@ export const releaseLease = internalMutation({
     credentialId: v.id("credential_sets"),
     leaseToken: v.string(),
   },
-  handler: async (ctx, args): Promise<BrokerErrorResult | BrokerOkResult> => {
+  handler: async (
+    ctx: BrokerMutationCtx,
+    args: ReleaseLeaseArgs,
+  ): Promise<BrokerErrorResult | BrokerOkResult> => {
     const nowMs = Date.now();
-    const row = (await ctx.db.get(args.credentialId)) as CredentialSetRecord | null;
+    const row = await ctx.db.get(args.credentialId);
     if (!row) {
       return brokerError("CREDENTIAL_NOT_FOUND", "Credential record does not exist.");
     }
@@ -426,7 +511,7 @@ export const addCredentialSet = internalMutation({
     actorId: v.optional(v.string()),
     status: v.optional(credentialStatus),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx: BrokerMutationCtx, args: AddCredentialSetArgs) => {
     const nowMs = Date.now();
     const actorId = normalizeActorId(args.actorId);
     const status = args.status ?? "active";
@@ -473,10 +558,10 @@ export const disableCredentialSet = internalMutation({
     credentialId: v.id("credential_sets"),
     actorId: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx: BrokerMutationCtx, args: DisableCredentialSetArgs) => {
     const nowMs = Date.now();
     const actorId = normalizeActorId(args.actorId);
-    const row = (await ctx.db.get(args.credentialId)) as CredentialSetRecord | null;
+    const row = await ctx.db.get(args.credentialId);
     if (!row) {
       await insertAdminEvent({
         ctx,
@@ -549,7 +634,7 @@ export const listCredentialSets = internalQuery({
     includePayload: v.optional(v.boolean()),
     limit: v.optional(v.number()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx: BrokerQueryCtx, args: ListCredentialSetsArgs) => {
     const normalizedStatus: ListStatus = args.status ?? "all";
     const includePayload = args.includePayload === true;
     const limit = normalizeListLimit(args.limit);
@@ -564,18 +649,18 @@ export const listCredentialSets = internalQuery({
     const kind = args.kind?.trim();
     if (kind) {
       if (normalizedStatus === "all") {
-        rows = (await ctx.db
+        rows = await ctx.db
           .query("credential_sets")
           .withIndex("by_kind_lastLeasedAtMs", (q) => q.eq("kind", kind))
-          .collect()) as CredentialSetRecord[];
+          .collect();
       } else {
-        rows = (await ctx.db
+        rows = await ctx.db
           .query("credential_sets")
           .withIndex("by_kind_status", (q) => q.eq("kind", kind).eq("status", normalizedStatus))
-          .collect()) as CredentialSetRecord[];
+          .collect();
       }
     } else {
-      rows = (await ctx.db.query("credential_sets").collect()) as CredentialSetRecord[];
+      rows = await ctx.db.query("credential_sets").collect();
       if (normalizedStatus !== "all") {
         rows = rows.filter((row) => row.status === normalizedStatus);
       }
@@ -593,7 +678,7 @@ export const listCredentialSets = internalQuery({
 
 export const cleanupLeaseEvents = internalMutation({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx: BrokerMutationCtx) => {
     const cutoffMs = Date.now() - LEASE_EVENT_RETENTION_MS;
     const staleRows = await ctx.db
       .query("lease_events")
@@ -618,7 +703,7 @@ export const cleanupLeaseEvents = internalMutation({
 
 export const cleanupAdminEvents = internalMutation({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx: BrokerMutationCtx) => {
     const cutoffMs = Date.now() - ADMIN_EVENT_RETENTION_MS;
     const staleRows = await ctx.db
       .query("admin_events")

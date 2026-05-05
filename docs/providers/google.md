@@ -108,6 +108,7 @@ Choose your preferred auth method and follow the setup steps.
 
     - `OPENCLAW_GEMINI_OAUTH_CLIENT_ID`
     - `OPENCLAW_GEMINI_OAUTH_CLIENT_SECRET`
+    - `OPENCLAW_GEMINI_OAUTH_CREDENTIALS_JSON` for hydrating `~/.gemini/oauth_creds.json`
 
     (Or the `GEMINI_CLI_*` variants.)
 

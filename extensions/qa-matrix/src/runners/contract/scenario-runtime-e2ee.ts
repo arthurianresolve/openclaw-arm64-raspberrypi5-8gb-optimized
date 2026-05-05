@@ -305,7 +305,7 @@ function parseMatrixQaCliJsonText(text: string): unknown {
   if (!candidate) {
     throw new Error("no JSON payload found");
   }
-  return JSON.parse(candidate) as unknown;
+  return JSON.parse(candidate);
 }
 
 function parseMatrixQaCliJson(result: MatrixQaCliRunResult): unknown {

@@ -61,7 +61,7 @@ const mocks = vi.hoisted(() => {
             capability: "read_only",
           },
           server: {
-            version: "2026.4.24",
+            version: "2026.4.25",
             connId: "local",
           },
           health: { ok: true },
@@ -108,7 +108,7 @@ const mocks = vi.hoisted(() => {
           capability: "admin_capable",
         },
         server: {
-          version: "2026.4.24",
+          version: "2026.4.25",
           connId: "remote",
         },
         health: { ok: true },

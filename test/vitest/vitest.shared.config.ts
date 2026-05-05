@@ -12,7 +12,6 @@ import {
   BUNDLED_PLUGIN_ROOT_DIR,
   BUNDLED_PLUGIN_TEST_GLOB,
 } from "./vitest.bundled-plugin-paths.ts";
-import { loadVitestExperimentalConfig } from "./vitest.performance-config.ts";
 import { shouldPrintVitestThrottle } from "./vitest.system-load.ts";
 
 type VitestHostInfo = {
@@ -37,6 +36,8 @@ export const jsdomOptimizedDeps = {
     },
   },
 };
+
+const vitestCacheDir = "/data/tmp/openclaw-vitest-cache";
 
 function detectVitestHostInfo(): Required<VitestHostInfo> {
   return detectVitestHostInfoImpl() as Required<VitestHostInfo>;
@@ -128,6 +129,8 @@ if (!isCI && localScheduling.throttledBySystem && shouldPrintVitestThrottle(proc
 
 export const sharedVitestConfig = {
   root: repoRoot,
+  cacheDir: vitestCacheDir,
+  configLoader: "runner",
   envFile: false,
   resolve: {
     alias: [
@@ -377,6 +380,5 @@ export const sharedVitestConfig = {
         "src/infra/tailscale.ts",
       ],
     },
-    ...loadVitestExperimentalConfig(),
   },
 };

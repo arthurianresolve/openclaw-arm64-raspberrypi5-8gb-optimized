@@ -569,14 +569,14 @@ describe("scripts/openclaw-cross-os-release-checks", () => {
 
   it("detects whether a managed gateway listener is still reachable on loopback", async () => {
     const server = createNetServer();
-    await new Promise((resolvePromise) => {
-      server.listen(0, "127.0.0.1", resolvePromise);
+    await new Promise<void>((resolvePromise) => {
+      server.listen(0, "127.0.0.1", () => resolvePromise());
     });
     const address = server.address();
     const port = typeof address === "object" && address ? address.port : 0;
     expect(await canConnectToLoopbackPort(port)).toBe(true);
-    await new Promise((resolvePromise) => {
-      server.close(resolvePromise);
+    await new Promise<void>((resolvePromise) => {
+      server.close(() => resolvePromise());
     });
     for (let attempt = 0; attempt < 20; attempt += 1) {
       if (!(await canConnectToLoopbackPort(port, 100))) {
@@ -610,7 +610,7 @@ describe("scripts/openclaw-cross-os-release-checks", () => {
   });
 
   it("verifies main dev updates against the prepared source sha when available", () => {
-    expect(resolveDevUpdateVerificationRef("main")).toBe("main");
+    expect(resolveDevUpdateVerificationRef("main", "")).toBe("main");
     expect(
       resolveDevUpdateVerificationRef("main", "08753a1d793c040b101c8a26c43445dbbab14995"),
     ).toBe("08753a1d793c040b101c8a26c43445dbbab14995");
@@ -620,9 +620,9 @@ describe("scripts/openclaw-cross-os-release-checks", () => {
         "08753a1d793c040b101c8a26c43445dbbab14995",
       ),
     ).toBe("08753a1d793c040b101c8a26c43445dbbab14995");
-    expect(resolveDevUpdateVerificationRef("codex/cross-os-release-checks-full-native-e2e")).toBe(
-      "codex/cross-os-release-checks-full-native-e2e",
-    );
+    expect(
+      resolveDevUpdateVerificationRef("codex/cross-os-release-checks-full-native-e2e", ""),
+    ).toBe("codex/cross-os-release-checks-full-native-e2e");
   });
 
   it("drops the bundled plugin postinstall disable flag for real updater calls", () => {

@@ -341,6 +341,18 @@ describe("gateway codex harness live helpers", () => {
     expect(isExpectedCodexModelsCommandText(text)).toBe(true);
   });
 
+  it("accepts the interactive TUI header summary from Docker live harness", () => {
+    const text = [
+      "`codex models` is interactive here and did not print a model list. It opened a Codex TUI session, which interpreted `models` as a prompt and replied:",
+      "",
+      "> Could you clarify what you want to do with “models”?",
+      "",
+      "The visible session header showed the current model as `gpt-5.5`.",
+    ].join("\n");
+
+    expect(isExpectedCodexModelsCommandText(text)).toBe(true);
+  });
+
   it("accepts the local Codex model-cache summary", () => {
     const text = [
       "Available models in this Codex install, from the local cache fetched on `2026-04-18`, are:",

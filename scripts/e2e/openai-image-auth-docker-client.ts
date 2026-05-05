@@ -170,8 +170,7 @@ async function main() {
   const records: RequestRecord[] = [];
   const mock = await startMockServer(records);
   try {
-    const { buildOpenAIImageGenerationProvider } =
-      await import("../../dist/extensions/openai/image-generation-provider.js");
+    const { buildOpenAIImageGenerationProvider } = await import("./dist-modules.mjs");
     const provider = buildOpenAIImageGenerationProvider();
 
     const directResult = await provider.generateImage({

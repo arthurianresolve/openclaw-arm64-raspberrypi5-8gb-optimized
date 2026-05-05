@@ -39,6 +39,10 @@ import {
   resetTaskRegistryForTests,
   setTaskRegistryControlRuntimeForTests,
 } from "./task-registry.js";
+import {
+  resetTaskVerificationRuntimeForTests,
+  setTaskVerificationRuntimeForTests,
+} from "./task-verification-runtime.js";
 
 const ORIGINAL_STATE_DIR = process.env.OPENCLAW_STATE_DIR;
 const hoisted = vi.hoisted(() => {
@@ -75,6 +79,7 @@ async function withTaskExecutorStateDir(run: (stateDir: string) => Promise<void>
     resetTaskRegistryDeliveryRuntimeForTests();
     resetTaskRegistryControlRuntimeForTests();
     resetAgentRunContextForTest();
+    resetTaskVerificationRuntimeForTests();
     resetTaskRegistryForTests({ persist: false });
     resetTaskFlowRegistryForTests({ persist: false });
     setTaskRegistryDeliveryRuntimeForTests({
@@ -95,6 +100,7 @@ async function withTaskExecutorStateDir(run: (stateDir: string) => Promise<void>
       resetTaskRegistryDeliveryRuntimeForTests();
       resetTaskRegistryControlRuntimeForTests();
       resetAgentRunContextForTest();
+      resetTaskVerificationRuntimeForTests();
       resetTaskRegistryForTests({ persist: false });
       resetTaskFlowRegistryForTests({ persist: false });
     }
@@ -164,6 +170,7 @@ describe("task-executor", () => {
     resetTaskRegistryDeliveryRuntimeForTests();
     resetTaskRegistryControlRuntimeForTests();
     resetAgentRunContextForTest();
+    resetTaskVerificationRuntimeForTests();
     resetTaskRegistryForTests({ persist: false });
     resetTaskFlowRegistryForTests({ persist: false });
     hoisted.sendMessageMock.mockReset();
@@ -407,6 +414,310 @@ describe("task-executor", () => {
     });
   });
 
+  it("marks a flow blocked when post-unit verification fails in stop mode", async () => {
+    await withTaskExecutorStateDir(async () => {
+      setTaskVerificationRuntimeForTests({
+        runCommand: () => ({
+          passed: false,
+          exitCode: 1,
+          signal: null,
+          stdout: "",
+          stderr: "queue test failed",
+        }),
+      });
+
+      const created = createRunningTaskRun({
+        runtime: "acp",
+        ownerKey: "agent:main:main",
+        scopeKind: "session",
+        childSessionKey: "agent:codex:acp:verify-child",
+        runId: "run-executor-verify-stop",
+        task: "Verify queue patch",
+        startedAt: 10,
+        unitVerificationPolicy: {
+          commands: ["pnpm test -- queue"],
+          retryCount: 1,
+          autoRepair: false,
+          failMode: "stop",
+        },
+      });
+
+      completeTaskRunByRunId({
+        runId: "run-executor-verify-stop",
+        endedAt: 50,
+        lastEventAt: 50,
+        terminalSummary: "Task edits applied.",
+      });
+
+      expect(getTaskFlowById(created.parentFlowId!)).toMatchObject({
+        flowId: created.parentFlowId,
+        status: "blocked",
+        blockedTaskId: created.taskId,
+        blockedSummary: "Verification failed: pnpm test -- queue (exit 1).",
+        verificationState: {
+          latestTaskId: created.taskId,
+          status: "failed",
+          failMode: "stop",
+          summary: "Verification failed: pnpm test -- queue (exit 1).",
+          commands: [
+            expect.objectContaining({
+              command: "pnpm test -- queue",
+              passed: false,
+              exitCode: 1,
+            }),
+          ],
+        },
+      });
+    });
+  });
+
+  it("records verification failures without blocking when fail mode is record_only", async () => {
+    await withTaskExecutorStateDir(async () => {
+      setTaskVerificationRuntimeForTests({
+        runCommand: () => ({
+          passed: false,
+          exitCode: 2,
+          signal: null,
+          stdout: "",
+          stderr: "lint failed",
+        }),
+      });
+
+      const created = createRunningTaskRun({
+        runtime: "acp",
+        ownerKey: "agent:main:main",
+        scopeKind: "session",
+        childSessionKey: "agent:codex:acp:verify-record",
+        runId: "run-executor-verify-record",
+        task: "Verify docs patch",
+        startedAt: 10,
+        unitVerificationPolicy: {
+          commands: ["pnpm lint -- docs"],
+          retryCount: 0,
+          autoRepair: false,
+          failMode: "record_only",
+        },
+      });
+
+      completeTaskRunByRunId({
+        runId: "run-executor-verify-record",
+        endedAt: 50,
+        lastEventAt: 50,
+        terminalSummary: "Task edits applied.",
+      });
+
+      expect(getTaskFlowById(created.parentFlowId!)).toMatchObject({
+        flowId: created.parentFlowId,
+        status: "succeeded",
+        verificationState: {
+          latestTaskId: created.taskId,
+          status: "failed",
+          failMode: "record_only",
+          summary: "Verification failed: pnpm lint -- docs (exit 2).",
+        },
+      });
+    });
+  });
+
+  it("auto-enqueues a repair task when verification fails with remaining repair budget", async () => {
+    await withTaskExecutorStateDir(async () => {
+      setTaskVerificationRuntimeForTests({
+        runCommand: () => ({
+          passed: false,
+          exitCode: 3,
+          signal: null,
+          stdout: "",
+          stderr: "typecheck failed",
+        }),
+      });
+
+      const flow = createManagedTaskFlow({
+        ownerKey: "agent:main:main",
+        controllerId: "tests/verification-repair",
+        goal: "Patch queue regression",
+        status: "running",
+        currentStep: "execute_unit",
+        unitContextPacket: {
+          unitId: "queue-regression",
+          objective: "Patch queue regression",
+          ownedPaths: ["src/queue"],
+          relevantDocs: ["docs/help/testing.md"],
+          invariants: ["Do not drop queued work"],
+          validationCommands: ["pnpm tsc -p tsconfig.core.json --noEmit"],
+          contextMode: "isolated-session",
+          packetSource: "taskflow",
+        },
+      });
+
+      const created = runTaskInFlow({
+        flowId: flow.flowId,
+        runtime: "acp",
+        runId: "run-verification-repair-parent",
+        task: "Patch queue regression",
+        status: "running",
+        startedAt: 10,
+        lastEventAt: 10,
+        unitVerificationPolicy: {
+          commands: ["pnpm tsc -p tsconfig.core.json --noEmit"],
+          retryCount: 1,
+          autoRepair: true,
+          failMode: "stop",
+        },
+      });
+      if (!created.created || !created.task) {
+        throw new Error("expected managed child task creation to succeed");
+      }
+
+      completeTaskRunByRunId({
+        runId: "run-verification-repair-parent",
+        endedAt: 50,
+        lastEventAt: 50,
+        terminalSummary: "Patch applied.",
+      });
+
+      const latest = findLatestTaskForFlowId(flow.flowId);
+      expect(latest).toMatchObject({
+        parentFlowId: flow.flowId,
+        parentTaskId: created.task.taskId,
+        status: "queued",
+        runId: "run-verification-repair-parent:verification-repair:0",
+        label: expect.stringMatching(/^Verification repair: Patch queue regression/),
+        unitVerificationPolicy: {
+          commands: ["pnpm tsc -p tsconfig.core.json --noEmit"],
+          retryCount: 0,
+          autoRepair: false,
+          failMode: "stop",
+        },
+      });
+      expect(latest?.task).toContain("Repair the failing verification for Patch queue regression");
+      expect(latest?.task).toContain("Remaining automatic repair budget after this retry: 0.");
+      expect(latest?.label).toMatch(/^Verification repair: Patch queue regression/);
+
+      expect(getTaskFlowById(flow.flowId)).toMatchObject({
+        flowId: flow.flowId,
+        status: "running",
+        currentStep: "verification_repair",
+        verificationState: {
+          latestTaskId: created.task.taskId,
+          status: "failed",
+          failMode: "stop",
+          summary: "Verification failed: pnpm tsc -p tsconfig.core.json --noEmit (exit 3).",
+          remainingRepairBudget: 0,
+          repairTaskId: latest?.taskId,
+          resumeStepAfterRepair: "execute_unit",
+          repairAttemptCount: 1,
+          repairSuccessCount: 0,
+          repairFailureCount: 0,
+          history: [
+            expect.objectContaining({
+              taskId: created.task.taskId,
+              status: "failed",
+            }),
+          ],
+        },
+      });
+      expect(getTaskFlowById(flow.flowId)?.verificationState?.history).toHaveLength(1);
+
+      const duplicateRepair = runTaskInFlow({
+        flowId: flow.flowId,
+        runtime: "acp",
+        runId: "run-verification-repair-duplicate",
+        task: "Repair the unit so the verification commands pass.",
+        label: "Verification repair: duplicate",
+        status: "queued",
+        allowDuringRepair: true,
+      });
+      expect(duplicateRepair).toMatchObject({
+        found: true,
+        created: false,
+        reason: "Flow already has an active verification repair task.",
+      });
+    });
+  });
+
+  it("exits verification repair mode after a repair task passes and allows generic work again", async () => {
+    await withTaskExecutorStateDir(async () => {
+      setTaskVerificationRuntimeForTests({
+        runCommand: () => ({
+          passed: true,
+          exitCode: 0,
+          signal: null,
+          stdout: "ok",
+          stderr: "",
+        }),
+      });
+
+      const flow = createManagedTaskFlow({
+        ownerKey: "agent:main:main",
+        controllerId: "tests/verification-repair-success",
+        goal: "Patch queue regression",
+        status: "running",
+        currentStep: "verification_repair",
+        verificationState: {
+          latestTaskId: "task-parent",
+          status: "failed",
+          failMode: "stop",
+          summary: "Verification failed previously.",
+          commands: [],
+          repairTaskId: "task-repair",
+          resumeStepAfterRepair: "execute_unit",
+        },
+      });
+
+      const repairTask = createRunningTaskRun({
+        runtime: "acp",
+        ownerKey: "agent:main:main",
+        scopeKind: "session",
+        parentFlowId: flow.flowId,
+        childSessionKey: "agent:codex:acp:repair-child",
+        runId: "run-verification-repair-success",
+        label: "Verification repair: Patch queue regression",
+        task: "Repair the unit so the verification commands pass.",
+        startedAt: 10,
+        unitVerificationPolicy: {
+          commands: ["pnpm tsc -p tsconfig.core.json --noEmit"],
+          retryCount: 0,
+          autoRepair: false,
+          failMode: "stop",
+        },
+      });
+
+      completeTaskRunByRunId({
+        runId: "run-verification-repair-success",
+        endedAt: 50,
+        lastEventAt: 50,
+        terminalSummary: "Repair passed verification.",
+      });
+
+      expect(getTaskFlowById(flow.flowId)).toMatchObject({
+        flowId: flow.flowId,
+        status: "running",
+        currentStep: "execute_unit",
+        verificationState: {
+          latestTaskId: repairTask.taskId,
+          status: "passed",
+          repairTaskId: "task-repair",
+          resumeStepAfterRepair: "execute_unit",
+          repairAttemptCount: 0,
+          repairSuccessCount: 1,
+          repairFailureCount: 0,
+        },
+      });
+
+      const resumed = runTaskInFlow({
+        flowId: flow.flowId,
+        runtime: "acp",
+        runId: "run-post-repair-normal-work",
+        task: "Resume normal unit work",
+        status: "queued",
+      });
+      expect(resumed).toMatchObject({
+        found: true,
+        created: true,
+      });
+    });
+  });
+
   it("cancels active tasks linked to a managed TaskFlow", async () => {
     await withTaskExecutorStateDir(async () => {
       hoisted.cancelSessionMock.mockResolvedValue(undefined);
@@ -632,6 +943,35 @@ describe("task-executor", () => {
         found: false,
         created: false,
         reason: "Flow not found.",
+      });
+      expect(findLatestTaskForFlowId(flow.flowId)).toBeUndefined();
+    });
+  });
+
+  it("suppresses generic child spawning while a managed flow is in verification repair mode", async () => {
+    await withTaskExecutorStateDir(async () => {
+      const flow = createManagedTaskFlow({
+        ownerKey: "agent:main:main",
+        controllerId: "tests/managed-flow",
+        goal: "Repair flow",
+        status: "running",
+        currentStep: "verification_repair",
+      });
+
+      const created = runTaskInFlowForOwner({
+        flowId: flow.flowId,
+        callerOwnerKey: "agent:main:main",
+        runtime: "acp",
+        childSessionKey: "agent:codex:acp:child",
+        runId: "run-flow-repair-blocked",
+        task: "Start unrelated work",
+      });
+
+      expect(created).toMatchObject({
+        found: true,
+        created: false,
+        reason:
+          "Flow is in verification repair mode; generic child work is suppressed until repair completes.",
       });
       expect(findLatestTaskForFlowId(flow.flowId)).toBeUndefined();
     });

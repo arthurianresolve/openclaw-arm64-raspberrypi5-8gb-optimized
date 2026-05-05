@@ -13,7 +13,7 @@ describe("resolveNpmRunner", () => {
     const runner = resolveNpmRunner({
       execPath,
       env: {},
-      existsSync: (candidate) => candidate === expectedNpmCliPath,
+      existsSync: (candidate: string | Buffer) => String(candidate) === expectedNpmCliPath,
       platform: "darwin",
     });
 
@@ -34,7 +34,7 @@ describe("resolveNpmRunner", () => {
     const runner = resolveNpmRunner({
       execPath,
       env: {},
-      existsSync: (candidate) => candidate === expectedNpmCliPath,
+      existsSync: (candidate: string | Buffer) => String(candidate) === expectedNpmCliPath,
       platform: "win32",
     });
 
@@ -52,7 +52,7 @@ describe("resolveNpmRunner", () => {
     const runner = resolveNpmRunner({
       execPath,
       env: {},
-      existsSync: (candidate) => candidate === expectedNpmExePath,
+      existsSync: (candidate: string | Buffer) => String(candidate) === expectedNpmExePath,
       npmArgs: ["install", "--silent"],
       platform: "win32",
     });
@@ -72,7 +72,7 @@ describe("resolveNpmRunner", () => {
       comSpec: "C:\\Windows\\System32\\cmd.exe",
       execPath,
       env: {},
-      existsSync: (candidate) => candidate === npmCmdPath,
+      existsSync: (candidate: string | Buffer) => String(candidate) === npmCmdPath,
       npmArgs: ["install", "--omit=dev"],
       platform: "win32",
     });
@@ -93,7 +93,7 @@ describe("resolveNpmRunner", () => {
       comSpec: "C:\\Windows\\System32\\cmd.exe",
       execPath,
       env: {},
-      existsSync: (candidate) => candidate === npmCmdPath,
+      existsSync: (candidate: string | Buffer) => String(candidate) === npmCmdPath,
       npmArgs: ["install", "@slack/bolt@^4.6.0"],
       platform: "win32",
     });

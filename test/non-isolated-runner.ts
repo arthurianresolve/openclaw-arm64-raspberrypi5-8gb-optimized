@@ -61,11 +61,11 @@ function restoreSharedTestHomeAfterEnvUnstub(testHomeRaw: string | undefined): v
 }
 
 export default class OpenClawNonIsolatedRunner extends TestRunner {
-  override onCollectStart(file: { filepath: string }) {
+  override onCollectStart(file: Parameters<TestRunner["onCollectStart"]>[0]) {
     super.onCollectStart(file);
     restoreSharedTestHomeAfterEnvUnstub(getSharedTestHome());
     const orderLogPath = process.env.OPENCLAW_VITEST_FILE_ORDER_LOG?.trim();
-    if (orderLogPath) {
+    if (orderLogPath && "filepath" in file && typeof file.filepath === "string") {
       fs.appendFileSync(orderLogPath, `START ${file.filepath}\n`);
     }
   }
@@ -94,7 +94,13 @@ export default class OpenClawNonIsolatedRunner extends TestRunner {
     restoreSharedTestHomeAfterEnvUnstub(testHome);
     vi.clearAllMocks();
     vi.resetModules();
-    this.moduleRunner?.mocker?.reset?.();
-    resetEvaluatedModules(this.workerState.evaluatedModules as EvaluatedModules, true);
+    const runnerState = this as any as {
+      moduleRunner?: { mocker?: { reset?: () => void } };
+      workerState?: { evaluatedModules?: EvaluatedModules };
+    };
+    runnerState.moduleRunner?.mocker?.reset?.();
+    if (runnerState.workerState?.evaluatedModules) {
+      resetEvaluatedModules(runnerState.workerState.evaluatedModules, true);
+    }
   }
 }

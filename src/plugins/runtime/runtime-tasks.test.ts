@@ -72,6 +72,7 @@ describe("runtime tasks", () => {
           ownerKey: "agent:main:main",
           goal: "Review inbox",
           currentStep: "triage",
+          priority: "normal",
         }),
       ]),
     );
@@ -80,6 +81,7 @@ describe("runtime tasks", () => {
       ownerKey: "agent:main:main",
       goal: "Review inbox",
       currentStep: "triage",
+      priority: "normal",
       state: { lane: "priority" },
       taskSummary: {
         total: 1,
@@ -131,6 +133,209 @@ describe("runtime tasks", () => {
     expect(taskDetail).not.toHaveProperty("taskId");
     expect(taskDetail).not.toHaveProperty("requesterSessionKey");
     expect(taskDetail).not.toHaveProperty("scopeKind");
+  });
+
+  it("exposes verification and repair metadata in TaskFlow DTOs", () => {
+    const legacyTaskFlow = createRuntimeTaskFlow().bindSession({
+      sessionKey: "agent:main:main",
+    });
+    const taskFlows = createRuntimeTaskFlows().bindSession({
+      sessionKey: "agent:main:main",
+    });
+
+    const created = legacyTaskFlow.createManaged({
+      controllerId: "tests/runtime-tasks",
+      goal: "Repair failing verification",
+      currentStep: "verification_repair",
+      stateJson: {
+        verification: {
+          latestTaskId: "task-parent",
+          status: "failed",
+          failMode: "stop",
+          verifiedAt: 123,
+          summary: "Verification failed: pnpm tsc --noEmit (exit 2).",
+          commands: [
+            {
+              command: "pnpm tsc --noEmit",
+              passed: false,
+              exitCode: 2,
+              durationMs: 25,
+            },
+          ],
+          remainingRepairBudget: 1,
+          repairTaskId: "task-repair",
+          repairAttemptCount: 2,
+          repairSuccessCount: 1,
+          repairFailureCount: 1,
+          history: [
+            {
+              taskId: "task-parent",
+              status: "failed",
+              failMode: "stop",
+              verifiedAt: 123,
+              summary: "Verification failed: pnpm tsc --noEmit (exit 2).",
+              commands: [
+                {
+                  command: "pnpm tsc --noEmit",
+                  passed: false,
+                  exitCode: 2,
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+
+    expect(taskFlows.list()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: created.flowId,
+          currentStep: "verification_repair",
+          priority: "repair",
+          requiresRepair: true,
+          verification: expect.objectContaining({
+            status: "failed",
+            summary: "Verification failed: pnpm tsc --noEmit (exit 2).",
+            remainingRepairBudget: 1,
+            repairTaskId: "task-repair",
+          }),
+        }),
+      ]),
+    );
+    expect(taskFlows.get(created.flowId)).toMatchObject({
+      id: created.flowId,
+      currentStep: "verification_repair",
+      priority: "repair",
+      requiresRepair: true,
+      verification: {
+        latestTaskId: "task-parent",
+        status: "failed",
+        failMode: "stop",
+        verifiedAt: 123,
+        summary: "Verification failed: pnpm tsc --noEmit (exit 2).",
+        commands: [
+          {
+            command: "pnpm tsc --noEmit",
+            passed: false,
+            exitCode: 2,
+            durationMs: 25,
+          },
+        ],
+        remainingRepairBudget: 1,
+        repairTaskId: "task-repair",
+        repairAttemptCount: 2,
+        repairSuccessCount: 1,
+        repairFailureCount: 1,
+        history: [
+          {
+            taskId: "task-parent",
+            status: "failed",
+            failMode: "stop",
+            verifiedAt: 123,
+            summary: "Verification failed: pnpm tsc --noEmit (exit 2).",
+            commands: [
+              {
+                command: "pnpm tsc --noEmit",
+                passed: false,
+                exitCode: 2,
+              },
+            ],
+          },
+        ],
+      },
+    });
+  });
+
+  it("prioritizes repair flows in list and latest lookups", () => {
+    const legacyTaskFlow = createRuntimeTaskFlow().bindSession({
+      sessionKey: "agent:main:main",
+    });
+    const taskFlows = createRuntimeTaskFlows().bindSession({
+      sessionKey: "agent:main:main",
+    });
+
+    const generic = legacyTaskFlow.createManaged({
+      controllerId: "tests/runtime-tasks",
+      goal: "Generic queued work",
+      createdAt: 200,
+      updatedAt: 200,
+    });
+    const repair = legacyTaskFlow.createManaged({
+      controllerId: "tests/runtime-tasks",
+      goal: "Repair failing verification",
+      currentStep: "verification_repair",
+      createdAt: 100,
+      updatedAt: 100,
+      stateJson: {
+        verification: {
+          status: "failed",
+          failMode: "stop",
+          summary: "Verification failed.",
+        },
+      },
+    });
+
+    expect(taskFlows.list().map((flow) => flow.id)).toEqual([repair.flowId, generic.flowId]);
+    expect(taskFlows.findLatest()?.id).toBe(repair.flowId);
+    expect(taskFlows.resolve("agent:main:main")?.id).toBe(repair.flowId);
+  });
+
+  it("summarizes repair metrics for machine-facing callers", () => {
+    const legacyTaskFlow = createRuntimeTaskFlow().bindSession({
+      sessionKey: "agent:main:main",
+    });
+    const taskFlows = createRuntimeTaskFlows().bindSession({
+      sessionKey: "agent:main:main",
+    });
+
+    legacyTaskFlow.createManaged({
+      controllerId: "tests/runtime-tasks",
+      goal: "Verified flow",
+      stateJson: {
+        verification: {
+          status: "passed",
+          summary: "Verification passed.",
+          commands: [],
+          repairAttemptCount: 1,
+          repairSuccessCount: 1,
+          repairFailureCount: 0,
+        },
+      },
+    });
+    legacyTaskFlow.createManaged({
+      controllerId: "tests/runtime-tasks",
+      goal: "Repair in progress",
+      status: "running",
+      currentStep: "verification_repair",
+      stateJson: {
+        verification: {
+          status: "failed",
+          summary: "Verification failed.",
+          commands: [],
+          repairAttemptCount: 2,
+          repairSuccessCount: 1,
+          repairFailureCount: 1,
+        },
+      },
+    });
+
+    expect(taskFlows.summarize()).toEqual({
+      total: 2,
+      active: 2,
+      blocked: 0,
+      waiting: 0,
+      terminal: 0,
+      cancelRequested: 0,
+      repairPriority: 1,
+      verificationTracked: 2,
+      verificationPassed: 1,
+      verificationFailed: 1,
+      repairAttempts: 3,
+      repairSuccesses: 2,
+      repairFailures: 1,
+      repairSuccessRate: 2 / 3,
+    });
   });
 
   it("maps task cancellation results onto canonical task DTOs", async () => {

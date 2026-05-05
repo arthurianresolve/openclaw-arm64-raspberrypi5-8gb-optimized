@@ -46,7 +46,7 @@ export async function requestJsonlSocket<T>(params: {
           continue;
         }
         try {
-          const msg = JSON.parse(line) as unknown;
+          const msg = JSON.parse(line);
           const result = accept(msg);
           if (result === undefined) {
             continue;

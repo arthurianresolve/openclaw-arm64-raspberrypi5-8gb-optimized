@@ -416,7 +416,7 @@ function readClaudeCliKeychainCredentials(
       { encoding: "utf8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"] },
     );
 
-    const data = JSON.parse(result.trim());
+    const data = JSON.parse(result.trim()) as Record<string, unknown>;
     return parseClaudeCliOauthCredential(data?.claudeAiOauth);
   } catch {
     return null;
@@ -491,7 +491,7 @@ export function writeClaudeCliKeychainCredentials(
       { encoding: "utf8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"] },
     );
 
-    const existingData = JSON.parse(existingResult.trim());
+    const existingData = JSON.parse(existingResult.trim()) as Record<string, unknown>;
     const existingOauth = existingData?.claudeAiOauth;
     if (!existingOauth || typeof existingOauth !== "object") {
       return false;

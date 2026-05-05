@@ -71,6 +71,27 @@ async function runQaCoverageReport(opts: { repoRoot?: string; output?: string; j
   await runtime.runQaCoverageReportCommand(opts);
 }
 
+async function runQaPromptCorpusFetch(opts: {
+  repoRoot?: string;
+  manifest?: string;
+  cacheRoot?: string;
+  dryRun?: boolean;
+  json?: boolean;
+}) {
+  const runtime = await loadQaLabCliRuntime();
+  await runtime.runQaPromptCorpusFetchCommand(opts);
+}
+
+async function runQaPromptCorpusAnalyze(opts: {
+  repoRoot?: string;
+  manifest?: string;
+  cacheRoot?: string;
+  json?: boolean;
+}) {
+  const runtime = await loadQaLabCliRuntime();
+  await runtime.runQaPromptCorpusAnalyzeCommand(opts);
+}
+
 async function runQaCharacterEval(opts: {
   repoRoot?: string;
   outputDir?: string;
@@ -356,6 +377,48 @@ export function registerQaLabCli(program: Command) {
     .action(async (opts: { repoRoot?: string; output?: string; json?: boolean }) => {
       await runQaCoverageReport(opts);
     });
+
+  const promptCorpus = qa
+    .command("prompt-corpus")
+    .description("Manage external prompt corpora used for offline eval-only analysis");
+
+  promptCorpus
+    .command("fetch")
+    .description("Fetch the configured external prompt corpus into the ignored QA cache")
+    .option("--repo-root <path>", "Repository root to target when running from a neutral cwd")
+    .option("--manifest <path>", "Prompt corpus manifest JSON path")
+    .option("--cache-root <path>", "Override qa/.cache/external-corpora")
+    .option("--dry-run", "Resolve raw URLs and cache paths without downloading", false)
+    .option("--json", "Emit machine-readable JSON output", false)
+    .action(
+      async (opts: {
+        repoRoot?: string;
+        manifest?: string;
+        cacheRoot?: string;
+        dryRun?: boolean;
+        json?: boolean;
+      }) => {
+        await runQaPromptCorpusFetch(opts);
+      },
+    );
+
+  promptCorpus
+    .command("analyze")
+    .description("Analyze cached external prompt corpora alongside OpenClaw prompt samples")
+    .option("--repo-root <path>", "Repository root to target when running from a neutral cwd")
+    .option("--manifest <path>", "Prompt corpus manifest JSON path")
+    .option("--cache-root <path>", "Override qa/.cache/external-corpora")
+    .option("--json", "Emit machine-readable JSON output", false)
+    .action(
+      async (opts: {
+        repoRoot?: string;
+        manifest?: string;
+        cacheRoot?: string;
+        json?: boolean;
+      }) => {
+        await runQaPromptCorpusAnalyze(opts);
+      },
+    );
 
   qa.command("character-eval")
     .description("Run the character QA scenario across live models and write a judged report")

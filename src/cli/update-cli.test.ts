@@ -1492,15 +1492,18 @@ describe("update-cli", () => {
         mockPackageInstallStatus(createCaseDir("openclaw-update"));
         await updateCommand({ yes: true, tag: "main" });
       },
-      expectedSpec: "github:openclaw/openclaw#main",
+      expectedSpec: "github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master",
     },
     {
       name: "explicit git package spec",
       run: async () => {
         mockPackageInstallStatus(createCaseDir("openclaw-update"));
-        await updateCommand({ yes: true, tag: "github:openclaw/openclaw#main" });
+        await updateCommand({
+          yes: true,
+          tag: "github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master",
+        });
       },
-      expectedSpec: "github:openclaw/openclaw#main",
+      expectedSpec: "github:arthurianresolve/openclaw-arm64-raspberrypi5-8gb-optimized#master",
     },
     {
       name: "OPENCLAW_UPDATE_PACKAGE_SPEC override",
@@ -2480,8 +2483,8 @@ describe("update-cli", () => {
         makeOkUpdateResult({
           mode: "npm",
           root: updatedRoot,
-          before: { version: "2026.4.23" },
-          after: { version: "2026.4.24" },
+          before: { version: "2026.4.24" },
+          after: { version: "2026.4.25" },
         }),
     });
     prepareRestartScript.mockResolvedValue(null);
@@ -2519,9 +2522,13 @@ describe("update-cli", () => {
         .mocked(defaultRuntime.error)
         .mock.calls.map((call) => String(call[0]))
         .join("\n"),
-    ).toContain(
-      "Gateway version mismatch: expected 2026.4.24, running gateway reported 2026.4.23.",
-    );
+    ).toContain("Gateway did not become healthy after restart.");
+    expect(
+      vi
+        .mocked(defaultRuntime.error)
+        .mock.calls.map((call) => String(call[0]))
+        .join("\n"),
+    ).toContain("Gateway version mismatch: expected 2026.4.25");
     expect(doctorCommand).not.toHaveBeenCalled();
   });
 
@@ -2534,17 +2541,17 @@ describe("update-cli", () => {
         makeOkUpdateResult({
           mode: "npm",
           root: updatedRoot,
-          before: { version: "2026.4.23" },
-          after: { version: "2026.4.24" },
+          before: { version: "2026.4.25" },
+          after: { version: "2026.4.26" },
         }),
     });
-    readPackageVersion.mockResolvedValue("2026.4.24");
+    readPackageVersion.mockResolvedValue("2026.4.26");
     serviceLoaded.mockResolvedValue(true);
     probeGateway.mockResolvedValue({
       ok: true,
       close: null,
       server: {
-        version: "2026.4.24",
+        version: "2026.4.26",
         connId: "updated-gateway",
       },
       auth: { role: "operator", scopes: ["operator.read"], capability: "read_only" },
@@ -2817,10 +2824,10 @@ describe("update-cli", () => {
     });
   });
 
-  it("uses ~/openclaw as the default dev checkout directory", async () => {
+  it("uses ~/excaliclaw as the default dev checkout directory", async () => {
     const homedirSpy = vi.spyOn(os, "homedir").mockReturnValue("/tmp/oc-home");
     await withEnvAsync({ OPENCLAW_GIT_DIR: undefined }, async () => {
-      expect(resolveGitInstallDir()).toBe(path.posix.join("/tmp/oc-home", "openclaw"));
+      expect(resolveGitInstallDir()).toBe(path.posix.join("/tmp/oc-home", "excaliclaw"));
     });
     homedirSpy.mockRestore();
   });

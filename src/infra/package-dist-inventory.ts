@@ -329,7 +329,7 @@ export async function writePackageDistInventory(packageRoot: string): Promise<st
 async function readPackageDistInventory(packageRoot: string): Promise<string[]> {
   const inventoryPath = path.join(packageRoot, PACKAGE_DIST_INVENTORY_RELATIVE_PATH);
   const raw = await fs.readFile(inventoryPath, "utf8");
-  const parsed = JSON.parse(raw) as unknown;
+  const parsed = JSON.parse(raw);
   if (!Array.isArray(parsed) || parsed.some((entry) => typeof entry !== "string")) {
     throw new Error(`Invalid package dist inventory at ${PACKAGE_DIST_INVENTORY_RELATIVE_PATH}`);
   }
@@ -349,6 +349,75 @@ export async function readPackageDistInventoryIfPresent(
     }
     throw error;
   }
+}
+
+const DIST_JS_IMPORT_SPECIFIER_PATTERN =
+  /\b(?:import|export)\s+(?:(?:[^'"()]*?\s+from\s+)|)["'](?<staticSpecifier>[^"']+)["']|\bimport\s*\(\s*["'](?<dynamicSpecifier>[^"']+)["']\s*\)/gu;
+const PACKAGE_DIST_IMPORT_REFERENCE_ENTRYPOINTS = [
+  "dist/entry.js",
+  "dist/cli/run-main.js",
+  "dist/index.js",
+  "dist/index.mjs",
+] as const;
+
+function isRelativeModuleSpecifier(value: string): boolean {
+  return value.startsWith("./") || value.startsWith("../");
+}
+
+function normalizeModuleSpecifierTarget(value: string): string {
+  return value.split(/[?#]/u, 1)[0] ?? value;
+}
+
+function resolveDistImportTarget(importer: string, specifier: string, actualFiles: Set<string>) {
+  const normalizedSpecifier = normalizeModuleSpecifierTarget(specifier);
+  const base = normalizeRelativePath(
+    path.posix.normalize(path.posix.join(path.posix.dirname(importer), normalizedSpecifier)),
+  );
+  const candidates = [
+    base,
+    `${base}.js`,
+    `${base}.mjs`,
+    `${base}.cjs`,
+    `${base}/index.js`,
+    `${base}/index.mjs`,
+    `${base}/index.cjs`,
+  ];
+  return candidates.find((candidate) => actualFiles.has(candidate)) ?? null;
+}
+
+export async function collectPackageDistImportReferenceErrors(
+  packageRoot: string,
+): Promise<string[]> {
+  const actualFiles = new Set(await collectPackageDistInventory(packageRoot));
+  const jsFiles = PACKAGE_DIST_IMPORT_REFERENCE_ENTRYPOINTS.filter((relativePath) =>
+    actualFiles.has(relativePath),
+  );
+  const errors: string[] = [];
+
+  await Promise.all(
+    jsFiles.map(async (relativePath) => {
+      let source: string;
+      try {
+        source = await fs.readFile(path.join(packageRoot, relativePath), "utf8");
+      } catch {
+        errors.push(`unable to read packaged dist file ${relativePath}`);
+        return;
+      }
+
+      for (const match of source.matchAll(DIST_JS_IMPORT_SPECIFIER_PATTERN)) {
+        const specifier = match.groups?.staticSpecifier ?? match.groups?.dynamicSpecifier ?? "";
+        if (!isRelativeModuleSpecifier(specifier)) {
+          continue;
+        }
+        if (resolveDistImportTarget(relativePath, specifier, actualFiles)) {
+          continue;
+        }
+        errors.push(`missing packaged dist import target ${specifier} from ${relativePath}`);
+      }
+    }),
+  );
+
+  return errors.toSorted((left, right) => left.localeCompare(right));
 }
 
 export async function collectPackageDistInventoryErrors(packageRoot: string): Promise<string[]> {

@@ -37,7 +37,7 @@ export function readBundleJsonObject(params: {
     return params.onOpenFailure?.(opened) ?? { ok: true, raw: {} };
   }
   try {
-    const raw = JSON.parse(fs.readFileSync(opened.fd, "utf-8")) as unknown;
+    const raw = JSON.parse(fs.readFileSync(opened.fd, "utf-8"));
     if (!isRecord(raw)) {
       return { ok: false, error: `${params.relativePath} must contain a JSON object` };
     }

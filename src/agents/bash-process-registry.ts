@@ -8,6 +8,50 @@ const MIN_JOB_TTL_MS = 60 * 1000; // 1 minute
 const MAX_JOB_TTL_MS = 3 * 60 * 60 * 1000; // 3 hours
 const DEFAULT_PENDING_OUTPUT_CHARS = 30_000;
 
+function currentLineStart(text: string, cursor: number): number {
+  return text.lastIndexOf("\n", Math.max(0, cursor - 1)) + 1;
+}
+
+function currentLineEnd(text: string, cursor: number): number {
+  const nextNewline = text.indexOf("\n", cursor);
+  return nextNewline === -1 ? text.length : nextNewline;
+}
+
+function applyCarriageReturnSemantics(base: string, chunk: string): string {
+  if (!chunk.includes("\r")) {
+    return base + chunk;
+  }
+
+  let text = base;
+  let cursor = text.length;
+  for (const char of chunk) {
+    if (char === "\r") {
+      cursor = currentLineStart(text, cursor);
+      continue;
+    }
+    if (char === "\n") {
+      const lineEnd = currentLineEnd(text, cursor);
+      if (lineEnd === text.length) {
+        text += "\n";
+        cursor = text.length;
+      } else {
+        cursor = lineEnd + 1;
+      }
+      continue;
+    }
+
+    if (cursor >= text.length) {
+      text += char;
+      cursor = text.length;
+      continue;
+    }
+
+    text = `${text.slice(0, cursor)}${char}${text.slice(cursor + 1)}`;
+    cursor += 1;
+  }
+  return text;
+}
+
 function clampTtl(value: number | undefined) {
   if (!value || Number.isNaN(value)) {
     return DEFAULT_JOB_TTL_MS;
@@ -114,26 +158,27 @@ export function appendOutput(session: ProcessSession, stream: "stdout" | "stderr
   session.pendingStdoutChars ??= sumPendingChars(session.pendingStdout);
   session.pendingStderrChars ??= sumPendingChars(session.pendingStderr);
   const buffer = stream === "stdout" ? session.pendingStdout : session.pendingStderr;
-  const bufferChars = stream === "stdout" ? session.pendingStdoutChars : session.pendingStderrChars;
   const pendingCap = Math.min(
     session.pendingMaxOutputChars ?? DEFAULT_PENDING_OUTPUT_CHARS,
     session.maxOutputChars,
   );
-  buffer.push(chunk);
-  let pendingChars = bufferChars + chunk.length;
-  if (pendingChars > pendingCap) {
-    session.truncated = true;
-    pendingChars = capPendingBuffer(buffer, pendingChars, pendingCap);
+  const nextPending = applyCarriageReturnSemantics(buffer.join(""), chunk);
+  const cappedPending = trimWithCap(nextPending, pendingCap);
+  session.truncated = session.truncated || cappedPending.length < nextPending.length;
+  buffer.length = 0;
+  if (cappedPending.length > 0) {
+    buffer.push(cappedPending);
   }
+  const pendingChars = cappedPending.length;
   if (stream === "stdout") {
     session.pendingStdoutChars = pendingChars;
   } else {
     session.pendingStderrChars = pendingChars;
   }
   session.totalOutputChars += chunk.length;
-  const aggregated = trimWithCap(session.aggregated + chunk, session.maxOutputChars);
-  session.truncated =
-    session.truncated || aggregated.length < session.aggregated.length + chunk.length;
+  const nextAggregated = applyCarriageReturnSemantics(session.aggregated, chunk);
+  const aggregated = trimWithCap(nextAggregated, session.maxOutputChars);
+  session.truncated = session.truncated || aggregated.length < nextAggregated.length;
   session.aggregated = aggregated;
   session.tail = tail(session.aggregated, 2000);
 }
@@ -235,28 +280,6 @@ function sumPendingChars(buffer: string[]) {
     total += chunk.length;
   }
   return total;
-}
-
-function capPendingBuffer(buffer: string[], pendingChars: number, cap: number) {
-  if (pendingChars <= cap) {
-    return pendingChars;
-  }
-  const last = buffer.at(-1);
-  if (last && last.length >= cap) {
-    buffer.length = 0;
-    buffer.push(last.slice(last.length - cap));
-    return cap;
-  }
-  while (buffer.length && pendingChars - buffer[0].length >= cap) {
-    pendingChars -= buffer[0].length;
-    buffer.shift();
-  }
-  if (buffer.length && pendingChars > cap) {
-    const overflow = pendingChars - cap;
-    buffer[0] = buffer[0].slice(overflow);
-    pendingChars = cap;
-  }
-  return pendingChars;
 }
 
 export function trimWithCap(text: string, max: number) {

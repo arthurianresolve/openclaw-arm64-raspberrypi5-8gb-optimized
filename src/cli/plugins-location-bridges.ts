@@ -43,6 +43,7 @@ function buildBridgeFromPersistedBundledRecord(
       officialInstall?.defaultChoice === "clawhub" && clawhubSpec ? "clawhub" : "npm",
     ...(npmSpec ? { npmSpec } : {}),
     ...(clawhubSpec ? { clawhubSpec } : {}),
+    ...(record.packageVersion ? { packageVersion: record.packageVersion } : {}),
     ...(record.enabledByDefault ? { enabledByDefault: true } : {}),
     ...(channelIds.length ? { channelIds } : {}),
   };

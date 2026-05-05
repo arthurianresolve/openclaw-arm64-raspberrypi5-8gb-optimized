@@ -9,7 +9,7 @@ import { SessionManager } from "@mariozechner/pi-coding-agent";
 import {
   queueRuntimeContextForNextTurn,
   resolveRuntimeContextPromptParts,
-} from "../../dist/agents/pi-embedded-runner/run/runtime-context-prompt.js";
+} from "./dist-modules.mjs";
 
 type TranscriptEntry = {
   type?: string;
@@ -77,7 +77,10 @@ async function verifyRuntimeContextTranscriptShape(root: string) {
   await queueRuntimeContextForNextTurn({
     runtimeContext: promptSubmission.runtimeContext,
     session: {
-      sendCustomMessage: async (message, options) => {
+      sendCustomMessage: async (
+        message: { customType: string; content: string; display: boolean; details?: unknown },
+        options?: { deliverAs?: string },
+      ) => {
         assert(options?.deliverAs === "nextTurn", "runtime context was not queued for next turn");
         sessionManager.appendCustomMessageEntry(
           message.customType,
@@ -95,7 +98,19 @@ async function verifyRuntimeContextTranscriptShape(root: string) {
   });
   sessionManager.appendMessage({
     role: "assistant",
-    content: "done",
+    content: [{ type: "text", text: "done" }],
+    api: "openai-codex-responses",
+    provider: "openai-codex",
+    model: "gpt-5.4-codex",
+    usage: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
+    stopReason: "stop",
     timestamp: Date.now() + 1,
   });
 

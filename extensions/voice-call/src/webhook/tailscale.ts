@@ -53,7 +53,9 @@ export async function getTailscaleSelfInfo(): Promise<TailscaleSelfInfo | null> 
   }
 
   try {
-    const status = JSON.parse(stdout);
+    const status = JSON.parse(stdout) as {
+      Self?: { DNSName?: string; ID?: string };
+    };
     return {
       dnsName: status.Self?.DNSName?.replace(/\.$/, "") || null,
       nodeId: status.Self?.ID || null,

@@ -41,14 +41,16 @@ const DEFAULT_VAPID_SUBJECT = "mailto:openclaw@localhost";
 const withLock = createAsyncLock();
 
 type WebPushRuntime = typeof import("web-push");
-type WebPushRuntimeModule = WebPushRuntime & { default?: WebPushRuntime };
 
 let webPushRuntimePromise: Promise<WebPushRuntime> | undefined;
 
 async function loadWebPushRuntime(): Promise<WebPushRuntime> {
-  webPushRuntimePromise ??= import("web-push").then(
-    (mod: WebPushRuntimeModule) => mod.default ?? mod,
-  );
+  webPushRuntimePromise ??= import("web-push").then((mod): WebPushRuntime => {
+    if ("default" in mod && mod.default) {
+      return mod.default as WebPushRuntime;
+    }
+    return mod;
+  });
   return await webPushRuntimePromise;
 }
 

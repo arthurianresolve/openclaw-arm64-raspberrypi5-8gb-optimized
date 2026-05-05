@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { createArgReader, createGatewayWsClient, resolveGatewayUrl } from "./gateway-ws-client.ts";
 
 function writeStdoutLine(message = ""): void {

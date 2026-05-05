@@ -182,7 +182,7 @@ function loadBundleFileBackedMcpConfig(params: {
     if (!stat.isFile()) {
       return { mcpServers: {} };
     }
-    const raw = JSON.parse(fs.readFileSync(opened.fd, "utf-8")) as unknown;
+    const raw = JSON.parse(fs.readFileSync(opened.fd, "utf-8"));
     const servers = extractMcpServerMap(raw);
     const baseDir = normalizeBundlePath(path.dirname(absolutePath));
     return {

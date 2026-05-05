@@ -120,6 +120,17 @@ function isTmpCompileCachePath(cachePath: string): boolean {
   );
 }
 
+function isDataBackedPath(targetPath: string): boolean {
+  const normalized = targetPath.trim().replace(/\/+$/, "");
+  return normalized === "/data" || normalized.startsWith("/data/");
+}
+
+function isHomeBackedPath(targetPath: string, homeDir: string): boolean {
+  const normalizedPath = targetPath.trim().replace(/\/+$/, "");
+  const normalizedHome = homeDir.trim().replace(/\/+$/, "");
+  return normalizedPath === normalizedHome || normalizedPath.startsWith(`${normalizedHome}/`);
+}
+
 export function noteStartupOptimizationHints(
   env: NodeJS.ProcessEnv = process.env,
   deps?: {
@@ -147,6 +158,8 @@ export function noteStartupOptimizationHints(
   const compileCache = normalizeOptionalString(env.NODE_COMPILE_CACHE) ?? "";
   const disableCompileCache = normalizeOptionalString(env.NODE_DISABLE_COMPILE_CACHE) ?? "";
   const noRespawn = normalizeOptionalString(env.OPENCLAW_NO_RESPAWN) ?? "";
+  const qmdWrapperHome = normalizeOptionalString(env.QMD_WRAPPER_HOME) ?? "";
+  const homeDir = normalizeOptionalString(env.HOME) ?? resolveHomeDir();
   const lines: string[] = [];
 
   if (!compileCache) {
@@ -169,6 +182,21 @@ export function noteStartupOptimizationHints(
     );
   }
 
+  const suggestDataBackedPiPaths =
+    isArmHost &&
+    ((compileCache.length > 0 &&
+      isHomeBackedPath(compileCache, homeDir) &&
+      !isDataBackedPath(compileCache)) ||
+      (qmdWrapperHome.length > 0 &&
+        isHomeBackedPath(qmdWrapperHome, homeDir) &&
+        !isDataBackedPath(qmdWrapperHome)));
+
+  if (suggestDataBackedPiPaths) {
+    lines.push(
+      "- ARM64 hosts booting from SSD/NVMe can reduce SD-card I/O bottlenecks by moving OpenClaw cache/QMD state under /data/openclaw.",
+    );
+  }
+
   if (lines.length === 0) {
     return;
   }
@@ -178,6 +206,9 @@ export function noteStartupOptimizationHints(
     "  export NODE_COMPILE_CACHE=/var/tmp/openclaw-compile-cache",
     "  mkdir -p /var/tmp/openclaw-compile-cache",
     "  export OPENCLAW_NO_RESPAWN=1",
+    suggestDataBackedPiPaths
+      ? "  ./scripts/setup-raspberry-pi-system.sh --enable-qmd-service --enable-linger"
+      : undefined,
     isTruthyEnvValue(disableCompileCache) ? "  unset NODE_DISABLE_COMPILE_CACHE" : undefined,
   ].filter((line): line is string => Boolean(line));
 

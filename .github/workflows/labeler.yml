@@ -33,13 +33,13 @@ jobs:
     if: ${{ github.event_name != 'pull_request_target' || github.event.pull_request.user.login != 'dependabot[bot]' }}
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/create-github-app-token@v3
+      - uses: actions/create-github-app-token@v3.1.1
         id: app-token
         continue-on-error: true
         with:
           app-id: "2729701"
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
-      - uses: actions/create-github-app-token@v3
+      - uses: actions/create-github-app-token@v3.1.1
         id: app-token-fallback
         if: steps.app-token.outcome == 'failure'
         with:
@@ -467,13 +467,13 @@ jobs:
       pull-requests: write
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/create-github-app-token@v3
+      - uses: actions/create-github-app-token@v3.1.1
         id: app-token
         continue-on-error: true
         with:
           app-id: "2729701"
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
-      - uses: actions/create-github-app-token@v3
+      - uses: actions/create-github-app-token@v3.1.1
         id: app-token-fallback
         if: steps.app-token.outcome == 'failure'
         with:
@@ -766,13 +766,13 @@ jobs:
     if: github.event_name == 'issues'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/create-github-app-token@v3
+      - uses: actions/create-github-app-token@v3.1.1
         id: app-token
         continue-on-error: true
         with:
           app-id: "2729701"
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
-      - uses: actions/create-github-app-token@v3
+      - uses: actions/create-github-app-token@v3.1.1
         id: app-token-fallback
         if: steps.app-token.outcome == 'failure'
         with:

@@ -119,7 +119,7 @@ jobs:
           fi
 
       - name: Checkout trusted workflow helper
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           persist-credentials: false
           ref: ${{ github.ref_name }}
@@ -140,7 +140,7 @@ jobs:
 
       - name: Checkout selected ref for reachability fallback
         if: steps.fast_ref.outputs.fallback == 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           persist-credentials: false
           ref: ${{ inputs.ref }}
@@ -325,7 +325,7 @@ jobs:
       source_sha: ${{ steps.package.outputs.source_sha }}
     steps:
       - name: Checkout trusted workflow ref
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           persist-credentials: false
           ref: ${{ github.ref_name }}
@@ -599,7 +599,7 @@ jobs:
       OPENCLAW_ENABLE_PRIVATE_QA_CLI: "1"
     steps:
       - name: Checkout selected ref
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           persist-credentials: false
           ref: ${{ needs.resolve_target.outputs.revision }}
@@ -668,7 +668,7 @@ jobs:
       OPENCLAW_ENABLE_PRIVATE_QA_CLI: "1"
     steps:
       - name: Checkout selected ref
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           persist-credentials: false
           ref: ${{ needs.resolve_target.outputs.revision }}
@@ -725,7 +725,7 @@ jobs:
       OPENCLAW_ENABLE_PRIVATE_QA_CLI: "1"
     steps:
       - name: Checkout selected ref
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           persist-credentials: false
           ref: ${{ needs.resolve_target.outputs.revision }}
@@ -802,7 +802,7 @@ jobs:
       OPENCLAW_ENABLE_PRIVATE_QA_CLI: "1"
     steps:
       - name: Checkout selected ref
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           persist-credentials: false
           ref: ${{ needs.resolve_target.outputs.revision }}
@@ -895,7 +895,7 @@ jobs:
       OPENCLAW_ENABLE_PRIVATE_QA_CLI: "1"
     steps:
       - name: Checkout selected ref
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           persist-credentials: false
           ref: ${{ needs.resolve_target.outputs.revision }}

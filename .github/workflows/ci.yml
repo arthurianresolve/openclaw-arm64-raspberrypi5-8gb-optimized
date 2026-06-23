@@ -350,7 +350,7 @@ jobs:
           python-version: "3.12"
 
       - name: Restore pre-commit cache
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: .cache/pre-commit-security-fast
           key: pre-commit-security-fast-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('.pre-commit-config.yaml') }}
@@ -530,7 +530,7 @@ jobs:
         run: pnpm ui:i18n:check
 
       - name: Cache dist build
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: |
             dist/
@@ -1544,7 +1544,7 @@ jobs:
       - name: Cache extension package boundary artifacts
         id: extension-package-boundary-cache
         if: matrix.group == 'extension-package-boundary'
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: |
             dist/plugin-sdk
@@ -1863,7 +1863,7 @@ jobs:
 
       - name: Save pnpm store cache
         if: steps.pnpm-cache.outputs.cache-enabled == 'true' && steps.pnpm-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v5.0.5
         continue-on-error: true
         with:
           path: ${{ steps.pnpm-cache.outputs.store-path }}
@@ -1960,7 +1960,7 @@ jobs:
           echo "key=$toolchain_key" >> "$GITHUB_OUTPUT"
 
       - name: Cache SwiftPM
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: ~/Library/Caches/org.swift.swiftpm
           key: ${{ runner.os }}-swiftpm-${{ hashFiles('apps/macos/Package.resolved') }}
@@ -1969,7 +1969,7 @@ jobs:
 
       - name: Cache Swift build directory
         id: swift-build-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: apps/macos/.build
           key: ${{ runner.os }}-swift-build-v2-${{ steps.swift-toolchain.outputs.key }}-${{ hashFiles('apps/macos/Package.swift', 'apps/macos/Package.resolved', 'apps/macos/Sources/**', 'apps/macos/Tests/**', 'apps/shared/OpenClawKit/Package.swift', 'apps/shared/OpenClawKit/Sources/**', 'apps/swabble/Package.swift', 'apps/swabble/Sources/**') }}
@@ -2101,7 +2101,7 @@ jobs:
             apps/android/gradle/libs.versions.toml
 
       - name: Cache Android SDK
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: ~/.android-sdk
           key: ${{ runner.os }}-android-sdk-v1-cmdline-12266719-platform-36-build-tools-36.0.0

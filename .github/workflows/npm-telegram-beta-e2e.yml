@@ -116,7 +116,7 @@ jobs:
           fetch-depth: 1
 
       - name: Set up Blacksmith Docker Builder
-        uses: useblacksmith/setup-docker-builder@722e97d12b1d06a961800dd6c05d79d951ad3c80 # v1
+        uses: useblacksmith/setup-docker-builder@5fe3b77775f1dd55595beb998036fe1f2cf47118 # v1
         with:
           max-cache-size-mb: 800000
 
